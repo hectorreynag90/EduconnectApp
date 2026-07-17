@@ -80,7 +80,8 @@ fun HomeDocenteScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(EduconnectBlue)
-                .padding(horizontal = 20.dp, vertical = 20.dp),
+                .padding(horizontal = 20.dp,
+                    vertical = 20.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
