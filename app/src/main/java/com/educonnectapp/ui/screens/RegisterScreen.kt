@@ -126,13 +126,20 @@ fun RegisterScreen(
 
         // BODY BLANCO
         Column(
-            modifier = Modifier.fillMaxWidth().background(BackgroundWhite)
-                .padding(horizontal = 20.dp, vertical = 20.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(BackgroundWhite)
+                .padding(horizontal = 20.dp,
+                    vertical = 20.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             // SELECTOR ROL
-            Row(modifier = Modifier.fillMaxWidth().padding(4.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
                 Button(
                     onClick = { rolSeleccionado = "Docente" },
                     modifier = Modifier.weight(1f),
@@ -204,8 +211,13 @@ fun RegisterScreen(
 
                 //DNI
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(text = "DNI", fontFamily = Roboto, fontWeight = FontWeight.Bold,
-                        fontSize = 13.sp, color = TextBlue, letterSpacing = 1.sp)
+                    Text(text = "DNI",
+                        fontFamily = Roboto,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp,
+                        color = TextBlue,
+                        letterSpacing = 1.sp
+                    )
                     Spacer(modifier = Modifier.height(4.dp))
 
                     OutlinedTextField(
@@ -215,7 +227,9 @@ fun RegisterScreen(
                             Text(
                                 text = "00000000",
                                 color = TextSecondary,
-                                fontSize = 14.sp, fontFamily = Roboto)},
+                                fontSize = 14.sp,
+                                fontFamily = Roboto
+                            )},
                         leadingIcon = {
                                 Image(painter = painterResource(id = R.drawable.dni_darkgray),
                                     contentDescription = null,
@@ -255,8 +269,11 @@ fun RegisterScreen(
                                 fontSize = 14.sp,
                                 fontFamily = Roboto)},
                         leadingIcon = {
-                            Image(painter = painterResource(id = R.drawable.phone_darkgray),
-                            contentDescription = null, modifier = Modifier.size(22.dp))},
+                            Image(
+                                painter = painterResource(id = R.drawable.phone_darkgray),
+                                contentDescription = null,
+                                modifier = Modifier.size(22.dp)
+                            )},
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                         shape = RoundedCornerShape(10.dp),
                         colors = OutlinedTextFieldDefaults.colors(
@@ -265,7 +282,8 @@ fun RegisterScreen(
                             focusedTextColor = TextPrimary,
                             unfocusedTextColor = TextPrimary,
                             cursorColor = EduconnectBlue),
-                        modifier = Modifier.fillMaxWidth().height(50.dp), singleLine = true
+                        modifier = Modifier.fillMaxWidth().height(50.dp),
+                        singleLine = true
                     )
                 }
             }
@@ -281,13 +299,18 @@ fun RegisterScreen(
             OutlinedTextField(
                 value = email, onValueChange = { email = it },
                 placeholder = {
-                    Text(text = "Ingrese correo",
+                    Text(
+                        text = "Ingrese correo",
                         color = TextSecondary,
                         fontSize = 14.sp,
-                        fontFamily = Roboto) },
+                        fontFamily = Roboto
+                    ) },
                 leadingIcon = {
-                    Image(painter = painterResource(id = R.drawable.mail_darkgray),
-                    contentDescription = null, modifier = Modifier.size(25.dp)) },
+                    Image(
+                        painter = painterResource(id = R.drawable.mail_darkgray),
+                        contentDescription = null,
+                        modifier = Modifier.size(25.dp)
+                    )},
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                 shape = RoundedCornerShape(10.dp),
                 colors = OutlinedTextFieldDefaults.colors(
@@ -314,16 +337,20 @@ fun RegisterScreen(
                         text = "Mínimo 8 caracteres",
                         color = TextSecondary,
                         fontSize = 14.sp,
-                        fontFamily = Roboto)},
+                        fontFamily = Roboto
+                    )},
                 leadingIcon = {
                     Image(painter = painterResource(id = R.drawable.closed_darkgray),
                     contentDescription = null, modifier = Modifier.size(25.dp)) },
                 trailingIcon = {
                     IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                        Image(painter = painterResource(
+                        Image(
+                            painter = painterResource(
                             id = if (passwordVisible) R.drawable.eye_darkgray
                             else R.drawable.eyeoff_darkgray),
-                            contentDescription = null, modifier = Modifier.size(25.dp))
+                            contentDescription = null,
+                            modifier = Modifier.size(25.dp)
+                        )
                     }
                 },
                 visualTransformation = if (passwordVisible) VisualTransformation.None
@@ -345,8 +372,11 @@ fun RegisterScreen(
                 .padding(12.dp),
                 horizontalArrangement = Arrangement.spacedBy(5.dp),
                 verticalAlignment = Alignment.Top) {
-                Image(painter = painterResource(id = R.drawable.alerta_darkgray),
-                    contentDescription = null, modifier = Modifier.size(20.dp))
+                Image(
+                    painter = painterResource(id = R.drawable.alerta_darkgray),
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp)
+                )
                 Text(
                     text = if (rolSeleccionado == "Docente")
                         "Podrás asignar grado, sección y curso desde tu perfil."
