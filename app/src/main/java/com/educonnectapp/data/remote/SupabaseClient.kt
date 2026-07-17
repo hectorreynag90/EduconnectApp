@@ -76,7 +76,7 @@ fun obtenerUsuarioActualId(): String? {
     return supabase.auth.currentUserOrNull()?.id
 }
 
-// ==================== DATA CLASSES ALUMNOS ====================
+// DATA CLASSES ALUMNOS
 
 @Serializable
 data class AlumnoRow(
@@ -118,13 +118,20 @@ suspend fun obtenerAlumnoPorId(alumnoId: Long): AlumnoRow? {
         .firstOrNull()
 }
 
-// ==================== DATA CLASSES GRADOS Y SECCIONES ====================
+// DATA CLASSES GRADOS Y SECCIONES
 
 @Serializable
-data class GradoRow(val id: Long, val nombre: String)
+data class GradoRow(
+    val id: Long,
+    val nombre: String
+)
 
 @Serializable
-data class SeccionRow(val id: Long, val nombre: String, val grado_id: Long = 0L)
+data class SeccionRow(
+    val id: Long,
+    val nombre: String,
+    val grado_id: Long = 0L
+)
 
 // GRADOS
 
@@ -569,7 +576,6 @@ suspend fun obtenerPadresSinLeer(
 }
 
 // DATA CLASSES PUBLICACIONES
-
 @Serializable
 data class PublicacionInsert(
     val docente_id: String,
