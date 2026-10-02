@@ -84,6 +84,10 @@ data class AlumnoItem(
     val apellidos: String
 )
 
+// "Apellidos, Nombres"; si el backend solo envía el nombre completo, lo muestra tal cual
+fun nombreAlumno(apellidos: String, nombres: String): String =
+    listOf(apellidos, nombres).filter { it.isNotBlank() }.joinToString(", ")
+
 @Composable
 fun RegistroAsistenciaScreen(
     docenteId: String,
@@ -587,7 +591,7 @@ fun RegistroAsistenciaScreen(
 
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "${index + 1}. ${alumno.apellidos}, ${alumno.nombres}".uppercase(),
+                                text = "${index + 1}. ${nombreAlumno(alumno.apellidos, alumno.nombres)}".uppercase(),
                                 fontFamily = Roboto,
                                 fontWeight = FontWeight.SemiBold,
                                 fontSize = 13.sp,

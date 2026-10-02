@@ -57,17 +57,8 @@ import com.educonnectapp.ui.screens.DetalleAsistencia
 
 import com.educonnectapp.data.remote.buscarAlumnoPorCodigo
 import com.educonnectapp.data.remote.obtenerAlumnosPorSeccion
-import com.educonnectapp.data.remote.obtenerAlumnoPorId
 import com.educonnectapp.data.remote.obtenerGradoPorId
 import com.educonnectapp.data.remote.obtenerSeccionPorId
-import com.educonnectapp.data.remote.AsistenciaInsert
-import com.educonnectapp.data.remote.obtenerAsistenciasDia
-import com.educonnectapp.data.remote.insertarAsistencia
-import com.educonnectapp.data.remote.insertarAsistenciasEnLote
-import com.educonnectapp.data.remote.actualizarAsistencia
-import com.educonnectapp.data.remote.obtenerAsistenciasPorAlumno
-import com.educonnectapp.data.remote.obtenerAsistenciasPorMes
-import com.educonnectapp.data.remote.obtenerDetalleAsistencia
 import com.educonnectapp.data.remote.obtenerCursoPorId
 import com.educonnectapp.data.remote.obtenerDocenteSecciones
 import com.educonnectapp.data.remote.obtenerDocenteSeccionesPorSeccion
@@ -89,8 +80,6 @@ import com.educonnectapp.ui.screens.PadreLecturaItem
 import com.educonnectapp.data.remote.obtenerLecturasComunicado
 import com.educonnectapp.data.remote.PublicacionInsert
 import com.educonnectapp.data.remote.contarNotificacionesNoLeidas
-import com.educonnectapp.data.remote.enviarNotificacionAsistencia
-import com.educonnectapp.data.remote.guardarCambios
 import com.educonnectapp.data.remote.insertarPublicacion
 import com.educonnectapp.data.remote.obtenerResumenPublicaciones
 import com.educonnectapp.ui.screens.PublicacionesScreen
@@ -105,10 +94,7 @@ import com.educonnectapp.ui.screens.DetalleAgendaScreen
 import com.educonnectapp.ui.screens.HijoAgendaItem
 import com.educonnectapp.ui.screens.PublicacionAgendaItem
 import com.educonnectapp.data.remote.marcarComunicadoLeido
-import com.educonnectapp.data.remote.obtenerAsistenciasPorDocente
 import com.educonnectapp.data.remote.obtenerComunicadosPadre
-import com.educonnectapp.data.remote.obtenerFcmTokenPorPadreId
-import com.educonnectapp.data.remote.obtenerPadreIdDeAlumno
 import com.educonnectapp.data.remote.supabase
 import com.educonnectapp.ui.screens.ComunicadosPadresScreen
 import com.educonnectapp.ui.screens.SeleccionarEstudianteComunicadoScreen
@@ -121,7 +107,6 @@ import com.educonnectapp.ui.screens.HistorialAsistenciaScreen
 import com.educonnectapp.ui.screens.HistorialItem
 import com.educonnectapp.ui.screens.DetalleAlumnoItem
 import com.educonnectapp.ui.screens.SeleccionarSeccionHistorialScreen
-import com.educonnectapp.data.remote.obtenerResumenAsistenciasDocente
 
 // Backend propio (Spring Boot)
 import com.educonnectapp.data.api.ApiException
@@ -139,6 +124,17 @@ import com.educonnectapp.data.api.obtenerCursos
 import com.educonnectapp.data.api.obtenerHijos
 import com.educonnectapp.data.api.buscarAlumno
 import com.educonnectapp.data.api.asociarHijo
+import com.educonnectapp.data.api.AsistenciaHijoResponse
+import com.educonnectapp.data.api.obtenerHojaAsistencia
+import com.educonnectapp.data.api.registrarAsistencia
+import com.educonnectapp.data.api.actualizarAsistenciaDia
+import com.educonnectapp.data.api.obtenerHistorialDocente
+import com.educonnectapp.data.api.obtenerResumenAsistenciasHoy
+import com.educonnectapp.data.api.obtenerAsistenciasHijo
+import com.educonnectapp.data.api.formatearHora
+import com.educonnectapp.data.api.formatearFechaLarga
+import com.educonnectapp.data.api.porcentajeAsistencia
+import com.educonnectapp.data.api.inicioAnioEscolar
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -175,6 +171,36 @@ private fun HijoResponse.aAlumnoEncontrado() = AlumnoEncontrado(
     id = alumnoId, nombres = nombres, apellidos = apellidos,
     gradoNombre = grado, seccionNombre = seccion, codigoEstudiante = codigoEstudiante
 )
+
+// Historial docente: 1 fila por día con sus totales (el backend ya los agrupa)
+// presentes = solo "A" (total - faltas - tardanzas), así A, T y F se muestran por separado
+// sin importar si el backend suma las tardanzas dentro de "asistieron"
+private suspend fun cargarHistorialDocente(
+    seccionId: Long, cursoId: Long, grado: String, seccion: String, curso: String
+): List<HistorialItem> =
+    obtenerHistorialDocente(seccionId, cursoId).map { dia ->
+        val r = dia.resumen
+        HistorialItem(
+            id           = dia.fecha.hashCode().toLong(),
+            curso        = curso,
+            grado        = grado,
+            seccion      = seccion,
+            fecha        = dia.fecha,
+            fechaDisplay = formatearFechaLarga(dia.fecha),
+            hora         = formatearHora(dia.hora),
+            presentes    = (r.total - r.faltas - r.tardanzas).coerceAtLeast(0).toInt(),
+            ausentes     = r.faltas.toInt(),
+            total        = r.total.toInt(),
+            tardanzas    = r.tardanzas.toInt()
+        )
+    }.sortedByDescending { it.fecha }
+
+// Detalle de un día: alumnos con asistencia registrada
+// (el backend envía nombreCompleto; se muestra completo en "nombres")
+private suspend fun cargarDetalleDia(seccionId: Long, cursoId: Long, fecha: String): List<DetalleAlumnoItem> =
+    obtenerHojaAsistencia(seccionId, cursoId, fecha).alumnos.mapNotNull { a ->
+        a.estado?.let { DetalleAlumnoItem(id = a.alumnoId, nombres = a.nombreCompleto, apellidos = "", estado = it) }
+    }
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -280,6 +306,9 @@ fun EduConnectApp() {
     // Catálogo para AGREGAR_ASIGNACION: nombre -> id ("1er Grado|A" -> seccionId)
     var seccionIdPorNombre by remember { mutableStateOf<Map<String, Long>>(emptyMap()) }
     var cursoIdPorNombre by remember { mutableStateOf<Map<String, Long>>(emptyMap()) }
+    // Asistencias
+    var fechaHojaSel by remember { mutableStateOf("") }   // fecha de la hoja cargada (servidor)
+    var asistenciasHijoSel by remember { mutableStateOf<List<AsistenciaHijoResponse>>(emptyList()) }
 
     fun aviso(mensaje: String) { Toast.makeText(context, mensaje, Toast.LENGTH_SHORT).show() }
 
@@ -310,6 +339,12 @@ fun EduConnectApp() {
     fun alumnosDeSeccion(seccionId: Long): Int =
         asignacionesApiSel.firstOrNull { it.seccionId == seccionId }?.cantidadAlumnos?.toInt() ?: 0
 
+    fun actualizarResumen(resumen: Triple<Int, Int, Int>) {
+        resumenRealizadosSel = resumen.first
+        resumenPendientesSel = resumen.second
+        resumenPorcentajeSel = resumen.third
+    }
+
     // Al cerrar sesión: borrar datos del usuario anterior (otra cuenta no debe verlos)
     fun limpiarDatosSesion() {
         usuarioLogueado = null
@@ -320,6 +355,11 @@ fun EduConnectApp() {
         errorBusquedaSel = ""
         listaAlumnosSel = emptyList()
         historialDocenteSel = emptyList()
+        detalleAlumnosSel = emptyList()
+        listaHijosSel = emptyList()
+        todasAsistenciasSel = emptyList()
+        asistenciasHijoSel = emptyList()
+        actualizarResumen(Triple(0, 0, 0))
     }
 
 
@@ -410,15 +450,12 @@ fun EduConnectApp() {
 
                 Screen.HOME_DOCENTE -> {
                     androidx.compose.runtime.LaunchedEffect(usuarioLogueado?.id) {
-                        val docenteId = usuarioLogueado?.id ?: return@LaunchedEffect
+                        if (usuarioLogueado == null) return@LaunchedEffect
                         try {
-                            // Precarga de asignaciones (backend propio)
-                            aplicarAsignaciones(obtenerAsignaciones())
-                            // Precarga resumen para AsistenciasScreen (Supabase: se migra en la Etapa 3)
-                            val (realizados, pendientes, porcentaje) = obtenerResumenAsistenciasDocente(docenteId)
-                            resumenRealizadosSel = realizados
-                            resumenPendientesSel = pendientes
-                            resumenPorcentajeSel = porcentaje
+                            // Precarga de asignaciones y resumen del día (backend propio)
+                            val asignaciones = obtenerAsignaciones()
+                            aplicarAsignaciones(asignaciones)
+                            actualizarResumen(obtenerResumenAsistenciasHoy(asignaciones))
                         } catch (e: kotlinx.coroutines.CancellationException) {
                             throw e
                         } catch (e: Exception) { /* silencioso */ }
@@ -461,14 +498,14 @@ fun EduConnectApp() {
 
                 Screen.ASISTENCIAS -> {
                     androidx.compose.runtime.LaunchedEffect(Unit) {
-                        val docenteId = usuarioLogueado?.id ?: return@LaunchedEffect
+                        if (usuarioLogueado == null) return@LaunchedEffect
                         try {
-                            val (realizados, pendientes, porcentaje) = kotlinx.coroutines.withContext(Dispatchers.IO) {
-                                obtenerResumenAsistenciasDocente(docenteId)
+                            val asignaciones = asignacionesApiSel.ifEmpty {
+                                obtenerAsignaciones().also { aplicarAsignaciones(it) }
                             }
-                            resumenRealizadosSel = realizados
-                            resumenPendientesSel = pendientes
-                            resumenPorcentajeSel = porcentaje
+                            actualizarResumen(obtenerResumenAsistenciasHoy(asignaciones))
+                        } catch (e: kotlinx.coroutines.CancellationException) {
+                            throw e
                         } catch (e: Exception) { /* silencioso */ }
                     }
                     AsistenciasScreen(
@@ -541,14 +578,17 @@ fun EduConnectApp() {
                     var asistenciaExistente by remember { mutableStateOf<Map<Long, String>>(emptyMap()) }
                     androidx.compose.runtime.LaunchedEffect(seccionIdSel, cursoIdSel) {
                         try {
-                            // Si no hay alumnos precargados, cargarlos ahora
-                            if (listaAlumnosSel.isEmpty()) {
-                                listaAlumnosSel = obtenerAlumnosPorSeccion(seccionIdSel).map { AlumnoItem(id = it.id, nombres = it.nombres, apellidos = it.apellidos) }
+                            // 1 petición: alumnos de la sección + asistencia de hoy (si ya se registró)
+                            val hoja = obtenerHojaAsistencia(seccionIdSel, cursoIdSel)
+                            fechaHojaSel = hoja.fecha
+                            listaAlumnosSel = hoja.alumnos.map {
+                                AlumnoItem(id = it.alumnoId, nombres = it.nombreCompleto, apellidos = "")
                             }
-                            val fechaHoy = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date())
-                            val docenteId = usuarioLogueado?.id ?: return@LaunchedEffect
-                            val asistencias = obtenerAsistenciasDia(cursoIdSel, docenteId, fechaHoy)
-                            asistenciaExistente = if (asistencias.isNotEmpty()) asistencias.associate { it.alumno_id to it.estado } else emptyMap()
+                            asistenciaExistente = if (hoja.yaRegistrado)
+                                hoja.alumnos.mapNotNull { a -> a.estado?.let { a.alumnoId to it } }.toMap()
+                            else emptyMap()
+                        } catch (e: kotlinx.coroutines.CancellationException) {
+                            throw e
                         } catch (e: Exception) { aviso("Error cargando alumnos: ${e.message}") }
                     }
                     RegistroAsistenciaScreen(
@@ -566,69 +606,34 @@ fun EduConnectApp() {
                         onAvisos = { currentScreen = Screen.COMUNICADOS },
                         onPerfilDocente = { currentScreen = Screen.PERFIL_DOCENTE },
                         onNotificaciones = {},
-                        onGuardado = { presentes, ausentes, tardanzas, estados, hora, fecha ->
-                            val docenteId = usuarioLogueado?.id ?: return@RegistroAsistenciaScreen
+                        onGuardado = { presentes, ausentes, tardanzas, estados, _, _ ->
                             val esActualizacion = asistenciaExistente.isNotEmpty()
-                            // Navegar inmediatamente a confirmación
-                            presentesSel = presentes
-                            ausentesSel = ausentes
-                            tardanzasSel = tardanzas
-                            currentScreen = Screen.CONFIRMACION_ASISTENCIA
-                            // Guardar asistencias y luego actualizar resumen
                             CoroutineScope(Dispatchers.Main).launch {
                                 try {
-                                    // 1) Guardar registros en IO, esperar que terminen
-                                    kotlinx.coroutines.withContext(Dispatchers.IO) {
-                                        if (esActualizacion) {
-                                            // Actualizar solo los que cambiaron
-                                            estados.forEach { (alumnoId, estado) ->
-                                                if (asistenciaExistente[alumnoId] != estado) {
-                                                    actualizarAsistencia(alumnoId, cursoIdSel, docenteId, fecha, estado)
-                                                }
-                                            }
-                                        } else {
-                                            // Insertar todos en un solo batch (1 llamada a Supabase)
-                                            val lista = estados.map { (alumnoId, estado) ->
-                                                AsistenciaInsert(
-                                                    alumno_id = alumnoId, curso_id = cursoIdSel,
-                                                    docente_id = docenteId, fecha = fecha, hora = hora, estado = estado
-                                                )
-                                            }
-                                            insertarAsistenciasEnLote(lista)
+                                    if (esActualizacion) {
+                                        // Solo los alumnos cuyo estado cambió (el backend audita y avisa al director)
+                                        val cambios = estados.filter { (id, estado) ->
+                                            estado.isNotEmpty() && asistenciaExistente[id] != estado
                                         }
-                                    }
-                                    // 2) Consultar resumen en IO DESPUÉS de que el guardado terminó
-                                    val (realizados, pendientes, porcentaje) = kotlinx.coroutines.withContext(Dispatchers.IO) {
-                                        obtenerResumenAsistenciasDocente(docenteId)
-                                    }
-                                    // 3) Actualizar estado en Main thread
-                                    resumenRealizadosSel = realizados
-                                    resumenPendientesSel = pendientes
-                                    resumenPorcentajeSel = porcentaje
-                                } catch (e: Exception) { /* silencioso */ }
-                                // 4) Notificaciones en background separado (no bloquean el resumen)
-                                CoroutineScope(Dispatchers.IO).launch {
-                                    estados.forEach { (alumnoId, estado) ->
-                                        try {
-                                            val alumno = listaAlumnosSel.find { it.id == alumnoId }
-                                            val alumnoNombre = if (alumno != null) "${alumno.nombres} ${alumno.apellidos}" else "Estudiante"
-                                            val padreId = obtenerPadreIdDeAlumno(alumnoId) ?: return@forEach
-                                            val fcmToken = obtenerFcmTokenPorPadreId(padreId)
-                                            enviarNotificacionAsistencia(
-                                                padreId = padreId,
-                                                alumnoNombre = alumnoNombre,
-                                                grado = gradoSel,
-                                                seccion = seccionSel,
-                                                curso = cursoSel,
-                                                estado = estado,
-                                                hora = hora,
-                                                fecha = fecha,
-                                                fcmToken = fcmToken,
-                                                esActualizacion = esActualizacion
+                                        if (cambios.isNotEmpty()) {
+                                            actualizarAsistenciaDia(
+                                                seccionIdSel, cursoIdSel, fechaHojaSel,
+                                                "Corrección desde el registro del día", cambios
                                             )
-                                        } catch (e: Exception) { /* silencioso */ }
+                                        }
+                                    } else {
+                                        registrarAsistencia(seccionIdSel, cursoIdSel, estados.filterValues { it.isNotEmpty() })
                                     }
-                                }
+                                    // El backend ya envió el push a los padres: solo mostrar la confirmación
+                                    presentesSel = presentes
+                                    ausentesSel = ausentes
+                                    tardanzasSel = tardanzas
+                                    currentScreen = Screen.CONFIRMACION_ASISTENCIA
+                                    // Refrescar el resumen del día
+                                    try { actualizarResumen(obtenerResumenAsistenciasHoy(asignacionesApiSel)) } catch (e: Exception) { }
+                                } catch (e: ApiException) {
+                                    aviso(if (e.codigo == 409) "La asistencia de hoy ya fue registrada" else "No se pudo guardar: ${e.message}")
+                                } catch (e: Exception) { aviso("No se pudo guardar: ${e.message}") }
                             }
                         }
                     )
@@ -643,27 +648,36 @@ fun EduConnectApp() {
                     totalAusentes = ausentesSel,
                     totalTardanzas = tardanzasSel,
                     onNuevaAsistencia = { currentScreen = Screen.HOME_DOCENTE },
-                    onVerHistorial = {},
+                    onVerHistorial = { currentScreen = Screen.SELECCIONAR_SECCION_HISTORIAL },
                     onClose = { currentScreen = Screen.HOME_DOCENTE }
                 )
 
                 Screen.SELECCIONAR_ESTUDIANTE -> {
                     androidx.compose.runtime.LaunchedEffect(usuarioLogueado?.id) {
-                        val padreId = usuarioLogueado?.id ?: return@LaunchedEffect
+                        if (usuarioLogueado == null) return@LaunchedEffect
                         try {
-                            val relaciones = obtenerHijosPadre(padreId)
-                            val fechaHoy = java.text.SimpleDateFormat("yyyy-MM", java.util.Locale.getDefault()).format(java.util.Date())
-                            val lista = mutableListOf<HijoItem>()
-                            relaciones.forEach { rel ->
-                                val alumno = buscarAlumnoPorCodigo(rel.codigo_estudiante) ?: return@forEach
-                                val grado = obtenerGradoPorId(alumno.grado_id) ?: return@forEach
-                                val seccion = obtenerSeccionPorId(alumno.seccion_id) ?: return@forEach
-                                val asistenciasMes = obtenerAsistenciasPorMes(alumno.id, fechaHoy)
-                                val presentes = asistenciasMes.count { it.estado == "A" }
-                                val total = asistenciasMes.size
-                                lista.add(HijoItem(id = alumno.id, nombres = alumno.nombres, apellidos = alumno.apellidos, gradoNombre = grado.nombre, seccionNombre = seccion.nombre, porcentajeMes = if (total > 0) (presentes * 100) / total else 0))
+                            val hijos = obtenerHijos()
+                            val hoy = java.time.LocalDate.now()
+                            val desde = hoy.withDayOfMonth(1).toString()
+                            // % de asistencia del mes de cada hijo (1 petición por hijo, en paralelo)
+                            val porcentajes = coroutineScope {
+                                hijos.map { h ->
+                                    async {
+                                        // A y T cuentan como asistencia
+                                        val asistencias = obtenerAsistenciasHijo(h.alumnoId, desde, hoy.toString()).asistencias
+                                        porcentajeAsistencia(asistencias.map { it.estado })
+                                    }
+                                }.awaitAll()
                             }
-                            listaHijosSel = lista
+                            listaHijosSel = hijos.mapIndexed { i, h ->
+                                HijoItem(
+                                    id = h.alumnoId, nombres = h.nombres, apellidos = h.apellidos,
+                                    gradoNombre = h.grado, seccionNombre = h.seccion,
+                                    porcentajeMes = porcentajes[i]
+                                )
+                            }
+                        } catch (e: kotlinx.coroutines.CancellationException) {
+                            throw e
                         } catch (e: Exception) { aviso("Error cargando estudiantes: ${e.message}") }
                     }
                     SeleccionarEstudianteScreen(
@@ -685,30 +699,30 @@ fun EduConnectApp() {
 
                 Screen.HISTORIAL_ASISTENCIAS -> {
                     androidx.compose.runtime.LaunchedEffect(alumnoIdSel) {
+                        todasAsistenciasSel = emptyList()
+                        listaCursosHistorialSel = emptyList()
                         try {
-                            // Cargar todas las asistencias del alumno
-                            val asistencias = obtenerAsistenciasPorAlumno(alumnoIdSel)
-
-                            // Cargar cursos únicos del alumno
-                            val cursoIds = asistencias.map { it.curso_id }.distinct()
-                            val cursos = cursoIds.mapNotNull { cursoId ->
-                                val c = obtenerCursoPorId(cursoId) ?: return@mapNotNull null
-                                CursoItem2(c.id, c.nombre)
-                            }
-                            listaCursosHistorialSel = cursos
-
-                            // Mapear asistencias con nombre de curso
-                            todasAsistenciasSel = asistencias.map { a ->
-                                val cursoNombre = cursos.find { it.id == a.curso_id }?.nombre ?: ""
+                            // Asistencias desde el inicio del año escolar en 1 petición
+                            // (el calendario filtra por mes en la pantalla)
+                            val hoy = java.time.LocalDate.now()
+                            val historial = obtenerAsistenciasHijo(alumnoIdSel, inicioAnioEscolar(hoy).toString(), hoy.toString())
+                            asistenciasHijoSel = historial.asistencias
+                            listaCursosHistorialSel = historial.asistencias
+                                .distinctBy { it.cursoId }
+                                .map { CursoItem2(it.cursoId, it.curso) }
+                                .sortedBy { it.nombre }
+                            todasAsistenciasSel = historial.asistencias.map { a ->
                                 AsistenciaItem(
-                                    id = a.id,
-                                    alumnoId = a.alumno_id,
-                                    cursoId = a.curso_id,
-                                    cursoNombre = cursoNombre,
+                                    id = a.asistenciaId,
+                                    alumnoId = alumnoIdSel,
+                                    cursoId = a.cursoId,
+                                    cursoNombre = a.curso,
                                     fecha = a.fecha,
                                     estado = a.estado
                                 )
                             }
+                        } catch (e: kotlinx.coroutines.CancellationException) {
+                            throw e
                         } catch (e: Exception) {
                             aviso("Error cargando historial: ${e.message}")
                         }
@@ -735,27 +749,19 @@ fun EduConnectApp() {
 
                 Screen.DETALLE_ASISTENCIA -> {
                     androidx.compose.runtime.LaunchedEffect(asistenciaIdSel) {
-                        try {
-                            val asistenciaBase = todasAsistenciasSel.find { it.id == asistenciaIdSel } ?: return@LaunchedEffect
-                            val asistencia = obtenerDetalleAsistencia(asistenciaBase.alumnoId, asistenciaBase.fecha, asistenciaBase.cursoId) ?: return@LaunchedEffect
-                            val alumno = obtenerAlumnoPorId(asistencia.alumno_id) ?: return@LaunchedEffect
-                            val grado = obtenerGradoPorId(alumno.grado_id) ?: return@LaunchedEffect
-                            val seccion = obtenerSeccionPorId(alumno.seccion_id) ?: return@LaunchedEffect
-                            val docente = obtenerUsuario(asistencia.docente_id)
-
-                            detalleAsistenciaSel = DetalleAsistencia(
-                                id = asistencia.id,
-                                fecha = asistencia.fecha,
-                                hora = asistencia.hora,
-                                estado = asistencia.estado,
-                                cursoNombre = asistenciaBase?.cursoNombre ?: "",
-                                gradoNombre = grado.nombre,
-                                seccionNombre = seccion.nombre,
-                                docenteNombre = docente.nombrecompleto
-                            )
-                        } catch (e: Exception) {
-                            aviso("Error cargando detalle: ${e.message}")
-                        }
+                        // Sin petición: el historial del hijo ya trae hora, curso y docente
+                        val a = asistenciasHijoSel.find { it.asistenciaId == asistenciaIdSel } ?: return@LaunchedEffect
+                        val hijo = listaHijosSel.find { it.id == alumnoIdSel }
+                        detalleAsistenciaSel = DetalleAsistencia(
+                            id = a.asistenciaId,
+                            fecha = a.fecha,
+                            hora = formatearHora(a.hora),
+                            estado = a.estado,
+                            cursoNombre = a.curso,
+                            gradoNombre = hijo?.gradoNombre ?: "",
+                            seccionNombre = hijo?.seccionNombre ?: "",
+                            docenteNombre = a.docente
+                        )
                     }
 
                     DetalleAsistenciaScreen(
@@ -1703,36 +1709,7 @@ fun EduConnectApp() {
                             historialDocenteSel = emptyList()
                             CoroutineScope(Dispatchers.Main).launch {
                                 try {
-                                    val docenteId = usuarioLogueado?.id ?: return@launch
-                                    val asistencias: List<com.educonnectapp.data.remote.AsistenciaHistorialRow> =
-                                        obtenerAsistenciasPorDocente(docenteId, cursoId)
-                                    val sdf    = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale("es", "PE"))
-                                    val sdfOut = java.text.SimpleDateFormat("EEEE dd 'de' MMMM yyyy", java.util.Locale("es", "PE"))
-                                    val agrupadas = asistencias.groupBy { it.fecha }
-                                    historialDocenteSel = agrupadas.map { (fechaKey, registros) ->
-                                        val presentes = registros.count { it.estado == "A" }
-                                        val tardanzas = registros.count { it.estado == "T" }
-                                        val ausentes  = registros.count { it.estado == "F" }
-                                        val total     = registros.size
-                                        val fechaDate = try { sdf.parse(fechaKey) } catch (e: Exception) { null }
-                                        val fechaDisplay = fechaDate?.let {
-                                            sdfOut.format(it).replaceFirstChar { c -> c.uppercase() }
-                                        } ?: fechaKey
-                                        val horaReg = registros.firstOrNull()?.hora ?: ""
-                                        HistorialItem(
-                                            id           = fechaKey.hashCode().toLong(),
-                                            curso        = curso,
-                                            grado        = grado,
-                                            seccion      = seccion,
-                                            fecha        = fechaKey,
-                                            fechaDisplay = fechaDisplay,
-                                            hora         = horaReg,
-                                            presentes    = presentes,
-                                            ausentes     = ausentes,
-                                            total        = total,
-                                            tardanzas    = tardanzas
-                                        )
-                                    }.sortedByDescending { it.fecha }
+                                    historialDocenteSel = cargarHistorialDocente(seccionId, cursoId, grado, seccion, curso)
                                 } catch (e: Exception) {
                                     aviso("Error cargando historial: ${e.message}")
                                 }
@@ -1746,42 +1723,10 @@ fun EduConnectApp() {
                 Screen.HISTORIAL_ASISTENCIA_DOCENTE -> {
                     androidx.compose.runtime.LaunchedEffect(cursoIdSel, seccionIdSel) {
                         if (historialDocenteSel.isNotEmpty()) return@LaunchedEffect  // ya precargado desde selección
-                        val docenteId = usuarioLogueado?.id ?: return@LaunchedEffect
                         try {
-                            val asistencias: List<com.educonnectapp.data.remote.AsistenciaHistorialRow> =
-                                obtenerAsistenciasPorDocente(docenteId, cursoIdSel)
-
-                            val sdf    = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale("es", "PE"))
-                            val sdfOut = java.text.SimpleDateFormat("EEEE dd 'de' MMMM yyyy", java.util.Locale("es", "PE"))
-
-                            val agrupadas = asistencias.groupBy { it.fecha }
-                            val lista = agrupadas.map { (fechaKey, registros) ->
-                                val presentes  = registros.count { it.estado == "A" }
-                                val tardanzas  = registros.count { it.estado == "T" }
-                                val ausentes   = registros.count { it.estado == "F" }
-                                val total      = registros.size
-                                val fechaDate = try { sdf.parse(fechaKey) } catch (e: Exception) { null }
-                                val fechaDisplay = fechaDate?.let {
-                                    sdfOut.format(it).replaceFirstChar { c -> c.uppercase() }
-                                } ?: fechaKey
-                                val horaReg = registros.firstOrNull()?.hora ?: ""
-
-                                HistorialItem(
-                                    id           = fechaKey.hashCode().toLong(),
-                                    curso        = cursoSel,
-                                    grado        = gradoSel,
-                                    seccion      = seccionSel,
-                                    fecha        = fechaKey,
-                                    fechaDisplay = fechaDisplay,
-                                    hora         = horaReg,
-                                    presentes    = presentes,
-                                    ausentes     = ausentes,
-                                    total        = total,
-                                    tardanzas    = tardanzas
-                                )
-                            }.sortedByDescending { it.fecha }
-
-                            historialDocenteSel = lista
+                            historialDocenteSel = cargarHistorialDocente(seccionIdSel, cursoIdSel, gradoSel, seccionSel, cursoSel)
+                        } catch (e: kotlinx.coroutines.CancellationException) {
+                            throw e
                         } catch (e: Exception) {
                             aviso("Error cargando historial: ${e.message}")
                         }
@@ -1807,19 +1752,12 @@ fun EduConnectApp() {
 
                 Screen.DETALLE_ASISTENCIA_DOCENTE -> {
                     androidx.compose.runtime.LaunchedEffect(historialItemSel?.fecha) {
-                        val fecha     = historialItemSel?.fecha ?: return@LaunchedEffect
-                        val docenteId = usuarioLogueado?.id     ?: return@LaunchedEffect
+                        val fecha = historialItemSel?.fecha ?: return@LaunchedEffect
                         try {
-                            val registros = obtenerAsistenciasDia(cursoIdSel, docenteId, fecha)
-                            detalleAlumnosSel = registros.mapNotNull { reg ->
-                                val alumno = obtenerAlumnoPorId(reg.alumno_id) ?: return@mapNotNull null
-                                DetalleAlumnoItem(
-                                    id        = alumno.id,
-                                    nombres   = alumno.nombres,
-                                    apellidos = alumno.apellidos,
-                                    estado    = reg.estado
-                                )
-                            }.sortedBy { it.apellidos }
+                            // 1 petición: la hoja de ese día ya trae nombre y estado de cada alumno
+                            detalleAlumnosSel = cargarDetalleDia(seccionIdSel, cursoIdSel, fecha)
+                        } catch (e: kotlinx.coroutines.CancellationException) {
+                            throw e
                         } catch (e: Exception) { aviso("Error cargando detalle: ${e.message}") }
                     }
 
@@ -1836,38 +1774,24 @@ fun EduConnectApp() {
                             onGuardarCambios = { alumnosEditados, motivo, onDone ->
                                 CoroutineScope(Dispatchers.Main).launch {
                                     try {
-                                        val docenteId = usuarioLogueado?.id ?: return@launch
-                                        guardarCambios(
-                                            alumnosOriginales = detalleAlumnosSel,
-                                            alumnosEditados   = alumnosEditados,
-                                            asistenciaId      = item.id,
-                                            docenteId         = docenteId,
-                                            docenteNombre     = usuarioLogueado?.nombrecompleto ?: "",
-                                            motivo            = motivo,
-                                            cursoId           = cursoIdSel,
-                                            fecha             = item.fecha,
-                                            gradoId           = gradoIdSel,
-                                            seccionId         = seccionIdSel,
-                                            gradoNombre       = gradoSel,
-                                            seccionNombre     = seccionSel,
-                                            cursoNombre       = cursoSel
-                                        )
-                                        // Recargar los datos actualizados
-                                        val registros = obtenerAsistenciasDia(cursoIdSel, docenteId, item.fecha)
-                                        detalleAlumnosSel = registros.mapNotNull { reg ->
-                                            val alumno = obtenerAlumnoPorId(reg.alumno_id) ?: return@mapNotNull null
-                                            DetalleAlumnoItem(
-                                                id        = alumno.id,
-                                                nombres   = alumno.nombres,
-                                                apellidos = alumno.apellidos,
-                                                estado    = reg.estado
+                                        // Solo los alumnos cuyo estado cambió
+                                        val originales = detalleAlumnosSel.associate { it.id to it.estado }
+                                        val cambios = alumnosEditados
+                                            .filter { originales[it.id] != it.estado }
+                                            .associate { it.id to it.estado }
+                                        if (cambios.isNotEmpty()) {
+                                            // El backend guarda, audita, avisa al director por correo y notifica a los padres
+                                            actualizarAsistenciaDia(
+                                                seccionIdSel, cursoIdSel, item.fecha,
+                                                motivo.ifBlank { "Corrección de asistencia" }, cambios
                                             )
-                                        }.sortedBy { it.apellidos }
-                                        onDone()
+                                        }
+                                        detalleAlumnosSel = cargarDetalleDia(seccionIdSel, cursoIdSel, item.fecha)
+                                        historialDocenteSel = emptyList()  // los totales cambiaron: recargar al volver
                                     } catch (e: Exception) {
                                         aviso("Error al guardar: ${e.message}")
-                                        onDone()
                                     }
+                                    onDone()
                                 }
                             }
                         )

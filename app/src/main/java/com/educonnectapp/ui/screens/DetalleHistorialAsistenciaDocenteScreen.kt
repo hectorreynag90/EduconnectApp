@@ -114,7 +114,8 @@ fun DetalleAsistenciaDocenteScreen(
     val presentes    = estadosActuales.count { it == "A" }
     val tardanzas    = estadosActuales.count { it == "T" }
     val faltas       = estadosActuales.count { it == "F" }
-    val porcentaje   = if (totalAlumnos > 0) presentes.toFloat() / totalAlumnos.toFloat() else 0f
+    // Asistencia del día = Presentes + Tardanzas (la tardanza cuenta como asistió)
+    val porcentaje   = if (totalAlumnos > 0) (presentes + tardanzas).toFloat() / totalAlumnos.toFloat() else 0f
 
     fun estadoTexto(e: String) = when(e) { "A" -> "Presente"; "T" -> "Tardanza"; else -> "Falta" }
 
@@ -587,14 +588,15 @@ fun DetalleAsistenciaDocenteScreen(
                                 cambiosResumen = alumnos.mapIndexedNotNull { i, a ->
                                     val nuevoEstado = estadosEditados[i]
                                     if (a.estado != nuevoEstado)
-                                        CambioResumen("${a.apellidos}, ${a.nombres}", a.estado, nuevoEstado)
+                                        CambioResumen(nombreAlumno(a.apellidos, a.nombres), a.estado, nuevoEstado)
                                     else null
                                 }
+                                val motivoIngresado = motivo   // guardar ANTES de limpiar el campo
                                 mostrarMotivo  = false
                                 modoEdicion    = false
                                 motivo         = ""
                                 mostrarCargando = true
-                                onGuardarCambios(alumnosEditados, motivo) {
+                                onGuardarCambios(alumnosEditados, motivoIngresado) {
                                     mostrarCargando  = false
                                     mostrarResultado = true
                                 }
@@ -644,7 +646,7 @@ private fun DetalleAlumnoRow(alumno: DetalleAlumnoItem) {
             modifier = Modifier.size(36.dp)
         )
         Text(
-            text = "${alumno.apellidos}, ${alumno.nombres}",
+            text = nombreAlumno(alumno.apellidos, alumno.nombres),
             fontFamily = Roboto, fontWeight = FontWeight.SemiBold,
             fontSize = 14.sp, color = TextBlue,
             modifier = Modifier.weight(1f),
@@ -690,7 +692,7 @@ private fun DetalleAlumnoRowEditable(
             modifier = Modifier.size(36.dp)
         )
         Text(
-            text = "${alumno.apellidos}, ${alumno.nombres}",
+            text = nombreAlumno(alumno.apellidos, alumno.nombres),
             fontFamily = Roboto, fontWeight = FontWeight.SemiBold,
             fontSize = 14.sp, color = TextBlue,
             modifier = Modifier.weight(1f),

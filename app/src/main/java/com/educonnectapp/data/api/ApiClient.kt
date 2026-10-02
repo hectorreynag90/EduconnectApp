@@ -1,6 +1,9 @@
 package com.educonnectapp.data.api
 
 import com.educonnectapp.BuildConfig
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -16,6 +19,7 @@ import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.POST
+import retrofit2.http.PUT
 import retrofit2.http.Path
 import retrofit2.http.Query
 import java.io.IOException
@@ -166,6 +170,36 @@ interface EduConnectApi {
 
     @DELETE("api/padre/hijos/{alumnoId}")
     suspend fun desasociarHijo(@Path("alumnoId") alumnoId: Long)
+
+    // Asistencias docente
+    @GET("api/docente/asistencias")
+    suspend fun hojaAsistencia(
+        @Query("seccionId") seccionId: Long,
+        @Query("cursoId") cursoId: Long,
+        @Query("fecha") fecha: String? = null          // null = hoy (fecha del servidor)
+    ): HojaAsistenciaResponse
+
+    @POST("api/docente/asistencias")
+    suspend fun registrarAsistencia(@Body body: RegistrarAsistenciaRequest): HojaAsistenciaResponse
+
+    @PUT("api/docente/asistencias")
+    suspend fun actualizarAsistencia(@Body body: ActualizarAsistenciaRequest): ActualizacionAsistenciaResponse
+
+    @GET("api/docente/asistencias/historial")
+    suspend fun historialAsistencia(
+        @Query("seccionId") seccionId: Long,
+        @Query("cursoId") cursoId: Long,
+        @Query("desde") desde: String? = null,
+        @Query("hasta") hasta: String? = null
+    ): List<DiaHistorialResponse>
+
+    // Asistencias padre
+    @GET("api/padre/hijos/{alumnoId}/asistencias")
+    suspend fun asistenciasHijo(
+        @Path("alumnoId") alumnoId: Long,
+        @Query("desde") desde: String? = null,
+        @Query("hasta") hasta: String? = null
+    ): HistorialHijoResponse
 }
 
 // =====================================================================
@@ -260,7 +294,7 @@ suspend fun cerrarSesion() {
 suspend fun guardarFcmToken(token: String) {
     SesionApi.fcmTokenPendiente = token
     if (SesionApi.token == null) return
-    if (token == SesionApi.fcmTokenRegistrado) return
+    if (token == SesionApi.fcmTokenRegistrado) return   // ya registrado en esta sesión
     llamar { api.registrarDispositivo(RegistrarDispositivoRequest(fcmToken = token)) }
     SesionApi.fcmTokenRegistrado = token
 }
@@ -365,3 +399,203 @@ suspend fun asociarHijo(codigo: String): HijoResponse =
     llamar { api.asociarHijo(AsociarHijoRequest(codigo.trim().uppercase())) }
 
 suspend fun desasociarHijo(alumnoId: Long) = llamar { api.desasociarHijo(alumnoId) }
+
+// =====================================================================
+// DATA CLASSES ASISTENCIAS
+// =====================================================================
+
+@Serializable
+data class ResumenConteo(
+    val total: Long = 0,
+    val asistieron: Long = 0,
+    val faltas: Long = 0,
+    val tardanzas: Long = 0
+)
+
+@Serializable
+data class AlumnoAsistenciaResponse(
+    val alumnoId: Long,
+    val codigoEstudiante: String = "",
+    val nombreCompleto: String,
+    val asistenciaId: Long? = null,
+    val estado: String? = null,      // "A", "F", "T" o null si aún no se registra
+    val hora: String? = null         // "HH:mm:ss"
+)
+
+@Serializable
+data class HojaAsistenciaResponse(
+    val seccionId: Long,
+    val cursoId: Long,
+    val fecha: String,               // "yyyy-MM-dd"
+    val yaRegistrado: Boolean = false,
+    val resumen: ResumenConteo = ResumenConteo(),
+    val alumnos: List<AlumnoAsistenciaResponse> = emptyList()
+)
+
+@Serializable
+data class EstadoAlumnoRequest(val alumnoId: Long, val estado: String)
+
+@Serializable
+data class RegistrarAsistenciaRequest(
+    val seccionId: Long,
+    val cursoId: Long,
+    val fecha: String? = null,
+    val registros: List<EstadoAlumnoRequest>
+)
+
+@Serializable
+data class ActualizarAsistenciaRequest(
+    val seccionId: Long,
+    val cursoId: Long,
+    val fecha: String,
+    val motivo: String,
+    val cambios: List<EstadoAlumnoRequest>
+)
+
+@Serializable
+data class CambioRealizadoResponse(
+    val alumnoId: Long,
+    val alumno: String = "",
+    val estadoAnterior: String = "",
+    val estadoNuevo: String = ""
+)
+
+@Serializable
+data class ActualizacionAsistenciaResponse(
+    val totalActualizados: Int = 0,
+    val cambios: List<CambioRealizadoResponse> = emptyList()
+)
+
+@Serializable
+data class DiaHistorialResponse(
+    val fecha: String,
+    val hora: String = "",
+    val resumen: ResumenConteo = ResumenConteo()
+)
+
+@Serializable
+data class AsistenciaHijoResponse(
+    val asistenciaId: Long,
+    val fecha: String,
+    val hora: String = "",
+    val estado: String,
+    val cursoId: Long,
+    val curso: String = "",
+    val docente: String = ""
+)
+
+@Serializable
+data class HistorialHijoResponse(
+    val alumnoId: Long,
+    val desde: String = "",
+    val hasta: String = "",
+    val resumen: ResumenConteo = ResumenConteo(),
+    val asistencias: List<AsistenciaHijoResponse> = emptyList()
+)
+
+// =====================================================================
+// ASISTENCIAS DOCENTE
+// (el backend envía el push a los padres, audita los cambios y avisa al director)
+// =====================================================================
+
+// Hoja del día: alumnos de la sección con su estado (si ya se registró)
+suspend fun obtenerHojaAsistencia(seccionId: Long, cursoId: Long, fecha: String? = null): HojaAsistenciaResponse =
+    llamar { api.hojaAsistencia(seccionId, cursoId, fecha) }
+
+// Registro inicial del día (todos los alumnos)
+suspend fun registrarAsistencia(seccionId: Long, cursoId: Long, estados: Map<Long, String>): HojaAsistenciaResponse =
+    llamar {
+        api.registrarAsistencia(
+            RegistrarAsistenciaRequest(
+                seccionId = seccionId,
+                cursoId = cursoId,
+                registros = estados.map { (alumnoId, estado) -> EstadoAlumnoRequest(alumnoId, estado) }
+            )
+        )
+    }
+
+// Edición de un día ya registrado (solo los alumnos que cambiaron)
+suspend fun actualizarAsistenciaDia(
+    seccionId: Long, cursoId: Long, fecha: String,
+    motivo: String, cambios: Map<Long, String>
+): ActualizacionAsistenciaResponse = llamar {
+    api.actualizarAsistencia(
+        ActualizarAsistenciaRequest(
+            seccionId = seccionId,
+            cursoId = cursoId,
+            fecha = fecha,
+            motivo = motivo.trim(),
+            cambios = cambios.map { (alumnoId, estado) -> EstadoAlumnoRequest(alumnoId, estado) }
+        )
+    )
+}
+
+// Historial resumido por día de una sección y curso
+suspend fun obtenerHistorialDocente(
+    seccionId: Long, cursoId: Long, desde: String? = null, hasta: String? = null
+): List<DiaHistorialResponse> = llamar { api.historialAsistencia(seccionId, cursoId, desde, hasta) }
+
+// Resumen del día para AsistenciasScreen: (realizados, pendientes, % asistencia)
+// 1 petición por asignación, todas en paralelo
+suspend fun obtenerResumenAsistenciasHoy(asignaciones: List<AsignacionResponse>): Triple<Int, Int, Int> {
+    if (asignaciones.isEmpty()) return Triple(0, 0, 0)
+    val hojas = coroutineScope {
+        asignaciones.map { a -> async { obtenerHojaAsistencia(a.seccionId, a.cursoId) } }.awaitAll()
+    }
+    val realizadas = hojas.filter { it.yaRegistrado }
+    // Se cuenta desde los estados de cada alumno: Presente (A) y Tardanza (T) son asistencia
+    val estados = realizadas.flatMap { h -> h.alumnos.mapNotNull { it.estado } }
+    val porcentaje = porcentajeAsistencia(estados)
+    return Triple(realizadas.size, hojas.size - realizadas.size, porcentaje)
+}
+
+// =====================================================================
+// ASISTENCIAS PADRE
+// =====================================================================
+
+suspend fun obtenerAsistenciasHijo(
+    alumnoId: Long, desde: String? = null, hasta: String? = null
+): HistorialHijoResponse = llamar { api.asistenciasHijo(alumnoId, desde, hasta) }
+
+// =====================================================================
+// REGLAS DE ASISTENCIA
+// =====================================================================
+
+// % de asistencia: Presente (A) y Tardanza (T) cuentan como asistió; solo Falta (F) resta
+fun porcentajeAsistencia(estados: List<String>): Int {
+    if (estados.isEmpty()) return 0
+    val asistio = estados.count { it == "A" || it == "T" }
+    return (asistio * 100) / estados.size
+}
+
+// Inicio del año escolar (Perú: marzo). Ajusta MES/DIA si la I.E. inicia en otra fecha.
+private const val INICIO_ESCOLAR_MES = 3
+private const val INICIO_ESCOLAR_DIA = 1
+
+// Fecha de inicio del año escolar vigente: si aún no llega marzo, es el del año anterior
+fun inicioAnioEscolar(hoy: java.time.LocalDate = java.time.LocalDate.now()): java.time.LocalDate {
+    val inicioEsteAnio = java.time.LocalDate.of(hoy.year, INICIO_ESCOLAR_MES, INICIO_ESCOLAR_DIA)
+    return if (hoy.isBefore(inicioEsteAnio)) inicioEsteAnio.minusYears(1) else inicioEsteAnio
+}
+
+// =====================================================================
+// UTILIDADES DE FORMATO
+// =====================================================================
+
+// "14:35:00" -> "02:35 p. m."
+fun formatearHora(hora: String?): String {
+    if (hora.isNullOrBlank()) return ""
+    return try {
+        val entrada = java.text.SimpleDateFormat("HH:mm", java.util.Locale.US).parse(hora.take(5))
+        java.text.SimpleDateFormat("hh:mm a", java.util.Locale("es", "PE")).format(entrada!!)
+    } catch (e: Exception) { hora.take(5) }
+}
+
+// "2026-10-02" -> "Viernes 02 de octubre 2026"
+fun formatearFechaLarga(fecha: String): String {
+    return try {
+        val d = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).parse(fecha)
+        java.text.SimpleDateFormat("EEEE dd 'de' MMMM yyyy", java.util.Locale("es", "PE"))
+            .format(d!!).replaceFirstChar { it.uppercase() }
+    } catch (e: Exception) { fecha }
+}

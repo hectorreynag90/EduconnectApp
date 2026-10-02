@@ -129,8 +129,9 @@ fun HistorialAsistenciaScreen(
 
     val totalRegistros     = historialFiltrado.size
     val totalAlumnosHistorial = historialFiltrado.sumOf { it.total }
+    // Asistencia = Presentes + Tardanzas (la tardanza cuenta como asistió)
     val promedioAsistencia = if (totalAlumnosHistorial > 0) {
-        historialFiltrado.sumOf { it.presentes }.toFloat() / totalAlumnosHistorial.toFloat() * 100
+        historialFiltrado.sumOf { it.presentes + it.tardanzas }.toFloat() / totalAlumnosHistorial.toFloat() * 100
     } else 0f
     val promedioFaltas    = if (totalAlumnosHistorial > 0) {
         historialFiltrado.sumOf { it.ausentes }.toFloat() / totalAlumnosHistorial.toFloat() * 100
