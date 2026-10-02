@@ -18,11 +18,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import android.app.NotificationManager
 import android.os.Build
-import com.educonnectapp.data.remote.ingresar
-import com.educonnectapp.data.remote.insertarUsuario
-import com.educonnectapp.data.remote.obtenerUsuario
-import com.educonnectapp.data.remote.obtenerUsuarioActualId
-import com.educonnectapp.data.remote.registrar
+
+
 import com.educonnectapp.ui.screens.AgregarAsignacionScreen
 import com.educonnectapp.ui.screens.AlumnoEncontrado
 import com.educonnectapp.ui.screens.AsistenciasScreen
@@ -57,7 +54,7 @@ import com.educonnectapp.ui.screens.HijoItem
 import com.educonnectapp.ui.screens.AsistenciaItem
 import com.educonnectapp.ui.screens.CursoItem2
 import com.educonnectapp.ui.screens.DetalleAsistencia
-import com.educonnectapp.data.remote.cerrarSesion
+
 import com.educonnectapp.data.remote.buscarAlumnoPorCodigo
 import com.educonnectapp.data.remote.obtenerAlumnosPorSeccion
 import com.educonnectapp.data.remote.obtenerAlumnoPorId
@@ -140,7 +137,14 @@ import com.educonnectapp.ui.screens.HistorialItem
 import com.educonnectapp.ui.screens.DetalleAlumnoItem
 import com.educonnectapp.ui.screens.SeleccionarSeccionHistorialScreen
 import com.educonnectapp.data.remote.obtenerResumenAsistenciasDocente
-import com.educonnectapp.data.remote.guardarFcmToken
+
+import com.educonnectapp.data.api.ApiException
+import com.educonnectapp.data.api.ingresar
+import com.educonnectapp.data.api.registrar
+import com.educonnectapp.data.api.cerrarSesion
+import com.educonnectapp.data.api.guardarFcmToken
+import com.educonnectapp.data.remote.obtenerUsuario
+
 import io.github.jan.supabase.postgrest.postgrest
 
 enum class Screen {
@@ -287,32 +291,40 @@ fun EduConnectApp() {
                                 isLoginLoading = true
                                 CoroutineScope(Dispatchers.Main).launch {
                                     try {
-                                        ingresar(emailInput, passwordInput)
-                                        val userId = obtenerUsuarioActualId()
-                                        if (userId != null) {
-                                            val usuario = obtenerUsuario(userId)
-                                            usuarioLogueado = UsuarioLogueado(
-                                                id = usuario.id,
-                                                nombrecompleto = usuario.nombrecompleto,
-                                                email = usuario.email,
-                                                rol = usuario.rol,
-                                                dni = usuario.dni,
-                                                telefono = usuario.telefono
-                                            )
-                                            currentScreen = if (usuario.rol == "Docente") Screen.HOME_DOCENTE else Screen.HOME_PADRE
+                                        val usuario = ingresar(emailInput, passwordInput)
+                                        // El director (ADMIN) aún no tiene pantallas en la app
+                                        if (usuario.rol != "DOCENTE" && usuario.rol != "PADRE") {
+                                            cerrarSesion()
+                                            aviso("Esta cuenta no tiene acceso a la app móvil")
+                                            return@launch
+                                        }
+                                        usuarioLogueado = UsuarioLogueado(
+                                            id = usuario.id.toString(),   // pasa a Long en la Etapa 2
+                                            nombrecompleto = usuario.nombreCompleto,
+                                            email = usuario.email,
+                                            rol = usuario.rol,
+                                            dni = usuario.dni,
+                                            telefono = usuario.telefono
+                                        )
+                                        currentScreen = if (usuario.rol == "DOCENTE") Screen.HOME_DOCENTE else Screen.HOME_PADRE
 
-                                            // Guardar FCM token
-                                            com.google.firebase.messaging.FirebaseMessaging.getInstance().token
-                                                .addOnCompleteListener { task ->
-                                                    if (task.isSuccessful) {
-                                                        val token = task.result
-                                                        CoroutineScope(Dispatchers.IO).launch {
-                                                            try { guardarFcmToken(token) } catch (e: Exception) { }
-                                                        }
+                                        // Registrar token FCM del dispositivo en el backend
+                                        com.google.firebase.messaging.FirebaseMessaging.getInstance().token
+                                            .addOnCompleteListener { task ->
+                                                if (task.isSuccessful) {
+                                                    val token = task.result
+                                                    CoroutineScope(Dispatchers.IO).launch {
+                                                        try { guardarFcmToken(token) } catch (e: Exception) { }
                                                     }
                                                 }
-                                        }
-                                    } catch (e: Exception) { aviso("Correo o contraseña incorrectos"); isLoginLoading = false }
+                                            }
+                                    } catch (e: ApiException) {
+                                        aviso(if (e.codigo == 401) "Correo o contraseña incorrectos" else (e.message ?: "Error al ingresar"))
+                                    } catch (e: Exception) {
+                                        aviso("Error al ingresar: ${e.message}")
+                                    } finally {
+                                        isLoginLoading = false
+                                    }
                                 }
                             }
                         }
@@ -327,17 +339,18 @@ fun EduConnectApp() {
                             dni.length != 8 -> aviso("El DNI debe tener 8 dígitos")
                             telefono.length != 9 -> aviso("El teléfono debe tener 9 dígitos")
                             password.length < 8 -> aviso("La contraseña debe tener al menos 8 caracteres")
+                            !password.any { it.isLetter() } || !password.any { it.isDigit() } -> aviso("La contraseña debe tener letras y números")
                             else -> {
                                 CoroutineScope(Dispatchers.Main).launch {
                                     try {
-                                        registrar(email, password)
-                                        val userId = obtenerUsuarioActualId()
-                                        if (userId != null) {
-                                            insertarUsuario(userId, nombre, dni, telefono, email, rol)
-                                            aviso("Cuenta creada exitosamente")
-                                            currentScreen = Screen.LOGIN
-                                        } else aviso("Error al crear la cuenta")
-                                    } catch (e: Exception) { aviso("Error: ${e.message ?: e.toString()}") }
+                                        registrar(nombre, dni, telefono, email, password, rol)
+                                        aviso("Cuenta creada exitosamente")
+                                        currentScreen = Screen.LOGIN
+                                    } catch (e: ApiException) {
+                                        aviso(if (e.codigo == 409) "Ya existe una cuenta con ese correo o DNI" else (e.message ?: "Error al crear la cuenta"))
+                                    } catch (e: Exception) {
+                                        aviso("Error: ${e.message ?: e.toString()}")
+                                    }
                                 }
                             }
                         }

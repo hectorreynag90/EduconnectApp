@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- debug: permite HTTP solo hacia el backend local -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false" />
+    <domain-config cleartextTrafficPermitted="true">
+        <!-- Emulador de Android Studio -> localhost de tu PC -->
+        <domain includeSubdomains="false">localhost</domain>
+        <!-- Celular real: reemplaza por la IP de tu PC en la red WiFi (ipconfig) -->
+        <domain includeSubdomains="false">192.168.10.15</domain>
+    </domain-config>
+</network-security-config>

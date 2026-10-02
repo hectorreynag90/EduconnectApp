@@ -14,6 +14,11 @@ val localProps = Properties().apply {
 val supabaseUrl: String = localProps.getProperty("SUPABASE_URL", "")
 val supabaseAnonKey: String = localProps.getProperty("SUPABASE_ANON_KEY", "")
 
+// Backend propio (Spring Boot). Debe terminar en "/".
+// Emulador: http://10.0.2.2:8080/  |  Celular real: http://IP_DE_TU_PC:8080/
+val apiUrl: String = localProps.getProperty("API_URL", "http://10.0.2.2:8080/")
+    .let { if (it.endsWith("/")) it else "$it/" }
+
 android {
     namespace = "com.educonnectapp"
     compileSdk = 37
@@ -27,6 +32,7 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "SUPABASE_URL", "\"$supabaseUrl\"")
         buildConfigField("String", "SUPABASE_ANON_KEY", "\"$supabaseAnonKey\"")
+        buildConfigField("String", "API_URL", "\"$apiUrl\"")
     }
     buildTypes {
         release { isMinifyEnabled = false }
@@ -57,13 +63,21 @@ dependencies {
     implementation("androidx.compose.material:material-icons-core")
     implementation("androidx.compose.material:material-icons-extended")
     implementation("io.coil-kt:coil-compose:2.6.0")
-    implementation("io.github.jan-tennert.supabase:functions-kt:VERSION")
-    // Supabase
+
+    // Supabase (se elimina al terminar la migración - Etapa 5)
     implementation(platform(libs.supabase.bom))
     implementation(libs.supabase.postgrest)
     implementation(libs.supabase.auth)
+    implementation("io.github.jan-tennert.supabase:functions-kt") // versión la da el BOM
     implementation(libs.ktor.client.android)
     implementation(libs.kotlinx.coroutines)
+
+    // Backend propio: Retrofit + OkHttp + kotlinx.serialization
+    implementation(libs.retrofit)
+    implementation(libs.retrofit.kotlinx.serialization)
+    implementation(libs.okhttp)
+    implementation(libs.okhttp.logging)
+    implementation(libs.kotlinx.serialization.json)
 
     // Firebase (BOM maneja versiones)
     implementation(platform("com.google.firebase:firebase-bom:32.7.0"))
