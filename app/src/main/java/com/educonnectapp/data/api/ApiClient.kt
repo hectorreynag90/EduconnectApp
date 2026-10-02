@@ -16,6 +16,7 @@ import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.POST
+import retrofit2.http.Path
 import retrofit2.http.Query
 import java.io.IOException
 import java.util.concurrent.TimeUnit
@@ -132,6 +133,39 @@ interface EduConnectApi {
 
     @DELETE("api/dispositivos")
     suspend fun eliminarDispositivo(@Query("fcmToken") fcmToken: String)
+
+    // Catálogos
+    @GET("api/catalogos/grados")
+    suspend fun grados(): List<GradoResponse>
+
+    @GET("api/catalogos/grados/{gradoId}/secciones")
+    suspend fun secciones(@Path("gradoId") gradoId: Long): List<SeccionResponse>
+
+    @GET("api/catalogos/cursos")
+    suspend fun cursos(): List<CursoResponse>
+
+    // Asignaciones del docente
+    @GET("api/docente/asignaciones")
+    suspend fun asignaciones(): List<AsignacionResponse>
+
+    @POST("api/docente/asignaciones")
+    suspend fun agregarAsignacion(@Body body: AsignacionRequest): AsignacionResponse
+
+    @DELETE("api/docente/asignaciones/{id}")
+    suspend fun eliminarAsignacion(@Path("id") id: Long)
+
+    // Hijos del padre
+    @GET("api/padre/hijos")
+    suspend fun hijos(): List<HijoResponse>
+
+    @GET("api/padre/hijos/buscar")
+    suspend fun buscarAlumno(@Query("codigo") codigo: String): BusquedaAlumnoResponse
+
+    @POST("api/padre/hijos")
+    suspend fun asociarHijo(@Body body: AsociarHijoRequest): HijoResponse
+
+    @DELETE("api/padre/hijos/{alumnoId}")
+    suspend fun desasociarHijo(@Path("alumnoId") alumnoId: Long)
 }
 
 // =====================================================================
@@ -226,6 +260,108 @@ suspend fun cerrarSesion() {
 suspend fun guardarFcmToken(token: String) {
     SesionApi.fcmTokenPendiente = token
     if (SesionApi.token == null) return
+    if (token == SesionApi.fcmTokenRegistrado) return
     llamar { api.registrarDispositivo(RegistrarDispositivoRequest(fcmToken = token)) }
     SesionApi.fcmTokenRegistrado = token
 }
+
+// =====================================================================
+// DATA CLASSES CATALOGOS
+// =====================================================================
+
+@Serializable
+data class GradoResponse(val id: Long, val nombre: String)
+
+@Serializable
+data class SeccionResponse(val id: Long, val nombre: String)
+
+@Serializable
+data class CursoResponse(val id: Long, val nombre: String)
+
+// =====================================================================
+// DATA CLASSES ASIGNACIONES DOCENTE
+// =====================================================================
+
+@Serializable
+data class AsignacionRequest(val seccionId: Long, val cursoId: Long)
+
+// Ya trae nombres y cantidad de alumnos: no hace falta consultar grado/sección/curso aparte
+@Serializable
+data class AsignacionResponse(
+    val id: Long,
+    val gradoId: Long,
+    val grado: String,
+    val seccionId: Long,
+    val seccion: String,
+    val cursoId: Long,
+    val curso: String,
+    val cantidadAlumnos: Long = 0
+)
+
+// =====================================================================
+// DATA CLASSES HIJOS PADRE
+// =====================================================================
+
+@Serializable
+data class HijoResponse(
+    val alumnoId: Long,
+    val codigoEstudiante: String,
+    val nombres: String,
+    val apellidos: String,
+    val nombreCompleto: String = "",
+    val gradoId: Long,
+    val grado: String,
+    val seccionId: Long,
+    val seccion: String
+)
+
+@Serializable
+data class BusquedaAlumnoResponse(
+    val alumno: HijoResponse,
+    val yaAsociado: Boolean = false
+)
+
+@Serializable
+data class AsociarHijoRequest(val codigoEstudiante: String)
+
+// =====================================================================
+// CATALOGOS
+// =====================================================================
+
+suspend fun obtenerGrados(): List<GradoResponse> = llamar { api.grados() }
+
+suspend fun obtenerSeccionesDeGrado(gradoId: Long): List<SeccionResponse> =
+    llamar { api.secciones(gradoId) }
+
+suspend fun obtenerCursos(): List<CursoResponse> = llamar { api.cursos() }
+
+// =====================================================================
+// ASIGNACIONES DOCENTE (el docente se identifica por el token)
+// =====================================================================
+
+suspend fun obtenerAsignaciones(): List<AsignacionResponse> = llamar { api.asignaciones() }
+
+suspend fun agregarAsignacion(seccionId: Long, cursoId: Long): AsignacionResponse =
+    llamar { api.agregarAsignacion(AsignacionRequest(seccionId, cursoId)) }
+
+suspend fun eliminarAsignacion(asignacionId: Long) = llamar { api.eliminarAsignacion(asignacionId) }
+
+// =====================================================================
+// HIJOS PADRE (el padre se identifica por el token)
+// =====================================================================
+
+suspend fun obtenerHijos(): List<HijoResponse> = llamar { api.hijos() }
+
+// Devuelve null si no existe ningún alumno con ese código
+suspend fun buscarAlumno(codigo: String): BusquedaAlumnoResponse? {
+    return try {
+        llamar { api.buscarAlumno(codigo.trim().uppercase()) }
+    } catch (e: ApiException) {
+        if (e.codigo == 404) null else throw e
+    }
+}
+
+suspend fun asociarHijo(codigo: String): HijoResponse =
+    llamar { api.asociarHijo(AsociarHijoRequest(codigo.trim().uppercase())) }
+
+suspend fun desasociarHijo(alumnoId: Long) = llamar { api.desasociarHijo(alumnoId) }

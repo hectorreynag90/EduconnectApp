@@ -58,14 +58,8 @@ import com.educonnectapp.ui.screens.DetalleAsistencia
 import com.educonnectapp.data.remote.buscarAlumnoPorCodigo
 import com.educonnectapp.data.remote.obtenerAlumnosPorSeccion
 import com.educonnectapp.data.remote.obtenerAlumnoPorId
-import com.educonnectapp.data.remote.obtenerTodosGrados
 import com.educonnectapp.data.remote.obtenerGradoPorId
-import com.educonnectapp.data.remote.obtenerGradosPorIds
-import com.educonnectapp.data.remote.obtenerGradoPorNombre
-import com.educonnectapp.data.remote.obtenerTodasSecciones
 import com.educonnectapp.data.remote.obtenerSeccionPorId
-import com.educonnectapp.data.remote.obtenerSeccionesPorIds
-import com.educonnectapp.data.remote.obtenerSeccionPorNombreYGrado
 import com.educonnectapp.data.remote.AsistenciaInsert
 import com.educonnectapp.data.remote.obtenerAsistenciasDia
 import com.educonnectapp.data.remote.insertarAsistencia
@@ -74,20 +68,11 @@ import com.educonnectapp.data.remote.actualizarAsistencia
 import com.educonnectapp.data.remote.obtenerAsistenciasPorAlumno
 import com.educonnectapp.data.remote.obtenerAsistenciasPorMes
 import com.educonnectapp.data.remote.obtenerDetalleAsistencia
-import com.educonnectapp.data.remote.obtenerTodosCursos
 import com.educonnectapp.data.remote.obtenerCursoPorId
-import com.educonnectapp.data.remote.obtenerCursosPorIds
-import com.educonnectapp.data.remote.obtenerCursoPorNombre
-import com.educonnectapp.data.remote.DocenteSeccionInsert
-import com.educonnectapp.data.remote.PadreAlumnoInsert
 import com.educonnectapp.data.remote.obtenerDocenteSecciones
-import com.educonnectapp.data.remote.obtenerDocenteSeccionesPorGrado
 import com.educonnectapp.data.remote.obtenerDocenteSeccionesPorSeccion
-import com.educonnectapp.data.remote.insertarDocenteSeccion
 import com.educonnectapp.data.remote.obtenerHijosPadre
-import com.educonnectapp.data.remote.insertarPadreAlumno
 import com.educonnectapp.data.remote.ComunicadoInsert
-import com.educonnectapp.data.remote.DocenteSeccionRow
 import com.educonnectapp.data.remote.insertarComunicado
 import com.educonnectapp.data.remote.obtenerResumenComunicados
 import com.educonnectapp.ui.screens.SeccionDestinatario
@@ -138,11 +123,25 @@ import com.educonnectapp.ui.screens.DetalleAlumnoItem
 import com.educonnectapp.ui.screens.SeleccionarSeccionHistorialScreen
 import com.educonnectapp.data.remote.obtenerResumenAsistenciasDocente
 
+// Backend propio (Spring Boot)
 import com.educonnectapp.data.api.ApiException
 import com.educonnectapp.data.api.ingresar
 import com.educonnectapp.data.api.registrar
 import com.educonnectapp.data.api.cerrarSesion
 import com.educonnectapp.data.api.guardarFcmToken
+import com.educonnectapp.data.api.AsignacionResponse
+import com.educonnectapp.data.api.HijoResponse
+import com.educonnectapp.data.api.obtenerAsignaciones
+import com.educonnectapp.data.api.agregarAsignacion
+import com.educonnectapp.data.api.obtenerGrados
+import com.educonnectapp.data.api.obtenerSeccionesDeGrado
+import com.educonnectapp.data.api.obtenerCursos
+import com.educonnectapp.data.api.obtenerHijos
+import com.educonnectapp.data.api.buscarAlumno
+import com.educonnectapp.data.api.asociarHijo
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import com.educonnectapp.data.remote.obtenerUsuario
 
 import io.github.jan.supabase.postgrest.postgrest
@@ -164,6 +163,17 @@ enum class Screen {
 data class UsuarioLogueado(
     val id: String, val nombrecompleto: String, val email: String,
     val rol: String, val dni: String = "", val telefono: String = "", val codigo: String = ""
+)
+
+// CONVERSION BACKEND -> UI
+private fun HijoResponse.aHijoAsociado() = HijoAsociado(
+    id = alumnoId, nombres = nombres, apellidos = apellidos,
+    gradoNombre = grado, seccionNombre = seccion, codigoEstudiante = codigoEstudiante
+)
+
+private fun HijoResponse.aAlumnoEncontrado() = AlumnoEncontrado(
+    id = alumnoId, nombres = nombres, apellidos = apellidos,
+    gradoNombre = grado, seccionNombre = seccion, codigoEstudiante = codigoEstudiante
 )
 
 class MainActivity : ComponentActivity() {
@@ -265,12 +275,52 @@ fun EduConnectApp() {
     var resumenPendientesSel by remember { mutableStateOf(0) }
     var resumenPorcentajeSel by remember { mutableStateOf(0) }
     var tardanzasSel by remember { mutableStateOf(0) }
-    var todasRelacionesSel by remember { mutableStateOf<List<DocenteSeccionRow>>(emptyList()) }
+    var asignacionesApiSel by remember { mutableStateOf<List<AsignacionResponse>>(emptyList()) }
     var todosGradosSel by remember { mutableStateOf<List<GradoItem>>(emptyList()) }
-    var todasSeccionesSel by remember { mutableStateOf<List<SeccionItem>>(emptyList()) }
-    var todosCursosSel by remember { mutableStateOf<List<CursoItem>>(emptyList()) }
+    // Catálogo para AGREGAR_ASIGNACION: nombre -> id ("1er Grado|A" -> seccionId)
+    var seccionIdPorNombre by remember { mutableStateOf<Map<String, Long>>(emptyMap()) }
+    var cursoIdPorNombre by remember { mutableStateOf<Map<String, Long>>(emptyMap()) }
 
     fun aviso(mensaje: String) { Toast.makeText(context, mensaje, Toast.LENGTH_SHORT).show() }
+
+    // ASIGNACIONES DEL DOCENTE (1 sola petición: ya traen nombres y cantidad de alumnos)
+    fun aplicarAsignaciones(lista: List<AsignacionResponse>) {
+        asignacionesApiSel = lista
+        todosGradosSel = lista.distinctBy { it.gradoId }.map { GradoItem(it.gradoId, it.grado) }.sortedBy { it.nombre }
+        asignacionesSel = lista.map { AsignacionItem(it.grado, it.seccion, it.curso) }
+        listaGradosSel = todosGradosSel
+        listaSeccionesSel = emptyList()
+        listaCursosSel = emptyList()
+        cantidadAlumnosSel = 0
+    }
+
+    // Filtros LOCALES sobre las asignaciones (sin peticiones al backend)
+    fun seccionesDeGrado(gradoId: Long): List<SeccionItem> =
+        asignacionesApiSel.filter { it.gradoId == gradoId }
+            .distinctBy { it.seccionId }
+            .map { SeccionItem(it.seccionId, it.seccion) }
+            .sortedBy { it.nombre }
+
+    fun cursosDeSeccion(seccionId: Long): List<CursoItem> =
+        asignacionesApiSel.filter { it.seccionId == seccionId }
+            .distinctBy { it.cursoId }
+            .map { CursoItem(it.cursoId, it.curso) }
+            .sortedBy { it.nombre }
+
+    fun alumnosDeSeccion(seccionId: Long): Int =
+        asignacionesApiSel.firstOrNull { it.seccionId == seccionId }?.cantidadAlumnos?.toInt() ?: 0
+
+    // Al cerrar sesión: borrar datos del usuario anterior (otra cuenta no debe verlos)
+    fun limpiarDatosSesion() {
+        usuarioLogueado = null
+        isLoginLoading = false
+        aplicarAsignaciones(emptyList())
+        hijosAsociadosSel = emptyList()
+        alumnoEncontradoSel = null
+        errorBusquedaSel = ""
+        listaAlumnosSel = emptyList()
+        historialDocenteSel = emptyList()
+    }
 
 
     Scaffold(modifier = Modifier.fillMaxSize(), contentColor = TextPrimary) { innerPadding ->
@@ -362,21 +412,9 @@ fun EduConnectApp() {
                     androidx.compose.runtime.LaunchedEffect(usuarioLogueado?.id) {
                         val docenteId = usuarioLogueado?.id ?: return@LaunchedEffect
                         try {
-                            val todasRelaciones = obtenerDocenteSecciones(docenteId)
-                            val gradoIds = todasRelaciones.map { it.grado_id }.distinct()
-                            val seccionIds = todasRelaciones.map { it.seccion_id }.distinct()
-                            val cursoIds = todasRelaciones.map { it.curso_id }.distinct()
-                            val todosGrados = obtenerGradosPorIds(gradoIds).map { GradoItem(it.id, it.nombre) }
-                            val todasSecciones = obtenerSeccionesPorIds(seccionIds).map { SeccionItem(it.id, it.nombre) }
-                            val todosCursos = obtenerCursosPorIds(cursoIds).map { CursoItem(it.id, it.nombre) }
-                            todasRelacionesSel = todasRelaciones
-                            todosGradosSel = todosGrados
-                            todasSeccionesSel = todasSecciones
-                            todosCursosSel = todosCursos
-                            listaGradosSel = todosGrados
-                            listaSeccionesSel = emptyList()
-                            listaCursosSel = emptyList()
-                            // Precarga resumen para AsistenciasScreen
+                            // Precarga de asignaciones (backend propio)
+                            aplicarAsignaciones(obtenerAsignaciones())
+                            // Precarga resumen para AsistenciasScreen (Supabase: se migra en la Etapa 3)
                             val (realizados, pendientes, porcentaje) = obtenerResumenAsistenciasDocente(docenteId)
                             resumenRealizadosSel = realizados
                             resumenPendientesSel = pendientes
@@ -450,24 +488,16 @@ fun EduConnectApp() {
 
                 Screen.SELECCIONAR_SECCION -> {
                     androidx.compose.runtime.LaunchedEffect(usuarioLogueado?.id) {
-                        val docenteId = usuarioLogueado?.id ?: return@LaunchedEffect
-                        if (todasRelacionesSel.isNotEmpty()) return@LaunchedEffect  // ya cargado en HOME_DOCENTE
+                        if (usuarioLogueado == null) return@LaunchedEffect
+                        if (asignacionesApiSel.isNotEmpty()) {
+                            // Ya cargadas en HOME_DOCENTE: solo reiniciar la selección
+                            aplicarAsignaciones(asignacionesApiSel)
+                            return@LaunchedEffect
+                        }
                         try {
-                            val todasRelaciones = obtenerDocenteSecciones(docenteId)
-                            val gradoIds = todasRelaciones.map { it.grado_id }.distinct()
-                            val seccionIds = todasRelaciones.map { it.seccion_id }.distinct()
-                            val cursoIds = todasRelaciones.map { it.curso_id }.distinct()
-                            // 3 consultas en lugar de N consultas individuales
-                            val todosGrados = obtenerGradosPorIds(gradoIds).map { GradoItem(it.id, it.nombre) }
-                            val todasSecciones = obtenerSeccionesPorIds(seccionIds).map { SeccionItem(it.id, it.nombre) }
-                            val todosCursos = obtenerCursosPorIds(cursoIds).map { CursoItem(it.id, it.nombre) }
-                            todasRelacionesSel = todasRelaciones
-                            todosGradosSel = todosGrados
-                            todasSeccionesSel = todasSecciones
-                            todosCursosSel = todosCursos
-                            listaGradosSel = todosGrados
-                            listaSeccionesSel = emptyList()
-                            listaCursosSel = emptyList()
+                            aplicarAsignaciones(obtenerAsignaciones())
+                        } catch (e: kotlinx.coroutines.CancellationException) {
+                            throw e
                         } catch (e: Exception) { aviso("Error cargando datos: ${e.message}") }
                     }
                     SeleccionarSeccionScreen(
@@ -477,30 +507,18 @@ fun EduConnectApp() {
                         listaCursos = listaCursosSel,
                         cantidadAlumnos = cantidadAlumnosSel,
 
-                        // Filtro LOCAL — sin consulta a Supabase
+                        // Filtro LOCAL — sin peticiones al backend
                         onGradoSeleccionado = { grado ->
-                            val seccionIds = todasRelacionesSel
-                                .filter { it.grado_id == grado.id }
-                                .map { it.seccion_id }.distinct()
-                            listaSeccionesSel = todasSeccionesSel.filter { it.id in seccionIds }
+                            listaSeccionesSel = seccionesDeGrado(grado.id)
                             listaCursosSel = emptyList()
                             cantidadAlumnosSel = 0
                         },
 
-                        // Filtro LOCAL — sin consulta a Supabase
+                        // Filtro LOCAL — la cantidad de alumnos ya viene en la asignación
                         onSeccionSeleccionada = { seccion ->
-                            val cursoIds = todasRelacionesSel
-                                .filter { it.seccion_id == seccion.id }
-                                .map { it.curso_id }.distinct()
-                            listaCursosSel = todosCursosSel.filter { it.id in cursoIds }
-                            // Precarga alumnos mientras el usuario elige el curso
-                            CoroutineScope(Dispatchers.Main).launch {
-                                try {
-                                    val alumnos = obtenerAlumnosPorSeccion(seccion.id)
-                                    cantidadAlumnosSel = alumnos.size
-                                    listaAlumnosSel = alumnos.map { AlumnoItem(id = it.id, nombres = it.nombres, apellidos = it.apellidos) }
-                                } catch (e: Exception) { cantidadAlumnosSel = 0 }
-                            }
+                            listaCursosSel = cursosDeSeccion(seccion.id)
+                            cantidadAlumnosSel = alumnosDeSeccion(seccion.id)
+                            listaAlumnosSel = emptyList()  // la lista de alumnos se carga en REGISTRO_ASISTENCIA (Etapa 3)
                         },
 
                         onBack = {
@@ -865,18 +883,13 @@ fun EduConnectApp() {
 
                 Screen.PERFIL_DOCENTE -> {
                     androidx.compose.runtime.LaunchedEffect(usuarioLogueado?.id) {
-                        val docenteId = usuarioLogueado?.id ?: return@LaunchedEffect
+                        if (usuarioLogueado == null) return@LaunchedEffect
                         try {
-                            val relaciones = obtenerDocenteSecciones(docenteId)
-                            val lista = mutableListOf<AsignacionItem>()
-                            relaciones.forEach { rel ->
-                                val grado = obtenerGradoPorId(rel.grado_id) ?: return@forEach
-                                val seccion = obtenerSeccionPorId(rel.seccion_id) ?: return@forEach
-                                val curso = obtenerCursoPorId(rel.curso_id) ?: return@forEach
-                                lista.add(AsignacionItem(grado.nombre, seccion.nombre, curso.nombre))
-                            }
-                            asignacionesSel = lista
-                        } catch (e: Exception) { }
+                            // 1 petición (antes: 1 + 3 consultas por cada asignación)
+                            aplicarAsignaciones(obtenerAsignaciones())
+                        } catch (e: kotlinx.coroutines.CancellationException) {
+                            throw e
+                        } catch (e: Exception) { aviso("Error cargando asignaciones: ${e.message}") }
                     }
                     PerfilDocenteScreen(
                         usuarioNombre = usuarioLogueado?.nombrecompleto ?: "",
@@ -903,8 +916,7 @@ fun EduConnectApp() {
                                 try {
                                     cerrarSesion()
                                 } catch (e: Exception) { }
-                                usuarioLogueado = null
-                                isLoginLoading = false
+                                limpiarDatosSesion()
                                 currentScreen = Screen.LOGIN
                             }
                         }
@@ -913,18 +925,13 @@ fun EduConnectApp() {
 
                 Screen.PERFIL_PADRE -> {
                     androidx.compose.runtime.LaunchedEffect(usuarioLogueado?.id) {
-                        val padreId = usuarioLogueado?.id ?: return@LaunchedEffect
+                        if (usuarioLogueado == null) return@LaunchedEffect
                         try {
-                            val relaciones = obtenerHijosPadre(padreId)
-                            val lista = mutableListOf<HijoAsociado>()
-                            relaciones.forEach { rel ->
-                                val alumno = buscarAlumnoPorCodigo(rel.codigo_estudiante) ?: return@forEach
-                                val grado = obtenerGradoPorId(alumno.grado_id) ?: return@forEach
-                                val seccion = obtenerSeccionPorId(alumno.seccion_id) ?: return@forEach
-                                lista.add(HijoAsociado(id = alumno.id, nombres = alumno.nombres, apellidos = alumno.apellidos, gradoNombre = grado.nombre, seccionNombre = seccion.nombre, codigoEstudiante = alumno.codigo_estudiante))
-                            }
-                            hijosAsociadosSel = lista
-                        } catch (e: Exception) { }
+                            // 1 petición: el backend ya trae grado y sección de cada hijo
+                            hijosAsociadosSel = obtenerHijos().map { it.aHijoAsociado() }
+                        } catch (e: kotlinx.coroutines.CancellationException) {
+                            throw e
+                        } catch (e: Exception) { aviso("Error cargando hijos: ${e.message}") }
                     }
                     PerfilPadreScreen(
                         usuarioNombre = usuarioLogueado?.nombrecompleto ?: "",
@@ -950,8 +957,7 @@ fun EduConnectApp() {
                                 try {
                                     cerrarSesion()
                                 } catch (e: Exception) { }
-                                usuarioLogueado = null
-                                isLoginLoading = false
+                                limpiarDatosSesion()
                                 currentScreen = Screen.LOGIN
                             }
                         }
@@ -960,15 +966,29 @@ fun EduConnectApp() {
 
                 Screen.AGREGAR_ASIGNACION -> {
                     androidx.compose.runtime.LaunchedEffect(Unit) {
+                        if (gradosDisp.isNotEmpty()) return@LaunchedEffect  // catálogo ya cargado
                         try {
-                            val grados = obtenerTodosGrados()
-                            val secciones = obtenerTodasSecciones()
-                            val cursos = obtenerTodosCursos()
+                            // Grados y cursos en paralelo
+                            val (grados, cursos) = coroutineScope {
+                                val g = async { obtenerGrados() }
+                                val c = async { obtenerCursos() }
+                                g.await() to c.await()
+                            }
+                            // Secciones de todos los grados en paralelo
+                            val seccionesPorGrado = coroutineScope {
+                                grados.map { grado -> async { grado to obtenerSeccionesDeGrado(grado.id) } }.awaitAll()
+                            }
                             gradosDisp = grados.map { it.nombre }
-                            val seccionesMap = mutableMapOf<String, List<String>>()
-                            grados.forEach { grado -> seccionesMap[grado.nombre] = secciones.filter { it.grado_id == grado.id }.map { it.nombre } }
-                            seccionesDisp = seccionesMap
+                            seccionesDisp = seccionesPorGrado.associate { (grado, secciones) ->
+                                grado.nombre to secciones.map { it.nombre }
+                            }
+                            seccionIdPorNombre = seccionesPorGrado.flatMap { (grado, secciones) ->
+                                secciones.map { "${grado.nombre}|${it.nombre}" to it.id }
+                            }.toMap()
                             cursosDisp = cursos.map { it.nombre }
+                            cursoIdPorNombre = cursos.associate { it.nombre to it.id }
+                        } catch (e: kotlinx.coroutines.CancellationException) {
+                            throw e
                         } catch (e: Exception) { aviso("Error cargando datos: ${e.message}") }
                     }
                     AgregarAsignacionScreen(
@@ -976,14 +996,18 @@ fun EduConnectApp() {
                         gradosDisp = gradosDisp, seccionesDisp = seccionesDisp, cursosDisp = cursosDisp,
                         onGuardar = { grado, seccion, curso ->
                             CoroutineScope(Dispatchers.Main).launch {
+                                val seccionId = seccionIdPorNombre["$grado|$seccion"]
+                                val cursoId = cursoIdPorNombre[curso]
+                                if (seccionId == null || cursoId == null) {
+                                    aviso("Selección no válida, vuelve a intentarlo")
+                                    return@launch
+                                }
                                 try {
-                                    val docenteId = usuarioLogueado?.id ?: return@launch
-                                    val gradoRow = obtenerGradoPorNombre(grado) ?: return@launch
-                                    val seccionRow = obtenerSeccionPorNombreYGrado(seccion, gradoRow.id) ?: return@launch
-                                    val cursoRow = obtenerCursoPorNombre(curso) ?: return@launch
-                                    insertarDocenteSeccion(DocenteSeccionInsert(docente_id = docenteId, grado_id = gradoRow.id, seccion_id = seccionRow.id, curso_id = cursoRow.id))
-                                    asignacionesSel = asignacionesSel + AsignacionItem(grado, seccion, curso)
+                                    val nueva = agregarAsignacion(seccionId, cursoId)
+                                    aplicarAsignaciones(asignacionesApiSel + nueva)
                                     aviso("Asignación agregada"); currentScreen = Screen.PERFIL_DOCENTE
+                                } catch (e: ApiException) {
+                                    aviso(if (e.codigo == 409) "Ya tienes asignado ese curso en esa sección" else (e.message ?: "Error al guardar"))
                                 } catch (e: Exception) { aviso("Error al guardar: ${e.message}") }
                             }
                         },
@@ -1002,13 +1026,14 @@ fun EduConnectApp() {
                         CoroutineScope(Dispatchers.Main).launch {
                             try {
                                 errorBusquedaSel = ""; alumnoEncontradoSel = null
-                                val alumno = buscarAlumnoPorCodigo(codigo)
-                                if (alumno == null) {
-                                    errorBusquedaSel = "No se encontró ningún estudiante con el código $codigo"
-                                } else {
-                                    val grado = obtenerGradoPorId(alumno.grado_id) ?: return@launch
-                                    val seccion = obtenerSeccionPorId(alumno.seccion_id) ?: return@launch
-                                    alumnoEncontradoSel = AlumnoEncontrado(id = alumno.id, nombres = alumno.nombres, apellidos = alumno.apellidos, gradoNombre = grado.nombre, seccionNombre = seccion.nombre, codigoEstudiante = alumno.codigo_estudiante)
+                                val resultado = buscarAlumno(codigo)
+                                when {
+                                    resultado == null ->
+                                        errorBusquedaSel = "No se encontró ningún estudiante con el código $codigo"
+                                    resultado.yaAsociado ->
+                                        errorBusquedaSel = "${resultado.alumno.nombres} ${resultado.alumno.apellidos} ya está asociado a tu cuenta"
+                                    else ->
+                                        alumnoEncontradoSel = resultado.alumno.aAlumnoEncontrado()
                                 }
                             } catch (e: Exception) { errorBusquedaSel = "Error al buscar: ${e.message}" }
                         }
@@ -1017,12 +1042,13 @@ fun EduConnectApp() {
                     onConfirmar = { alumno ->
                         CoroutineScope(Dispatchers.Main).launch {
                             try {
-                                val padreId = usuarioLogueado?.id ?: return@launch
-                                insertarPadreAlumno(PadreAlumnoInsert(padre_id = padreId, codigo_estudiante = alumno.codigoEstudiante))
+                                val hijo = asociarHijo(alumno.codigoEstudiante)
                                 aviso("Hijo asociado correctamente")
                                 alumnoEncontradoSel = null; errorBusquedaSel = ""
-                                hijosAsociadosSel = hijosAsociadosSel + HijoAsociado(id = alumno.id, nombres = alumno.nombres, apellidos = alumno.apellidos, gradoNombre = alumno.gradoNombre, seccionNombre = alumno.seccionNombre, codigoEstudiante = alumno.codigoEstudiante)
+                                hijosAsociadosSel = hijosAsociadosSel.filter { it.id != hijo.alumnoId } + hijo.aHijoAsociado()
                                 currentScreen = Screen.PERFIL_PADRE
+                            } catch (e: ApiException) {
+                                aviso(if (e.codigo == 409) "Este estudiante ya está asociado a tu cuenta" else (e.message ?: "Error al asociar"))
                             } catch (e: Exception) { aviso("Error al asociar: ${e.message}") }
                         }
                     },
@@ -1625,32 +1651,18 @@ fun EduConnectApp() {
 
                 Screen.SELECCIONAR_SECCION_HISTORIAL -> {
                     androidx.compose.runtime.LaunchedEffect(usuarioLogueado?.id) {
-                        val docenteId = usuarioLogueado?.id ?: return@LaunchedEffect
+                        if (usuarioLogueado == null) return@LaunchedEffect
                         // Limpiar historial previo para que no se muestre al volver con otro curso
                         historialDocenteSel = emptyList()
-                        if (todasRelacionesSel.isNotEmpty()) {
-                            // Ya cargado — solo restablecer las listas de selección
-                            listaGradosSel = todosGradosSel.sortedBy { it.nombre }
-                            listaSeccionesSel = emptyList()
-                            listaCursosSel = emptyList()
+                        if (asignacionesApiSel.isNotEmpty()) {
+                            // Ya cargadas — solo restablecer las listas de selección
+                            aplicarAsignaciones(asignacionesApiSel)
                             return@LaunchedEffect
                         }
                         try {
-                            val todasRelaciones = obtenerDocenteSecciones(docenteId)
-                            val gradoIds = todasRelaciones.map { it.grado_id }.distinct()
-                            val seccionIds = todasRelaciones.map { it.seccion_id }.distinct()
-                            val cursoIds = todasRelaciones.map { it.curso_id }.distinct()
-                            // 3 consultas en lote en lugar de N consultas individuales
-                            val todosGrados = obtenerGradosPorIds(gradoIds).map { GradoItem(it.id, it.nombre) }
-                            val todasSecciones = obtenerSeccionesPorIds(seccionIds).map { SeccionItem(it.id, it.nombre) }
-                            val todosCursos = obtenerCursosPorIds(cursoIds).map { CursoItem(it.id, it.nombre) }
-                            todasRelacionesSel = todasRelaciones
-                            todosGradosSel = todosGrados
-                            todasSeccionesSel = todasSecciones
-                            todosCursosSel = todosCursos
-                            listaGradosSel = todosGrados.sortedBy { it.nombre }
-                            listaSeccionesSel = emptyList()
-                            listaCursosSel = emptyList()
+                            aplicarAsignaciones(obtenerAsignaciones())
+                        } catch (e: kotlinx.coroutines.CancellationException) {
+                            throw e
                         } catch (e: Exception) {
                             aviso("Error cargando grados: ${e.message}")
                         }
@@ -1661,26 +1673,16 @@ fun EduConnectApp() {
                         listaSecciones = listaSeccionesSel,
                         listaCursos = listaCursosSel,
                         cantidadAlumnos = cantidadAlumnosSel,
-                        // Filtro LOCAL — sin consulta a Supabase
+                        // Filtro LOCAL — sin peticiones al backend
                         onGradoSeleccionado = { grado ->
-                            val seccionIds = todasRelacionesSel
-                                .filter { it.grado_id == grado.id }
-                                .map { it.seccion_id }.distinct()
-                            listaSeccionesSel = todasSeccionesSel.filter { it.id in seccionIds }.sortedBy { it.nombre }
+                            listaSeccionesSel = seccionesDeGrado(grado.id)
                             listaCursosSel = emptyList()
                             cantidadAlumnosSel = 0
                         },
-                        // Filtro LOCAL — sin consulta a Supabase
+                        // Filtro LOCAL — la cantidad de alumnos ya viene en la asignación
                         onSeccionSeleccionada = { seccion ->
-                            val cursoIds = todasRelacionesSel
-                                .filter { it.seccion_id == seccion.id }
-                                .map { it.curso_id }.distinct()
-                            listaCursosSel = todosCursosSel.filter { it.id in cursoIds }.sortedBy { it.nombre }
-                            CoroutineScope(Dispatchers.Main).launch {
-                                try {
-                                    cantidadAlumnosSel = obtenerAlumnosPorSeccion(seccion.id).size
-                                } catch (e: Exception) { cantidadAlumnosSel = 0 }
-                            }
+                            listaCursosSel = cursosDeSeccion(seccion.id)
+                            cantidadAlumnosSel = alumnosDeSeccion(seccion.id)
                         },
                         onBack = {
                             currentScreen = Screen.ASISTENCIAS
