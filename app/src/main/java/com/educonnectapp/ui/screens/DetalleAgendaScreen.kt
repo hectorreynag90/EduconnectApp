@@ -3,12 +3,14 @@ package com.educonnectapp.ui.screens
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -33,6 +35,8 @@ fun DetalleAgendaScreen(
     gradoNombre: String = "",
     seccionNombre: String = "",
     publicacion: PublicacionAgendaItem? = null,
+    descargandoAdjunto: Boolean = false,
+    onAbrirAdjunto: () -> Unit = {},
     onBack: () -> Unit = {},
     onHomePadre: () -> Unit = {},
     onAvisos: () -> Unit = {},
@@ -163,7 +167,11 @@ fun DetalleAgendaScreen(
                         modifier = Modifier.size(40.dp)
                     )
                     Text(
-                        text = "Vence en $diasRestantes días - $fechaDisplay",
+                        text = when {
+                            diasRestantes <= 0 -> "Vence hoy - $fechaDisplay"
+                            diasRestantes == 1 -> "Vence mañana - $fechaDisplay"
+                            else -> "Vence en $diasRestantes días - $fechaDisplay"
+                        },
                         fontFamily = Roboto,
                         fontWeight = FontWeight.Bold,
                         fontSize = 18.sp,
@@ -250,7 +258,7 @@ fun DetalleAgendaScreen(
                 FilaRegistro(
                     iconRes = R.drawable.clock_darkgray,
                     label = "Tiempo restante",
-                    valor = "$diasRestantes días",
+                    valor = textoDiasRestantes(diasRestantes),
                     colorValor = colorDias
                 )
 
@@ -276,6 +284,7 @@ fun DetalleAgendaScreen(
                             .fillMaxWidth()
                             .background(EduconnectBlue.copy(alpha = 0.06f), RoundedCornerShape(10.dp))
                             .border(1.dp, BorderBlue, RoundedCornerShape(10.dp))
+                            .clickable(enabled = !descargandoAdjunto) { onAbrirAdjunto() }
                             .padding(12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -285,19 +294,34 @@ fun DetalleAgendaScreen(
                             contentDescription = null,
                             modifier = Modifier.size(22.dp)
                         )
-                        Text(
-                            text = publicacion?.archivoAdjunto?.substringAfterLast("/") ?: "",
-                            fontFamily = Roboto,
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 14.sp,
-                            color = EduconnectBlue,
-                            modifier = Modifier.weight(1f)
-                        )
-                        Image(
-                            painter = painterResource(id = R.drawable.adjunto_orange),
-                            contentDescription = null,
-                            modifier = Modifier.size(22.dp)
-                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = publicacion?.archivoAdjunto?.substringAfterLast("/") ?: "",
+                                fontFamily = Roboto,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 14.sp,
+                                color = EduconnectBlue
+                            )
+                            Text(
+                                text = if (descargandoAdjunto) "Descargando..." else "Toca para abrir",
+                                fontFamily = Roboto,
+                                fontSize = 13.sp,
+                                color = TextSecondary
+                            )
+                        }
+                        if (descargandoAdjunto) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(22.dp),
+                                color = EduconnectBlue,
+                                strokeWidth = 2.dp
+                            )
+                        } else {
+                            Image(
+                                painter = painterResource(id = R.drawable.adjunto_orange),
+                                contentDescription = null,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
                     }
                 }
             }
@@ -353,7 +377,8 @@ fun DetalleAgendaPreview() {
                 cursoNombre = "Matemáticas",
                 docenteNombre = "Eduardo C.",
                 fechaEntrega = "2026-05-23",
-                estado = "Pendiente"
+                estado = "Pendiente",
+                archivoAdjunto = "Practica_funciones.pdf"
             )
         )
     }

@@ -11,9 +11,6 @@ val localProps = Properties().apply {
     val f = rootProject.file("local.properties")
     if (f.exists()) f.inputStream().use { load(it) }
 }
-val supabaseUrl: String = localProps.getProperty("SUPABASE_URL", "")
-val supabaseAnonKey: String = localProps.getProperty("SUPABASE_ANON_KEY", "")
-
 // Backend propio (Spring Boot). Debe terminar en "/".
 // Emulador: http://10.0.2.2:8080/  |  Celular real: http://IP_DE_TU_PC:8080/
 val apiUrl: String = localProps.getProperty("API_URL", "http://10.0.2.2:8080/")
@@ -30,8 +27,6 @@ android {
         versionCode = 1
         versionName = "1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        buildConfigField("String", "SUPABASE_URL", "\"$supabaseUrl\"")
-        buildConfigField("String", "SUPABASE_ANON_KEY", "\"$supabaseAnonKey\"")
         buildConfigField("String", "API_URL", "\"$apiUrl\"")
     }
     buildTypes {
@@ -64,12 +59,7 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
     implementation("io.coil-kt:coil-compose:2.6.0")
 
-    // Supabase (se elimina al terminar la migración - Etapa 5)
-    implementation(platform(libs.supabase.bom))
-    implementation(libs.supabase.postgrest)
-    implementation(libs.supabase.auth)
-    implementation("io.github.jan-tennert.supabase:functions-kt") // versión la da el BOM
-    implementation(libs.ktor.client.android)
+    // Corrutinas (Dispatchers.Main en MainActivity)
     implementation(libs.kotlinx.coroutines)
 
     // Backend propio: Retrofit + OkHttp + kotlinx.serialization

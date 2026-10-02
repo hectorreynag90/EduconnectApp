@@ -55,14 +55,6 @@ import com.educonnectapp.ui.screens.AsistenciaItem
 import com.educonnectapp.ui.screens.CursoItem2
 import com.educonnectapp.ui.screens.DetalleAsistencia
 
-import com.educonnectapp.data.remote.buscarAlumnoPorCodigo
-import com.educonnectapp.data.remote.obtenerAlumnosPorSeccion
-import com.educonnectapp.data.remote.obtenerGradoPorId
-import com.educonnectapp.data.remote.obtenerSeccionPorId
-import com.educonnectapp.data.remote.obtenerCursoPorId
-import com.educonnectapp.data.remote.obtenerDocenteSecciones
-import com.educonnectapp.data.remote.obtenerDocenteSeccionesPorSeccion
-import com.educonnectapp.data.remote.obtenerHijosPadre
 import com.educonnectapp.ui.screens.SeccionDestinatario
 import com.educonnectapp.ui.screens.SeleccionarComunicadoScreen
 import com.educonnectapp.ui.screens.BusquedaComunicadoScreen
@@ -70,16 +62,11 @@ import com.educonnectapp.ui.screens.DetalleComunicadoScreen
 import com.educonnectapp.ui.screens.SeccionComunicadoItem
 import com.educonnectapp.ui.screens.ComunicadoResumenItem
 import com.educonnectapp.ui.screens.PadreLecturaItem
-import com.educonnectapp.data.remote.PublicacionInsert
-import com.educonnectapp.data.remote.contarNotificacionesNoLeidas
-import com.educonnectapp.data.remote.insertarPublicacion
-import com.educonnectapp.data.remote.obtenerResumenPublicaciones
 import com.educonnectapp.ui.screens.PublicacionesScreen
 import com.educonnectapp.ui.screens.SeleccionarCursoPublicacionScreen
 import com.educonnectapp.ui.screens.NuevaTareaScreen
 import com.educonnectapp.ui.screens.NuevaEvaluacionScreen
 import com.educonnectapp.ui.screens.ConfirmacionPublicacionScreen
-import com.educonnectapp.data.remote.obtenerPublicacionesPorAlumno
 import com.educonnectapp.ui.screens.SeleccionarHijoAgendaScreen
 import com.educonnectapp.ui.screens.AgendaEscolarScreen
 import com.educonnectapp.ui.screens.DetalleAgendaScreen
@@ -137,10 +124,22 @@ import com.educonnectapp.data.api.fechaLocal
 import com.educonnectapp.data.api.horaLocal
 import com.educonnectapp.data.api.isoLocalSinZona
 import com.educonnectapp.data.api.aFechaHoraLocal
+import com.educonnectapp.data.api.PublicacionDocenteResponse
+import com.educonnectapp.data.api.PublicacionPadreResponse
+import com.educonnectapp.data.api.NotificacionResponse
+import com.educonnectapp.data.api.obtenerPublicacionesDocente
+import com.educonnectapp.data.api.crearPublicacion
+import com.educonnectapp.data.api.obtenerAgendaHijo
+import com.educonnectapp.data.api.marcarPublicacionLeida
+import com.educonnectapp.data.api.obtenerBandeja
+import com.educonnectapp.data.api.marcarNotificacionesLeidas
+import com.educonnectapp.data.api.marcarNotificacionLeida
+import com.educonnectapp.data.api.obtenerPublicacionHijo
+import com.educonnectapp.ui.screens.PanelNotificaciones
+import com.educonnectapp.ui.screens.NotificacionItem
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
-import com.educonnectapp.data.remote.obtenerUsuario
 
 
 enum class Screen {
@@ -158,7 +157,7 @@ enum class Screen {
 }
 
 data class UsuarioLogueado(
-    val id: String, val nombrecompleto: String, val email: String,
+    val id: Long, val nombrecompleto: String, val email: String,
     val rol: String, val dni: String = "", val telefono: String = "", val codigo: String = ""
 )
 
@@ -202,6 +201,28 @@ private suspend fun cargarDetalleDia(seccionId: Long, cursoId: Long, fecha: Stri
     obtenerHojaAsistencia(seccionId, cursoId, fecha).alumnos.mapNotNull { a ->
         a.estado?.let { DetalleAlumnoItem(id = a.alumnoId, nombres = a.nombreCompleto, apellidos = "", estado = it) }
     }
+
+// Agenda del padre: publicación del backend -> tarjeta de AgendaEscolarScreen
+// estado en la pantalla: "Pendiente" (por entregar), "Entregada", "No entregada" o "Vencida"
+private fun PublicacionPadreResponse.aPublicacionAgendaItem(hoy: String): PublicacionAgendaItem {
+    val fecha = fechaEntrega ?: ""
+    val estadoUi = when (calificacionHijo?.estado) {
+        "ENTREGADO", "RENDIDO", "CALIFICADO" -> "Entregada"
+        "NO_ENTREGADO", "NO_RINDIO" -> "No entregada"
+        else -> if (fecha.isNotEmpty() && fecha < hoy) "Vencida" else "Pendiente"
+    }
+    return PublicacionAgendaItem(
+        id = id,
+        titulo = titulo,
+        descripcion = descripcion,
+        tipo = if (tipo == "EVALUACION") "Examen" else "Tarea",
+        cursoNombre = curso,
+        docenteNombre = docente,
+        fechaEntrega = fecha,
+        estado = estadoUi,
+        archivoAdjunto = archivo?.nombre ?: ""
+    )
+}
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -275,15 +296,10 @@ fun EduConnectApp() {
     var comunicadoIdSel by remember { mutableStateOf(0L) }
     var comunicadoMensajeSel by remember { mutableStateOf("") }
     var comunicadoTotalNotifSel by remember { mutableStateOf(0) }
-    var totalTareasSel by remember { mutableStateOf(0) }
-    var totalExamenesSel by remember { mutableStateOf(0) }
-    var venceHoySel by remember { mutableStateOf(0) }
     var tipoPublicacionSel by remember { mutableStateOf("Tarea") }
     var tituloPublicacionSel by remember { mutableStateOf("") }
     var fechaEntregaSel by remember { mutableStateOf("") }
     var horaPublicacionSel by remember { mutableStateOf("") }
-    var puntajeMaximoSel by remember { mutableStateOf(0) }
-    var seccionPublicacionSel by remember { mutableStateOf<SeccionComunicadoItem?>(null) }
     var hijosAgendaSel by remember { mutableStateOf<List<HijoAgendaItem>>(emptyList()) }
     var hijoAgendaSel by remember { mutableStateOf<HijoAgendaItem?>(null) }
     var publicacionesAgendaSel by remember { mutableStateOf<List<PublicacionAgendaItem>>(emptyList()) }
@@ -315,6 +331,34 @@ fun EduConnectApp() {
     var comunicadosDocenteSel by remember { mutableStateOf<List<ComunicadoDocenteResponse>>(emptyList()) }
     var adjuntosComunicadoSel by remember { mutableStateOf<Map<Long, ArchivoResponse>>(emptyMap()) }
     var descargandoAdjunto by remember { mutableStateOf(false) }
+    // Datos ya cargados (evitan peticiones repetidas al volver a una pantalla).
+    // Se recargan al entrar al módulo desde el Home o después de guardar algo.
+    var datosDocenteCargados by remember { mutableStateOf(false) }
+    var comunicadosDocenteCargados by remember { mutableStateOf(false) }
+    var comunicadosTodosSel by remember { mutableStateOf<List<ComunicadoDocenteResponse>>(emptyList()) }
+    var historialDocenteCargado by remember { mutableStateOf(false) }
+    var hijosApiSel by remember { mutableStateOf<List<HijoResponse>?>(null) }
+    var hijosAsistenciaCargados by remember { mutableStateOf(false) }
+    var historialHijoCargadoDe by remember { mutableStateOf<Long?>(null) }
+    var comunicadosPadreCargados by remember { mutableStateOf(false) }
+    var comunicadosHijoCargadoDe by remember { mutableStateOf<Long?>(null) }
+    // Publicaciones (docente)
+    var publicacionesDocenteSel by remember { mutableStateOf<List<PublicacionDocenteResponse>>(emptyList()) }
+    var publicacionesCargadas by remember { mutableStateOf(false) }
+    var seccionesPublicacionSel by remember { mutableStateOf<List<SeccionComunicadoItem>>(emptyList()) }
+    var asignacionPublicacionSel by remember { mutableStateOf<AsignacionResponse?>(null) }
+    var publicandoSel by remember { mutableStateOf(false) }
+    var publicacionNotificadosSel by remember { mutableStateOf(0) }
+    // Agenda (padre)
+    var agendaPorHijoSel by remember { mutableStateOf<Map<Long, List<PublicacionPadreResponse>>>(emptyMap()) }
+    var agendaCargada by remember { mutableStateOf(false) }
+    var adjuntosPublicacionSel by remember { mutableStateOf<Map<Long, ArchivoResponse>>(emptyMap()) }
+    var publicacionesLeidasSel by remember { mutableStateOf<Set<Long>>(emptySet()) }
+    // Notificaciones (campana del Home padre)
+    var notificacionesSel by remember { mutableStateOf<List<NotificacionResponse>>(emptyList()) }
+    var notificacionesNoLeidasSel by remember { mutableStateOf(0L) }
+    var cargandoNotificaciones by remember { mutableStateOf(false) }
+    var mostrarNotificaciones by remember { mutableStateOf(false) }   // panel debajo de la campana
 
     fun aviso(mensaje: String) { Toast.makeText(context, mensaje, Toast.LENGTH_SHORT).show() }
 
@@ -351,9 +395,147 @@ fun EduConnectApp() {
         resumenPorcentajeSel = resumen.third
     }
 
+    // Hijos del padre: se piden 1 sola vez por sesión (se actualizan en PERFIL_PADRE y al asociar)
+    suspend fun hijosDelPadre(): List<HijoResponse> =
+        hijosApiSel ?: obtenerHijos().also { hijosApiSel = it }
+
+    // Navegación del padre (barra inferior): entrar al módulo recarga sus datos
+    fun irAvisosPadre() {
+        comunicadosPadreCargados = false
+        currentScreen = Screen.COMUNICADOS_PADRE
+    }
+
+    fun irAgenda() {
+        agendaCargada = false
+        currentScreen = Screen.SELECCIONAR_HIJO_AGENDA
+    }
+
+    // Agenda de cada hijo: 1 petición por hijo, en paralelo
+    // Rango: últimos 30 días (para ver lo entregado/vencido) hasta fin del año escolar
+    suspend fun cargarAgendaPadre() {
+        val hijos = hijosDelPadre()
+        val hoy = java.time.LocalDate.now()
+        val inicio = inicioAnioEscolar(hoy)
+        val desde = maxOf(hoy.minusDays(30), inicio).toString()
+        val hasta = inicio.plusYears(1).minusDays(1).toString()
+        val agendas = coroutineScope {
+            hijos.map { h -> async { obtenerAgendaHijo(h.alumnoId, desde, hasta) } }.awaitAll()
+        }
+        val publicacionesPorHijo = hijos.mapIndexed { i, h ->
+            // Solo tareas y evaluaciones vigentes (las anuladas no se muestran)
+            h.alumnoId to agendas[i].publicaciones.filter {
+                it.estado != "ANULADA" && (it.tipo == "TAREA" || it.tipo == "EVALUACION")
+            }
+        }.toMap()
+        agendaPorHijoSel = publicacionesPorHijo
+        adjuntosPublicacionSel = publicacionesPorHijo.values.flatten()
+            .mapNotNull { p -> p.archivo?.let { p.id to it } }.toMap()
+        publicacionesLeidasSel = publicacionesPorHijo.values.flatten().filter { it.leido }.map { it.id }.toSet()
+        val hoyTexto = hoy.toString()
+        hijosAgendaSel = hijos.map { h ->
+            val items = publicacionesPorHijo[h.alumnoId].orEmpty().map { it.aPublicacionAgendaItem(hoyTexto) }
+            HijoAgendaItem(
+                id = h.alumnoId,
+                nombres = h.nombres,
+                apellidos = h.apellidos,
+                gradoNombre = h.grado,
+                seccionNombre = h.seccion,
+                gradoId = h.gradoId,
+                seccionId = h.seccionId,
+                tareasPendientes = items.count { it.tipo == "Tarea" && it.estado == "Pendiente" },
+                examenesPendientes = items.count { it.tipo == "Examen" && it.estado == "Pendiente" }
+            )
+        }
+        agendaCargada = true
+    }
+
+    // Campana del padre: abre (o cierra) el panel de notificaciones y carga la bandeja
+    fun abrirNotificaciones() {
+        if (mostrarNotificaciones) { mostrarNotificaciones = false; return }
+        mostrarNotificaciones = true
+        cargandoNotificaciones = true
+        CoroutineScope(Dispatchers.Main).launch {
+            try {
+                // 1 petición: bandeja del padre (más recientes primero)
+                val bandeja = obtenerBandeja()
+                notificacionesSel = bandeja.notificaciones.sortedByDescending { aFechaHoraLocal(it.createdAt) }
+                notificacionesNoLeidasSel = bandeja.noLeidas
+                // Curso, grado y sección de las tareas/exámenes: salen de la agenda (1 petición por hijo, solo si no está cargada)
+                val hayPublicaciones = notificacionesSel.any { it.tipo == "PUBLICACION" || it.tipo == "CALIFICACION" }
+                if (hayPublicaciones && !agendaCargada) {
+                    try { cargarAgendaPadre() } catch (e: Exception) { /* el panel se muestra sin ese dato */ }
+                }
+            } catch (e: Exception) {
+                aviso("Error cargando notificaciones: ${e.message}")
+            } finally {
+                cargandoNotificaciones = false
+            }
+        }
+    }
+
+    // Hijo y publicación a los que apunta una notificación de tarea/examen (busca en la agenda ya cargada)
+    fun contextoPublicacion(publicacionId: Long?): Pair<HijoAgendaItem, PublicacionPadreResponse>? {
+        if (publicacionId == null) return null
+        for ((alumnoId, publicaciones) in agendaPorHijoSel) {
+            val publicacion = publicaciones.find { it.id == publicacionId } ?: continue
+            val hijo = hijosAgendaSel.find { it.id == alumnoId } ?: continue
+            return hijo to publicacion
+        }
+        return null
+    }
+
+    // Notificación de tarea/examen: abre directamente su detalle (DETALLE_AGENDA).
+    // Si no está en la agenda cargada, la pide al backend; si no se encuentra, abre la Agenda.
+    fun abrirPublicacionDeNotificacion(publicacionId: Long?) {
+        CoroutineScope(Dispatchers.Main).launch {
+            try {
+                if (!agendaCargada) cargarAgendaPadre()
+                var contexto = contextoPublicacion(publicacionId)
+                if (contexto == null && publicacionId != null) {
+                    // Fuera del rango de la agenda: probar con cada hijo
+                    for (hijo in hijosAgendaSel) {
+                        val publicacion = try { obtenerPublicacionHijo(hijo.id, publicacionId) } catch (e: ApiException) { null }
+                        if (publicacion != null) {
+                            publicacion.archivo?.let { adjuntosPublicacionSel = adjuntosPublicacionSel + (publicacion.id to it) }
+                            if (publicacion.leido) publicacionesLeidasSel = publicacionesLeidasSel + publicacion.id
+                            contexto = hijo to publicacion
+                            break
+                        }
+                    }
+                }
+                val encontrado = contexto
+                when {
+                    encontrado == null -> irAgenda()
+                    encontrado.second.estado == "ANULADA" -> aviso("Esta publicación fue anulada por el docente")
+                    else -> {
+                        hijoAgendaSel = encontrado.first
+                        publicacionAgendaSel = encontrado.second
+                            .aPublicacionAgendaItem(java.time.LocalDate.now().toString())
+                        currentScreen = Screen.DETALLE_AGENDA
+                    }
+                }
+            } catch (e: Exception) {
+                aviso("No se pudo abrir la publicación: ${e.message}")
+            }
+        }
+    }
+
+    // Lleva al módulo de la notificación (asistencias, comunicados o agenda) con datos frescos
+    fun irAModuloDeNotificacion(tipo: String) {
+        when (tipo) {
+            "ASISTENCIA" -> {
+                hijosAsistenciaCargados = false
+                currentScreen = Screen.SELECCIONAR_ESTUDIANTE
+            }
+            "COMUNICADO" -> irAvisosPadre()
+            "PUBLICACION", "CALIFICACION" -> irAgenda()
+            else -> { /* AVISO: el mensaje completo ya se ve en la bandeja */ }
+        }
+    }
+
     // Comunicados de cada hijo del padre: 1 petición por hijo, en paralelo
     suspend fun cargarComunicadosPadre() {
-        val hijos = obtenerHijos()
+        val hijos = hijosDelPadre()
         val respuestas = coroutineScope {
             hijos.map { h -> async { obtenerComunicadosHijo(h.alumnoId) } }.awaitAll()
         }
@@ -368,6 +550,53 @@ fun EduConnectApp() {
                 sinLeer = respuestas[i].noLeidos,
                 total = respuestas[i].comunicados.size
             )
+        }
+        comunicadosPadreCargados = true
+    }
+
+    // Comunicados del docente: 1 petición (todas las secciones); las pantallas filtran localmente
+    suspend fun comunicadosDelDocente(): List<ComunicadoDocenteResponse> {
+        if (!comunicadosDocenteCargados) {
+            comunicadosTodosSel = obtenerComunicadosDocente()
+            comunicadosDocenteCargados = true
+        }
+        return comunicadosTodosSel
+    }
+
+    // Publicar tarea o evaluación: sube el adjunto (si hay) y crea la publicación.
+    // El backend notifica por push a los padres de la sección.
+    fun publicar(
+        tipoBackend: String, titulo: String, descripcion: String, adjunto: String,
+        seccion: SeccionDestinatario, fechaEntrega: String, hora: String
+    ) {
+        if (publicandoSel) return   // evita doble envío
+        publicandoSel = true
+        aviso(if (adjunto.isNotEmpty()) "Subiendo adjunto y publicando..." else "Publicando...")
+        CoroutineScope(Dispatchers.Main).launch {
+            try {
+                val archivoId = if (adjunto.isNotEmpty())
+                    subirArchivo(context.contentResolver, android.net.Uri.parse(adjunto)).id
+                else null
+                val publicada = crearPublicacion(
+                    seccion.seccionId, seccion.cursoId, tipoBackend, titulo, descripcion, fechaEntrega, archivoId
+                )
+                tituloPublicacionSel = publicada.titulo
+                fechaEntregaSel = publicada.fechaEntrega ?: fechaEntrega
+                horaPublicacionSel = hora
+                publicacionNotificadosSel = publicada.totalAlumnos.toInt()
+                publicacionesCargadas = false   // el resumen cambió
+                currentScreen = Screen.CONFIRMACION_PUBLICACION
+            } catch (e: ApiException) {
+                aviso(when (e.codigo) {
+                    413 -> "El archivo supera los 10 MB"
+                    415 -> "Tipo de archivo no permitido (PDF, Word, Excel, TXT o imagen)"
+                    else -> "Error al publicar: ${e.message}"
+                })
+            } catch (e: Exception) {
+                aviso("Error al publicar: ${e.message}")
+            } finally {
+                publicandoSel = false
+            }
         }
     }
 
@@ -421,6 +650,29 @@ fun EduConnectApp() {
         comunicadosPadreSel = emptyList()
         comunicadoPadreSel = null
         adjuntosComunicadoSel = emptyMap()
+        datosDocenteCargados = false
+        comunicadosDocenteCargados = false
+        comunicadosTodosSel = emptyList()
+        historialDocenteCargado = false
+        hijosApiSel = null
+        hijosAsistenciaCargados = false
+        historialHijoCargadoDe = null
+        comunicadosPadreCargados = false
+        comunicadosHijoCargadoDe = null
+        publicacionesDocenteSel = emptyList()
+        publicacionesCargadas = false
+        seccionesPublicacionSel = emptyList()
+        asignacionPublicacionSel = null
+        agendaPorHijoSel = emptyMap()
+        agendaCargada = false
+        hijosAgendaSel = emptyList()
+        hijoAgendaSel = null
+        publicacionesAgendaSel = emptyList()
+        adjuntosPublicacionSel = emptyMap()
+        publicacionesLeidasSel = emptySet()
+        notificacionesSel = emptyList()
+        notificacionesNoLeidasSel = 0L
+        mostrarNotificaciones = false
     }
 
 
@@ -450,7 +702,7 @@ fun EduConnectApp() {
                                             return@launch
                                         }
                                         usuarioLogueado = UsuarioLogueado(
-                                            id = usuario.id.toString(),   // pasa a Long en la Etapa 2
+                                            id = usuario.id,
                                             nombrecompleto = usuario.nombreCompleto,
                                             email = usuario.email,
                                             rol = usuario.rol,
@@ -512,11 +764,14 @@ fun EduConnectApp() {
                 Screen.HOME_DOCENTE -> {
                     androidx.compose.runtime.LaunchedEffect(usuarioLogueado?.id) {
                         if (usuarioLogueado == null) return@LaunchedEffect
+                        if (datosDocenteCargados) return@LaunchedEffect   // ya cargado en esta sesión
                         try {
-                            // Precarga de asignaciones y resumen del día (backend propio)
+                            // Precarga de asignaciones y resumen del día (1 sola vez por sesión;
+                            // el resumen se refresca al guardar una asistencia)
                             val asignaciones = obtenerAsignaciones()
                             aplicarAsignaciones(asignaciones)
                             actualizarResumen(obtenerResumenAsistenciasHoy(asignaciones))
+                            datosDocenteCargados = true
                         } catch (e: kotlinx.coroutines.CancellationException) {
                             throw e
                         } catch (e: Exception) { /* silencioso */ }
@@ -526,45 +781,63 @@ fun EduConnectApp() {
                         onAsistencias = {
                             currentScreen = Screen.ASISTENCIAS
                         },
-                        onComunicados = { currentScreen = Screen.COMUNICADOS },
-                        onPublicaciones = { currentScreen = Screen.PUBLICACIONES },
+                        onComunicados = {
+                            comunicadosDocenteCargados = false   // entrar al módulo: datos frescos
+                            currentScreen = Screen.COMUNICADOS
+                        },
+                        onPublicaciones = {
+                            publicacionesCargadas = false
+                            currentScreen = Screen.PUBLICACIONES
+                        },
                         onAlumnos = {},
-                        onAvisos = { currentScreen = Screen.COMUNICADOS },
+                        onAvisos = {
+                            comunicadosDocenteCargados = false
+                            currentScreen = Screen.COMUNICADOS
+                        },
                         onPerfilDocente = { currentScreen = Screen.PERFIL_DOCENTE },
                         onNotificaciones = {}
                     )
                 }
 
                 Screen.HOME_PADRE -> {
-                    var tieneNotificaciones by remember { mutableStateOf(false) }
                     androidx.compose.runtime.LaunchedEffect(usuarioLogueado?.id) {
-                        val padreId = usuarioLogueado?.id ?: return@LaunchedEffect
+                        if (usuarioLogueado == null) return@LaunchedEffect
                         try {
-                            val sinLeer = contarNotificacionesNoLeidas(padreId)
-                            tieneNotificaciones = sinLeer > 0
+                            // 1 petición: notificaciones sin leer para el punto rojo de la campana
+                            val bandeja = obtenerBandeja()
+                            notificacionesSel = bandeja.notificaciones
+                            notificacionesNoLeidasSel = bandeja.noLeidas
+                        } catch (e: kotlinx.coroutines.CancellationException) {
+                            throw e
                         } catch (e: Exception) { /* silencioso */ }
                     }
                     HomePadreScreen(
                         usuarioNombre = usuarioLogueado?.nombrecompleto ?: "",
-                        tieneNotificaciones = tieneNotificaciones,
-                        onAsistencias = { currentScreen = Screen.SELECCIONAR_ESTUDIANTE },
-                        onComunicados = { currentScreen = Screen.COMUNICADOS_PADRE },
-                        onAgenda = { currentScreen = Screen.SELECCIONAR_HIJO_AGENDA },
-                        onEstadoAcademico = {},
-                        onAvisos = {},
+                        tieneNotificaciones = notificacionesNoLeidasSel > 0,
+                        onAsistencias = {
+                            hijosAsistenciaCargados = false
+                            currentScreen = Screen.SELECCIONAR_ESTUDIANTE
+                        },
+                        onComunicados = { irAvisosPadre() },
+                        onAgenda = { irAgenda() },
+                        onEstadoAcademico = { aviso("Estado académico disponible próximamente") },
+                        onAvisos = { irAvisosPadre() },
                         onPerfil = { currentScreen = Screen.PERFIL_PADRE },
-                        onNotificaciones = { currentScreen = Screen.HISTORIAL_ASISTENCIAS }
+                        onNotificaciones = { abrirNotificaciones() }
                     )
                 }
 
                 Screen.ASISTENCIAS -> {
                     androidx.compose.runtime.LaunchedEffect(Unit) {
                         if (usuarioLogueado == null) return@LaunchedEffect
+                        // El resumen ya se calculó en HOME_DOCENTE (y se refresca al guardar una asistencia)
+                        if (datosDocenteCargados) return@LaunchedEffect
                         try {
                             val asignaciones = asignacionesApiSel.ifEmpty {
                                 obtenerAsignaciones().also { aplicarAsignaciones(it) }
                             }
                             actualizarResumen(obtenerResumenAsistenciasHoy(asignaciones))
+                            datosDocenteCargados = true
                         } catch (e: kotlinx.coroutines.CancellationException) {
                             throw e
                         } catch (e: Exception) { /* silencioso */ }
@@ -575,7 +848,10 @@ fun EduConnectApp() {
                         onHistorial = { currentScreen = Screen.SELECCIONAR_SECCION_HISTORIAL },
                         onHomeDocente = { currentScreen = Screen.HOME_DOCENTE },
                         onAlumnos = {},
-                        onAvisos = {},
+                        onAvisos = {
+                            comunicadosDocenteCargados = false
+                            currentScreen = Screen.COMUNICADOS
+                        },
                         onPerfilDocente = { currentScreen = Screen.PERFIL_DOCENTE },
                         onNotificaciones = {},
                         realizados = resumenRealizadosSel,
@@ -599,7 +875,7 @@ fun EduConnectApp() {
                         } catch (e: Exception) { aviso("Error cargando datos: ${e.message}") }
                     }
                     SeleccionarSeccionScreen(
-                        docenteId = usuarioLogueado?.id ?: "",
+                        docenteId = usuarioLogueado?.id?.toString() ?: "",
                         listaGrados = listaGradosSel,
                         listaSecciones = listaSeccionesSel,
                         listaCursos = listaCursosSel,
@@ -653,7 +929,7 @@ fun EduConnectApp() {
                         } catch (e: Exception) { aviso("Error cargando alumnos: ${e.message}") }
                     }
                     RegistroAsistenciaScreen(
-                        docenteId = usuarioLogueado?.id ?: "",
+                        docenteId = usuarioLogueado?.id?.toString() ?: "",
                         gradoId = gradoIdSel,
                         seccionId = seccionIdSel,
                         cursoId = cursoIdSel,
@@ -716,8 +992,9 @@ fun EduConnectApp() {
                 Screen.SELECCIONAR_ESTUDIANTE -> {
                     androidx.compose.runtime.LaunchedEffect(usuarioLogueado?.id) {
                         if (usuarioLogueado == null) return@LaunchedEffect
+                        if (hijosAsistenciaCargados) return@LaunchedEffect   // al volver del historial
                         try {
-                            val hijos = obtenerHijos()
+                            val hijos = hijosDelPadre()
                             val hoy = java.time.LocalDate.now()
                             val desde = hoy.withDayOfMonth(1).toString()
                             // % de asistencia del mes de cada hijo (1 petición por hijo, en paralelo)
@@ -737,22 +1014,24 @@ fun EduConnectApp() {
                                     porcentajeMes = porcentajes[i]
                                 )
                             }
+                            hijosAsistenciaCargados = true
                         } catch (e: kotlinx.coroutines.CancellationException) {
                             throw e
                         } catch (e: Exception) { aviso("Error cargando estudiantes: ${e.message}") }
                     }
                     SeleccionarEstudianteScreen(
-                        padreId = usuarioLogueado?.id ?: "",
+                        padreId = usuarioLogueado?.id?.toString() ?: "",
                         padreNombre = usuarioLogueado?.nombrecompleto ?: "",
                         listaHijos = listaHijosSel,
                         onBack = { currentScreen = Screen.HOME_PADRE },
                         onHomePadre = { currentScreen = Screen.HOME_PADRE },
-                        onAvisos = {},
-                        onAgenda = {},
+                        onAvisos = { irAvisosPadre() },
+                        onAgenda = { irAgenda() },
                         onPerfil = { currentScreen = Screen.PERFIL_PADRE },
-                        onNotificaciones = {},
+                        onNotificaciones = { abrirNotificaciones() },
                         onVerHistorial = { alumnoId, alumnoNombre ->
                             alumnoIdSel = alumnoId; alumnoNombreSel = alumnoNombre
+                            historialHijoCargadoDe = null   // elegido desde la lista: datos frescos
                             currentScreen = Screen.HISTORIAL_ASISTENCIAS
                         }
                     )
@@ -760,6 +1039,8 @@ fun EduConnectApp() {
 
                 Screen.HISTORIAL_ASISTENCIAS -> {
                     androidx.compose.runtime.LaunchedEffect(alumnoIdSel) {
+                        // Al volver del detalle no se vuelve a pedir el historial
+                        if (historialHijoCargadoDe == alumnoIdSel) return@LaunchedEffect
                         todasAsistenciasSel = emptyList()
                         listaCursosHistorialSel = emptyList()
                         try {
@@ -782,6 +1063,7 @@ fun EduConnectApp() {
                                     estado = a.estado
                                 )
                             }
+                            historialHijoCargadoDe = alumnoIdSel
                         } catch (e: kotlinx.coroutines.CancellationException) {
                             throw e
                         } catch (e: Exception) {
@@ -796,10 +1078,10 @@ fun EduConnectApp() {
                         listaCursos = listaCursosHistorialSel,
                         onBack = { currentScreen = Screen.SELECCIONAR_ESTUDIANTE },
                         onHomePadre = { currentScreen = Screen.HOME_PADRE },
-                        onAvisos = {},
-                        onAgenda = {},
+                        onAvisos = { irAvisosPadre() },
+                        onAgenda = { irAgenda() },
                         onPerfil = { currentScreen = Screen.PERFIL_PADRE },
-                        onNotificaciones = {},
+                        onNotificaciones = { abrirNotificaciones() },
                         onVerDetalle = { asistenciaId, fecha ->
                             asistenciaIdSel = asistenciaId
                             fechaAsistenciaSel = fecha
@@ -831,10 +1113,10 @@ fun EduConnectApp() {
                         detalle = detalleAsistenciaSel,
                         onBack = { currentScreen = Screen.HISTORIAL_ASISTENCIAS },
                         onHomePadre = { currentScreen = Screen.HOME_PADRE },
-                        onAvisos = {},
-                        onAgenda = {},
+                        onAvisos = { irAvisosPadre() },
+                        onAgenda = { irAgenda() },
                         onPerfil = { currentScreen = Screen.PERFIL_PADRE },
-                        onNotificaciones = {}
+                        onNotificaciones = { abrirNotificaciones() }
                     )
                 }
 
@@ -844,7 +1126,7 @@ fun EduConnectApp() {
                         try {
                             // Resumen del día: 1 petición (el backend ya trae notificados y leídos)
                             val hoy = java.time.LocalDate.now().toString()
-                            val deHoy = obtenerComunicadosDocente().filter { fechaLocal(it.enviadoEn) == hoy }
+                            val deHoy = comunicadosDelDocente().filter { fechaLocal(it.enviadoEn) == hoy }
                             totalHoySel = deHoy.size
                             totalEnviadosSel = deHoy.sumOf { it.totalNotificados }
                             sinLeerSel = deHoy.sumOf { (it.totalNotificados - it.totalLeidos).coerceAtLeast(0).toInt() }
@@ -855,7 +1137,7 @@ fun EduConnectApp() {
                         }
                     }
                     ComunicadosScreen(
-                        docenteId = usuarioLogueado?.id ?: "",
+                        docenteId = usuarioLogueado?.id?.toString() ?: "",
                         docenteNombre = usuarioLogueado?.nombrecompleto ?: "",
                         totalEnviados = totalEnviadosSel,
                         totalHoy = totalHoySel,
@@ -895,7 +1177,7 @@ fun EduConnectApp() {
                         } catch (e: Exception) { aviso("Error cargando destinatarios: ${e.message}") }
                     }
                     NuevoComunicadoScreen(
-                        docenteId = usuarioLogueado?.id ?: "",
+                        docenteId = usuarioLogueado?.id?.toString() ?: "",
                         docenteNombre = usuarioLogueado?.nombrecompleto ?: "",
                         listaDestinatarios = listaDestinatariosSel,
                         onBack = { currentScreen = Screen.COMUNICADOS },
@@ -926,6 +1208,7 @@ fun EduConnectApp() {
                                     comunicadoNotificadosSel = enviado.totalNotificados
                                     comunicadoHoraSel = horaLocal(enviado.enviadoEn)
                                     comunicadoFechaSel = fechaLocal(enviado.enviadoEn)
+                                    comunicadosDocenteCargados = false   // hay un comunicado nuevo
                                     currentScreen = Screen.CONFIRMACION_COMUNICADO
                                 } catch (e: ApiException) {
                                     aviso(when (e.codigo) {
@@ -1003,7 +1286,9 @@ fun EduConnectApp() {
                         if (usuarioLogueado == null) return@LaunchedEffect
                         try {
                             // 1 petición: el backend ya trae grado y sección de cada hijo
-                            hijosAsociadosSel = obtenerHijos().map { it.aHijoAsociado() }
+                            val hijos = obtenerHijos()
+                            hijosApiSel = hijos
+                            hijosAsociadosSel = hijos.map { it.aHijoAsociado() }
                         } catch (e: kotlinx.coroutines.CancellationException) {
                             throw e
                         } catch (e: Exception) { aviso("Error cargando hijos: ${e.message}") }
@@ -1016,8 +1301,8 @@ fun EduConnectApp() {
                         hijosAsociados = hijosAsociadosSel,
                         onBack = { currentScreen = Screen.HOME_PADRE },
                         onHomePadre = { currentScreen = Screen.HOME_PADRE },
-                        onAvisos = {},
-                        onAgenda = {},
+                        onAvisos = { irAvisosPadre() },
+                        onAgenda = { irAgenda() },
                         onPerfil = { currentScreen = Screen.PERFIL_PADRE },
                         onEditarNombre = {},
                         onEditarDni = {},
@@ -1080,6 +1365,7 @@ fun EduConnectApp() {
                                 try {
                                     val nueva = agregarAsignacion(seccionId, cursoId)
                                     aplicarAsignaciones(asignacionesApiSel + nueva)
+                                    datosDocenteCargados = false   // el resumen del día debe incluirla
                                     aviso("Asignación agregada"); currentScreen = Screen.PERFIL_DOCENTE
                                 } catch (e: ApiException) {
                                     aviso(if (e.codigo == 409) "Ya tienes asignado ese curso en esa sección" else (e.message ?: "Error al guardar"))
@@ -1092,11 +1378,11 @@ fun EduConnectApp() {
 
                 Screen.ASOCIAR_HIJO -> AsociarHijoScreen(
                     onBack = { currentScreen = Screen.PERFIL_PADRE },
-                    onHomeDocente = { currentScreen = Screen.HOME_DOCENTE },
-                    onAvisos = {},
-                    onAgenda = {},
+                    onHomeDocente = { currentScreen = Screen.HOME_PADRE },   // pantalla del padre
+                    onAvisos = { irAvisosPadre() },
+                    onAgenda = { irAgenda() },
                     onPerfil = {currentScreen = Screen.PERFIL_PADRE},
-                    onNotificaciones = {},
+                    onNotificaciones = { abrirNotificaciones() },
                     onBuscar = { codigo ->
                         CoroutineScope(Dispatchers.Main).launch {
                             try {
@@ -1121,6 +1407,11 @@ fun EduConnectApp() {
                                 aviso("Hijo asociado correctamente")
                                 alumnoEncontradoSel = null; errorBusquedaSel = ""
                                 hijosAsociadosSel = hijosAsociadosSel.filter { it.id != hijo.alumnoId } + hijo.aHijoAsociado()
+                                hijosApiSel = hijosApiSel.orEmpty().filter { it.alumnoId != hijo.alumnoId } + hijo
+                                // Los módulos del padre deben incluir al nuevo hijo
+                                hijosAsistenciaCargados = false
+                                comunicadosPadreCargados = false
+                                agendaCargada = false
                                 currentScreen = Screen.PERFIL_PADRE
                             } catch (e: ApiException) {
                                 aviso(if (e.codigo == 409) "Este estudiante ya está asociado a tu cuenta" else (e.message ?: "Error al asociar"))
@@ -1134,11 +1425,11 @@ fun EduConnectApp() {
                     androidx.compose.runtime.LaunchedEffect(usuarioLogueado?.id) {
                         if (usuarioLogueado == null) return@LaunchedEffect
                         try {
-                            // 2 peticiones en total: asignaciones (si no están) + todos los comunicados del docente
+                            // Sin peticiones si se viene de COMUNICADOS (asignaciones y comunicados ya cargados)
                             val asignaciones = asignacionesApiSel.ifEmpty {
                                 obtenerAsignaciones().also { aplicarAsignaciones(it) }
                             }
-                            val porSeccion = obtenerComunicadosDocente().groupingBy { it.seccionId }.eachCount()
+                            val porSeccion = comunicadosDelDocente().groupingBy { it.seccionId }.eachCount()
                             seccionesComunicadoSel = asignaciones.map { a ->
                                 SeccionComunicadoItem(
                                     seccionId = a.seccionId,
@@ -1174,8 +1465,8 @@ fun EduConnectApp() {
                 Screen.BUSQUEDA_COMUNICADO -> {
                     androidx.compose.runtime.LaunchedEffect(seccionIdSel) {
                         try {
-                            // 1 petición: cada comunicado ya trae notificados y leídos
-                            val comunicados = obtenerComunicadosDocente(seccionIdSel)
+                            // Filtro LOCAL: los comunicados ya se cargaron (traen notificados y leídos)
+                            val comunicados = comunicadosDelDocente().filter { it.seccionId == seccionIdSel }
                             comunicadosDocenteSel = comunicados
                             comunicadosListaSel = comunicados.map { com ->
                                 ComunicadoResumenItem(
@@ -1263,22 +1554,31 @@ fun EduConnectApp() {
 
                 Screen.PUBLICACIONES -> {
                     androidx.compose.runtime.LaunchedEffect(usuarioLogueado?.id) {
-                        val docenteId = usuarioLogueado?.id ?: return@LaunchedEffect
+                        if (usuarioLogueado == null) return@LaunchedEffect
+                        if (publicacionesCargadas) return@LaunchedEffect   // al volver de la selección de curso
                         try {
-                            val (tareas, examenes, vence) = obtenerResumenPublicaciones(docenteId)
-                            totalTareasSel = tareas
-                            totalExamenesSel = examenes
-                            venceHoySel = vence
+                            // 1 petición: todas las publicaciones del docente
+                            publicacionesDocenteSel = obtenerPublicacionesDocente()
+                            publicacionesCargadas = true
+                        } catch (e: kotlinx.coroutines.CancellationException) {
+                            throw e
                         } catch (e: Exception) { aviso("Error cargando publicaciones: ${e.message}") }
                     }
+                    // Resumen (local): tareas y exámenes vigentes, y los que vencen hoy
+                    val vigentes = publicacionesDocenteSel.filter { it.estado != "ANULADA" }
+                    val hoy = java.time.LocalDate.now().toString()
                     PublicacionesScreen(
-                        totalTareas = totalTareasSel,
-                        totalExamenes = totalExamenesSel,
-                        venceHoy = venceHoySel,
+                        totalTareas = vigentes.count { it.tipo == "TAREA" },
+                        totalExamenes = vigentes.count { it.tipo == "EVALUACION" },
+                        venceHoy = vigentes.count { it.fechaEntrega == hoy },
+                        totalPublicacionesHoy = vigentes.count { fechaLocal(it.publicadoEn) == hoy },
                         onBack = { currentScreen = Screen.HOME_DOCENTE },
                         onHomeDocente = { currentScreen = Screen.HOME_DOCENTE },
                         onAlumnos = {},
-                        onAvisos = {currentScreen = Screen.COMUNICADOS },
+                        onAvisos = {
+                            comunicadosDocenteCargados = false
+                            currentScreen = Screen.COMUNICADOS
+                        },
                         onPerfilDocente = { currentScreen = Screen.PERFIL_DOCENTE },
                         onNotificaciones = {},
                         onNuevaTarea = {
@@ -1289,147 +1589,118 @@ fun EduConnectApp() {
                             tipoPublicacionSel = "Examen"
                             currentScreen = Screen.SELECCIONAR_CURSO_PUBLICACION
                         },
-                        onHistorial = {}
+                        onHistorial = { aviso("Historial de publicaciones disponible próximamente") }
                     )
                 }
 
                 Screen.SELECCIONAR_CURSO_PUBLICACION -> {
                     androidx.compose.runtime.LaunchedEffect(usuarioLogueado?.id) {
-                        val docenteId = usuarioLogueado?.id ?: return@LaunchedEffect
+                        if (usuarioLogueado == null) return@LaunchedEffect
                         try {
-                            val asignaciones = obtenerDocenteSecciones(docenteId)
-                            val lista = mutableListOf<SeccionComunicadoItem>()
-                            asignaciones.forEach { asig ->
-                                val grado = obtenerGradoPorId(asig.grado_id) ?: return@forEach
-                                val seccion = obtenerSeccionPorId(asig.seccion_id) ?: return@forEach
-                                val curso = obtenerCursoPorId(asig.curso_id) ?: return@forEach
-                                val alumnos = obtenerAlumnosPorSeccion(asig.seccion_id)
-                                lista.add(SeccionComunicadoItem(
-                                    seccionId = asig.seccion_id,
-                                    gradoNombre = grado.nombre,
-                                    seccionNombre = seccion.nombre,
-                                    cursoNombre = curso.nombre,
-                                    cantidadAlumnos = alumnos.size,
-                                    cantidadComunicados = 0
-                                ))
+                            // Sin peticiones si las asignaciones ya están cargadas (traen nombres y alumnos)
+                            val asignaciones = asignacionesApiSel.ifEmpty {
+                                obtenerAsignaciones().also { aplicarAsignaciones(it) }
                             }
-                            seccionesComunicadoSel = lista
+                            seccionesPublicacionSel = asignaciones.map { a ->
+                                SeccionComunicadoItem(
+                                    seccionId = a.seccionId,
+                                    gradoNombre = a.grado,
+                                    seccionNombre = a.seccion,
+                                    cursoNombre = a.curso,
+                                    cantidadAlumnos = a.cantidadAlumnos.toInt(),
+                                    cantidadComunicados = 0
+                                )
+                            }
+                        } catch (e: kotlinx.coroutines.CancellationException) {
+                            throw e
                         } catch (e: Exception) { aviso("Error cargando cursos: ${e.message}") }
                     }
                     SeleccionarCursoPublicacionScreen(
                         tipo = tipoPublicacionSel,
-                        secciones = seccionesComunicadoSel,
+                        secciones = seccionesPublicacionSel,
                         onBack = { currentScreen = Screen.PUBLICACIONES },
                         onHomeDocente = { currentScreen = Screen.HOME_DOCENTE },
                         onAlumnos = {},
-                        onAvisos = {currentScreen = Screen.COMUNICADOS },
+                        onAvisos = {
+                            comunicadosDocenteCargados = false
+                            currentScreen = Screen.COMUNICADOS
+                        },
                         onPerfilDocente = { currentScreen = Screen.PERFIL_DOCENTE },
                         onNotificaciones = {},
                         onSeleccionar = { seccion ->
-                            seccionPublicacionSel = seccion
-                            currentScreen = if (tipoPublicacionSel == "Tarea") Screen.NUEVA_TAREA else Screen.NUEVA_EVALUACION
+                            // La tarjeta no trae el id del curso: se busca la asignación por sección y curso
+                            val asignacion = asignacionesApiSel.find {
+                                it.seccionId == seccion.seccionId && it.curso == seccion.cursoNombre
+                            }
+                            if (asignacion == null) {
+                                aviso("No se encontró la asignación, vuelve a intentarlo")
+                            } else {
+                                asignacionPublicacionSel = asignacion
+                                currentScreen = if (tipoPublicacionSel == "Tarea") Screen.NUEVA_TAREA else Screen.NUEVA_EVALUACION
+                            }
                         }
                     )
                 }
 
                 Screen.NUEVA_TAREA -> {
-                    val dest = seccionPublicacionSel
-                    if (dest != null) {
+                    val asignacion = asignacionPublicacionSel
+                    if (asignacion != null) {
                         NuevaTareaScreen(
                             listaDestinatarios = listOf(
                                 SeccionDestinatario(
-                                    gradoId = dest.seccionId,
-                                    seccionId = dest.seccionId,
-                                    cursoId = dest.seccionId,
-                                    gradoNombre = dest.gradoNombre,
-                                    seccionNombre = dest.seccionNombre,
-                                    cursoNombre = dest.cursoNombre,
-                                    totalPadres = dest.cantidadAlumnos
+                                    gradoId = asignacion.gradoId,
+                                    seccionId = asignacion.seccionId,
+                                    cursoId = asignacion.cursoId,
+                                    gradoNombre = asignacion.grado,
+                                    seccionNombre = asignacion.seccion,
+                                    cursoNombre = asignacion.curso,
+                                    totalPadres = asignacion.cantidadAlumnos.toInt()
                                 )
                             ),
-                            cursoNombre = seccionPublicacionSel?.cursoNombre ?: "",
+                            cursoNombre = asignacion.curso,
                             onBack = { currentScreen = Screen.SELECCIONAR_CURSO_PUBLICACION },
                             onHomeDocente = { currentScreen = Screen.HOME_DOCENTE },
                             onAlumnos = {},
-                            onAvisos = {currentScreen = Screen.COMUNICADOS },
+                            onAvisos = {
+                                comunicadosDocenteCargados = false
+                                currentScreen = Screen.COMUNICADOS
+                            },
                             onPerfilDocente = { currentScreen = Screen.PERFIL_DOCENTE },
                             onNotificaciones = {},
-                            onPublicar = { titulo, descripcion, adjunto, seccion, fechaEntrega, fechaPub, hora ->
-                                CoroutineScope(Dispatchers.Main).launch {
-                                    try {
-                                        val docenteId = usuarioLogueado?.id ?: return@launch
-                                        val asig = obtenerDocenteSeccionesPorSeccion(docenteId, seccion.seccionId)
-                                            .firstOrNull() ?: return@launch
-                                        insertarPublicacion(PublicacionInsert(
-                                            docente_id = docenteId,
-                                            curso_id = asig.curso_id,
-                                            grado_id = asig.grado_id,
-                                            seccion_id = asig.seccion_id,
-                                            titulo = titulo,
-                                            descripcion = descripcion,
-                                            tipo = "Tarea",
-                                            fecha_entrega = fechaEntrega,
-                                            fecha_publicacion = fechaPub,
-                                            archivo_adjunto = adjunto
-                                        ))
-                                        tituloPublicacionSel = titulo
-                                        fechaEntregaSel = fechaEntrega
-                                        horaPublicacionSel = hora
-                                        puntajeMaximoSel = 0
-                                        currentScreen = Screen.CONFIRMACION_PUBLICACION
-                                    } catch (e: Exception) { aviso("Error al publicar: ${e.message}") }
-                                }
+                            onPublicar = { titulo, descripcion, adjunto, seccion, fechaEntrega, _, hora ->
+                                publicar("TAREA", titulo, descripcion, adjunto, seccion, fechaEntrega, hora)
                             }
                         )
                     }
                 }
 
                 Screen.NUEVA_EVALUACION -> {
-                    val dest = seccionPublicacionSel
-                    if (dest != null) {
+                    val asignacion = asignacionPublicacionSel
+                    if (asignacion != null) {
                         NuevaEvaluacionScreen(
                             listaDestinatarios = listOf(
                                 SeccionDestinatario(
-                                    gradoId = dest.seccionId,
-                                    seccionId = dest.seccionId,
-                                    cursoId = dest.seccionId,
-                                    gradoNombre = dest.gradoNombre,
-                                    seccionNombre = dest.seccionNombre,
-                                    cursoNombre = dest.cursoNombre,
-                                    totalPadres = dest.cantidadAlumnos
+                                    gradoId = asignacion.gradoId,
+                                    seccionId = asignacion.seccionId,
+                                    cursoId = asignacion.cursoId,
+                                    gradoNombre = asignacion.grado,
+                                    seccionNombre = asignacion.seccion,
+                                    cursoNombre = asignacion.curso,
+                                    totalPadres = asignacion.cantidadAlumnos.toInt()
                                 )
                             ),
-                            cursoNombre = seccionPublicacionSel?.cursoNombre ?: "",
+                            cursoNombre = asignacion.curso,
                             onBack = { currentScreen = Screen.SELECCIONAR_CURSO_PUBLICACION },
                             onHomeDocente = { currentScreen = Screen.HOME_DOCENTE },
                             onAlumnos = {},
-                            onAvisos = {currentScreen = Screen.COMUNICADOS },
+                            onAvisos = {
+                                comunicadosDocenteCargados = false
+                                currentScreen = Screen.COMUNICADOS
+                            },
                             onPerfilDocente = { currentScreen = Screen.PERFIL_DOCENTE },
                             onNotificaciones = {},
-                            onPublicar = { titulo, descripcion, adjunto, seccion, fechaExamen, fechaPub, hora ->
-                                CoroutineScope(Dispatchers.Main).launch {
-                                    try {
-                                        val docenteId = usuarioLogueado?.id ?: return@launch
-                                        val asig = obtenerDocenteSeccionesPorSeccion(docenteId, seccion.seccionId)
-                                            .firstOrNull() ?: return@launch
-                                        insertarPublicacion(PublicacionInsert(
-                                            docente_id = docenteId,
-                                            curso_id = asig.curso_id,
-                                            grado_id = asig.grado_id,
-                                            seccion_id = asig.seccion_id,
-                                            titulo = titulo,
-                                            descripcion = descripcion,
-                                            tipo = "Examen",
-                                            fecha_entrega = fechaExamen,
-                                            fecha_publicacion = fechaPub,
-                                            archivo_adjunto = adjunto
-                                        ))
-                                        tituloPublicacionSel = titulo
-                                        fechaEntregaSel = fechaExamen
-                                        horaPublicacionSel = hora
-                                        currentScreen = Screen.CONFIRMACION_PUBLICACION
-                                    } catch (e: Exception) { aviso("Error al publicar: ${e.message}") }
-                                }
+                            onPublicar = { titulo, descripcion, adjunto, seccion, fechaExamen, _, hora ->
+                                publicar("EVALUACION", titulo, descripcion, adjunto, seccion, fechaExamen, hora)
                             }
                         )
                     }
@@ -1438,55 +1709,38 @@ fun EduConnectApp() {
                 Screen.CONFIRMACION_PUBLICACION -> ConfirmacionPublicacionScreen(
                     tipo = tipoPublicacionSel,
                     titulo = tituloPublicacionSel,
-                    gradoNombre = seccionPublicacionSel?.gradoNombre ?: "",
-                    seccionNombre = seccionPublicacionSel?.seccionNombre ?: "",
-                    cursoNombre = seccionPublicacionSel?.cursoNombre ?: "",
-                    totalNotificados = seccionPublicacionSel?.cantidadAlumnos ?: 0,
+                    gradoNombre = asignacionPublicacionSel?.grado ?: "",
+                    seccionNombre = asignacionPublicacionSel?.seccion ?: "",
+                    cursoNombre = asignacionPublicacionSel?.curso ?: "",
+                    totalNotificados = publicacionNotificadosSel,
                     fechaEntrega = fechaEntregaSel,
                     hora = horaPublicacionSel,
                     onNuevaPublicacion = {
                         currentScreen = Screen.SELECCIONAR_CURSO_PUBLICACION
                     },
-                    onVerHistorial = {},
+                    onVerHistorial = { aviso("Historial de publicaciones disponible próximamente") },
                     onVolver = { currentScreen = Screen.PUBLICACIONES }
                 )
 
                 Screen.SELECCIONAR_HIJO_AGENDA -> {
                     androidx.compose.runtime.LaunchedEffect(usuarioLogueado?.id) {
-                        val padreId = usuarioLogueado?.id ?: return@LaunchedEffect
+                        if (usuarioLogueado == null) return@LaunchedEffect
+                        if (agendaCargada) return@LaunchedEffect   // al volver de la agenda de un hijo
                         try {
-                            val relaciones = obtenerHijosPadre(padreId)
-                            val lista = mutableListOf<HijoAgendaItem>()
-                            relaciones.forEach { rel ->
-                                val alumno = buscarAlumnoPorCodigo(rel.codigo_estudiante) ?: return@forEach
-                                val grado = obtenerGradoPorId(alumno.grado_id) ?: return@forEach
-                                val seccion = obtenerSeccionPorId(alumno.seccion_id) ?: return@forEach
-                                val publicaciones = obtenerPublicacionesPorAlumno(alumno.seccion_id, alumno.grado_id)
-                                val tareas = publicaciones.count { it.tipo == "Tarea" && it.estado.lowercase() == "pendiente" }
-                                val examenes = publicaciones.count { it.tipo == "Examen" && it.estado.lowercase() == "pendiente" }
-                                lista.add(HijoAgendaItem(
-                                    id = alumno.id,
-                                    nombres = alumno.nombres,
-                                    apellidos = alumno.apellidos,
-                                    gradoNombre = grado.nombre,
-                                    seccionNombre = seccion.nombre,
-                                    gradoId = alumno.grado_id,
-                                    seccionId = alumno.seccion_id,
-                                    tareasPendientes = tareas,
-                                    examenesPendientes = examenes
-                                ))
-                            }
-                            hijosAgendaSel = lista
-                        } catch (e: Exception) { aviso("Error cargando hijos: ${e.message}") }
+                            // 1 petición por hijo, en paralelo (antes: 4 consultas + 1 por publicación)
+                            cargarAgendaPadre()
+                        } catch (e: kotlinx.coroutines.CancellationException) {
+                            throw e
+                        } catch (e: Exception) { aviso("Error cargando agenda: ${e.message}") }
                     }
                     SeleccionarHijoAgendaScreen(
                         hijos = hijosAgendaSel,
                         onBack = { currentScreen = Screen.HOME_PADRE },
                         onHomePadre = { currentScreen = Screen.HOME_PADRE },
-                        onAvisos = {},
-                        onAgenda = {currentScreen = Screen.AGENDA_ESCOLAR},
+                        onAvisos = { irAvisosPadre() },
+                        onAgenda = { irAgenda() },
                         onPerfil = {currentScreen = Screen.PERFIL_PADRE},
-                        onNotificaciones = {},
+                        onNotificaciones = { abrirNotificaciones() },
                         onVerAgenda = { hijo ->
                             hijoAgendaSel = hijo
                             currentScreen = Screen.AGENDA_ESCOLAR
@@ -1495,26 +1749,12 @@ fun EduConnectApp() {
                 }
 
                 Screen.AGENDA_ESCOLAR -> {
-                    androidx.compose.runtime.LaunchedEffect(hijoAgendaSel?.id) {
+                    androidx.compose.runtime.LaunchedEffect(hijoAgendaSel?.id, agendaPorHijoSel) {
                         val hijo = hijoAgendaSel ?: return@LaunchedEffect
-                        try {
-                            val publicaciones = obtenerPublicacionesPorAlumno(hijo.seccionId, hijo.gradoId)
-                            publicacionesAgendaSel = publicaciones.map { pub ->
-                                val docente = obtenerUsuario(pub.docente_id)
-                                val curso = obtenerCursoPorId(pub.curso_id)
-                                PublicacionAgendaItem(
-                                    id = pub.id,
-                                    titulo = pub.titulo,
-                                    descripcion = pub.descripcion,
-                                    tipo = pub.tipo,
-                                    cursoNombre = curso?.nombre ?: "",
-                                    docenteNombre = docente.nombrecompleto,
-                                    fechaEntrega = pub.fecha_entrega,
-                                    estado = pub.estado,
-                                    archivoAdjunto = pub.archivo_adjunto
-                                )
-                            }
-                        } catch (e: Exception) { aviso("Error cargando agenda: ${e.message}") }
+                        // Sin peticiones: la agenda de cada hijo ya se cargó en SELECCIONAR_HIJO_AGENDA
+                        val hoy = java.time.LocalDate.now().toString()
+                        publicacionesAgendaSel = agendaPorHijoSel[hijo.id].orEmpty()
+                            .map { it.aPublicacionAgendaItem(hoy) }
                     }
                     AgendaEscolarScreen(
                         nombreHijo = hijoAgendaSel?.nombres ?: "",
@@ -1523,10 +1763,10 @@ fun EduConnectApp() {
                         publicaciones = publicacionesAgendaSel,
                         onBack = { currentScreen = Screen.SELECCIONAR_HIJO_AGENDA },
                         onHomePadre = { currentScreen = Screen.HOME_PADRE },
-                        onAvisos = {},
-                        onAgenda = {currentScreen = Screen.AGENDA_ESCOLAR},
+                        onAvisos = { irAvisosPadre() },
+                        onAgenda = { irAgenda() },
                         onPerfil = {currentScreen = Screen.PERFIL_PADRE},
-                        onNotificaciones = {},
+                        onNotificaciones = { abrirNotificaciones() },
                         onVerDetalle = { publicacion ->
                             publicacionAgendaSel = publicacion
                             currentScreen = Screen.DETALLE_AGENDA
@@ -1534,24 +1774,39 @@ fun EduConnectApp() {
                     )
                 }
 
-                Screen.DETALLE_AGENDA -> DetalleAgendaScreen(
-                    nombreHijo = hijoAgendaSel?.nombres ?: "",
-                    gradoNombre = hijoAgendaSel?.gradoNombre ?: "",
-                    seccionNombre = hijoAgendaSel?.seccionNombre ?: "",
-                    publicacion = publicacionAgendaSel,
-                    onBack = { currentScreen = Screen.AGENDA_ESCOLAR },
-                    onHomePadre = { currentScreen = Screen.HOME_PADRE },
-                    onAvisos = {},
-                    onAgenda = {currentScreen = Screen.AGENDA_ESCOLAR},
-                    onPerfil = {currentScreen = Screen.PERFIL_PADRE},
-                    onNotificaciones = {}
-                )
+                Screen.DETALLE_AGENDA -> {
+                    androidx.compose.runtime.LaunchedEffect(publicacionAgendaSel?.id) {
+                        val publicacion = publicacionAgendaSel ?: return@LaunchedEffect
+                        if (publicacion.id in publicacionesLeidasSel) return@LaunchedEffect   // ya estaba leída
+                        try {
+                            marcarPublicacionLeida(publicacion.id)
+                            publicacionesLeidasSel = publicacionesLeidasSel + publicacion.id
+                        } catch (e: kotlinx.coroutines.CancellationException) {
+                            throw e
+                        } catch (e: Exception) { /* se reintentará al abrirla de nuevo */ }
+                    }
+                    val adjunto = publicacionAgendaSel?.let { adjuntosPublicacionSel[it.id] }
+                    DetalleAgendaScreen(
+                        nombreHijo = hijoAgendaSel?.nombres ?: "",
+                        gradoNombre = hijoAgendaSel?.gradoNombre ?: "",
+                        seccionNombre = hijoAgendaSel?.seccionNombre ?: "",
+                        publicacion = publicacionAgendaSel,
+                        descargandoAdjunto = descargandoAdjunto,
+                        onAbrirAdjunto = { adjunto?.let { abrirAdjunto(it) } },
+                        onBack = { currentScreen = Screen.AGENDA_ESCOLAR },
+                        onHomePadre = { currentScreen = Screen.HOME_PADRE },
+                        onAvisos = { irAvisosPadre() },
+                        onAgenda = { irAgenda() },
+                        onPerfil = {currentScreen = Screen.PERFIL_PADRE},
+                        onNotificaciones = { abrirNotificaciones() }
+                    )
+                }
 
                 Screen.COMUNICADOS_PADRE -> {
                     androidx.compose.runtime.LaunchedEffect(usuarioLogueado?.id) {
                         if (usuarioLogueado == null) return@LaunchedEffect
                         try {
-                            cargarComunicadosPadre()
+                            if (!comunicadosPadreCargados) cargarComunicadosPadre()
                             sinLeerPadreSel = hijosComunicadoSel.sumOf { it.sinLeer }
                             totalPadreSel = hijosComunicadoSel.sumOf { it.total }
                             leidosPadreSel = totalPadreSel - sinLeerPadreSel
@@ -1565,10 +1820,10 @@ fun EduConnectApp() {
                         total = totalPadreSel,
                         onBack = { currentScreen = Screen.HOME_PADRE },
                         onHomePadre = { currentScreen = Screen.HOME_PADRE },
-                        onAvisos = {},
-                        onAgenda = {currentScreen = Screen.AGENDA_ESCOLAR},
+                        onAvisos = { irAvisosPadre() },
+                        onAgenda = { irAgenda() },
                         onPerfil = {currentScreen = Screen.PERFIL_PADRE},
-                        onNotificaciones = {},
+                        onNotificaciones = { abrirNotificaciones() },
                         onVerRecibidos = { currentScreen = Screen.SELECCIONAR_ESTUDIANTE_COMUNICADO },
                         onVerHistorial = { currentScreen = Screen.SELECCIONAR_ESTUDIANTE_COMUNICADO }
                     )
@@ -1578,7 +1833,8 @@ fun EduConnectApp() {
                     androidx.compose.runtime.LaunchedEffect(usuarioLogueado?.id) {
                         if (usuarioLogueado == null) return@LaunchedEffect
                         try {
-                            cargarComunicadosPadre()   // actualiza los "sin leer" de cada hijo
+                            // Ya cargados en COMUNICADOS_PADRE: solo se piden si se llega por otro camino
+                            if (!comunicadosPadreCargados) cargarComunicadosPadre()
                         } catch (e: kotlinx.coroutines.CancellationException) {
                             throw e
                         } catch (e: Exception) { aviso("Error: ${e.message}") }
@@ -1587,12 +1843,13 @@ fun EduConnectApp() {
                         hijos = hijosComunicadoSel,
                         onBack = { currentScreen = Screen.COMUNICADOS_PADRE },
                         onHomePadre = { currentScreen = Screen.HOME_PADRE },
-                        onAvisos = {},
-                        onAgenda = {currentScreen = Screen.AGENDA_ESCOLAR},
+                        onAvisos = { irAvisosPadre() },
+                        onAgenda = { irAgenda() },
                         onPerfil = {currentScreen = Screen.PERFIL_PADRE},
-                        onNotificaciones = {},
+                        onNotificaciones = { abrirNotificaciones() },
                         onVerComunicados = { hijo ->
                             hijoComunicadoSel = hijo
+                            comunicadosHijoCargadoDe = null   // elegido desde la lista: datos frescos
                             currentScreen = Screen.COMUNICADOS_RECIBIDOS
                         }
                     )
@@ -1601,6 +1858,8 @@ fun EduConnectApp() {
                 Screen.COMUNICADOS_RECIBIDOS -> {
                     androidx.compose.runtime.LaunchedEffect(hijoComunicadoSel?.id) {
                         val hijo = hijoComunicadoSel ?: return@LaunchedEffect
+                        // Al volver del detalle no se vuelve a pedir (la lectura ya se actualizó localmente)
+                        if (comunicadosHijoCargadoDe == hijo.id) return@LaunchedEffect
                         try {
                             // 1 petición: comunicados del hijo con su estado de lectura y adjunto
                             val respuesta = obtenerComunicadosHijo(hijo.id)
@@ -1624,6 +1883,7 @@ fun EduConnectApp() {
                                         leidoEn = isoLocalSinZona(c.leidoEn)
                                     )
                                 }.sortedBy { it.leido }
+                            comunicadosHijoCargadoDe = hijo.id
                         } catch (e: kotlinx.coroutines.CancellationException) {
                             throw e
                         } catch (e: Exception) { aviso("Error: ${e.message}") }
@@ -1635,10 +1895,10 @@ fun EduConnectApp() {
                         comunicados = comunicadosPadreSel,
                         onBack = { currentScreen = Screen.SELECCIONAR_ESTUDIANTE_COMUNICADO },
                         onHomePadre = { currentScreen = Screen.HOME_PADRE },
-                        onAvisos = {},
-                        onAgenda = {currentScreen = Screen.AGENDA_ESCOLAR},
+                        onAvisos = { irAvisosPadre() },
+                        onAgenda = { irAgenda() },
                         onPerfil = {currentScreen = Screen.PERFIL_PADRE},
-                        onNotificaciones = {},
+                        onNotificaciones = { abrirNotificaciones() },
                         onVerDetalle = { comunicado ->
                             comunicadoPadreSel = comunicado
                             currentScreen = Screen.DETALLE_COMUNICADO_PADRE
@@ -1656,6 +1916,12 @@ fun EduConnectApp() {
                             val actualizado = comunicado.copy(leido = true, leidoEn = ahora)
                             comunicadoPadreSel = actualizado
                             comunicadosPadreSel = comunicadosPadreSel.map { if (it.id == comunicado.id) actualizado else it }
+                            // Un "sin leer" menos en la tarjeta del hijo (sin volver a pedir los datos)
+                            hijoComunicadoSel?.let { h ->
+                                val hijoActualizado = h.copy(sinLeer = (h.sinLeer - 1).coerceAtLeast(0))
+                                hijoComunicadoSel = hijoActualizado
+                                hijosComunicadoSel = hijosComunicadoSel.map { if (it.id == h.id) hijoActualizado else it }
+                            }
                         } catch (e: kotlinx.coroutines.CancellationException) {
                             throw e
                         } catch (e: Exception) { /* se reintentará al abrirlo de nuevo */ }
@@ -1668,10 +1934,10 @@ fun EduConnectApp() {
                         onAbrirAdjunto = { adjunto?.let { abrirAdjunto(it) } },
                         onBack = { currentScreen = Screen.COMUNICADOS_RECIBIDOS },
                         onHomePadre = { currentScreen = Screen.HOME_PADRE },
-                        onAvisos = {},
-                        onAgenda = {currentScreen = Screen.AGENDA_ESCOLAR},
+                        onAvisos = { irAvisosPadre() },
+                        onAgenda = { irAgenda() },
                         onPerfil = {currentScreen = Screen.PERFIL_PADRE},
-                        onNotificaciones = {}
+                        onNotificaciones = { abrirNotificaciones() }
                     )
                 }
 
@@ -1680,6 +1946,7 @@ fun EduConnectApp() {
                         if (usuarioLogueado == null) return@LaunchedEffect
                         // Limpiar historial previo para que no se muestre al volver con otro curso
                         historialDocenteSel = emptyList()
+                        historialDocenteCargado = false
                         if (asignacionesApiSel.isNotEmpty()) {
                             // Ya cargadas — solo restablecer las listas de selección
                             aplicarAsignaciones(asignacionesApiSel)
@@ -1694,7 +1961,7 @@ fun EduConnectApp() {
                         }
                     }
                     SeleccionarSeccionHistorialScreen(
-                        docenteId = usuarioLogueado?.id ?: "",
+                        docenteId = usuarioLogueado?.id?.toString() ?: "",
                         listaGrados = listaGradosSel,
                         listaSecciones = listaSeccionesSel,
                         listaCursos = listaCursosSel,
@@ -1727,9 +1994,11 @@ fun EduConnectApp() {
                             cursoSel     = curso
                             // Cargar historial primero y navegar solo cuando los datos están listos
                             historialDocenteSel = emptyList()
+                            historialDocenteCargado = false
                             CoroutineScope(Dispatchers.Main).launch {
                                 try {
                                     historialDocenteSel = cargarHistorialDocente(seccionId, cursoId, grado, seccion, curso)
+                                    historialDocenteCargado = true   // aunque esté vacío: no volver a pedirlo
                                 } catch (e: Exception) {
                                     aviso("Error cargando historial: ${e.message}")
                                 }
@@ -1742,9 +2011,10 @@ fun EduConnectApp() {
 
                 Screen.HISTORIAL_ASISTENCIA_DOCENTE -> {
                     androidx.compose.runtime.LaunchedEffect(cursoIdSel, seccionIdSel) {
-                        if (historialDocenteSel.isNotEmpty()) return@LaunchedEffect  // ya precargado desde selección
+                        if (historialDocenteCargado) return@LaunchedEffect  // ya precargado desde la selección
                         try {
                             historialDocenteSel = cargarHistorialDocente(seccionIdSel, cursoIdSel, gradoSel, seccionSel, cursoSel)
+                            historialDocenteCargado = true
                         } catch (e: kotlinx.coroutines.CancellationException) {
                             throw e
                         } catch (e: Exception) {
@@ -1807,7 +2077,7 @@ fun EduConnectApp() {
                                             )
                                         }
                                         detalleAlumnosSel = cargarDetalleDia(seccionIdSel, cursoIdSel, item.fecha)
-                                        historialDocenteSel = emptyList()  // los totales cambiaron: recargar al volver
+                                        historialDocenteCargado = false  // los totales cambiaron: recargar al volver
                                     } catch (e: Exception) {
                                         aviso("Error al guardar: ${e.message}")
                                     }
@@ -1818,6 +2088,64 @@ fun EduConnectApp() {
                     }
                 }
             }
+
+            // PANEL DE NOTIFICACIONES (padre): se despliega debajo de la campana, encima de la pantalla actual
+            PanelNotificaciones(
+                visible = mostrarNotificaciones,
+                notificaciones = notificacionesSel.map { n ->
+                    // Tareas y exámenes: "Matemáticas · 2do Grado Sec. A · Carlos"
+                    val contexto = if (n.tipo == "PUBLICACION" || n.tipo == "CALIFICACION")
+                        contextoPublicacion(n.referenciaId) else null
+                    NotificacionItem(
+                        id = n.id,
+                        tipo = n.tipo,
+                        titulo = n.titulo,
+                        // El backend envía "Curso - Entrega: dd/MM/yyyy"; el curso ya va en la línea azul
+                        mensaje = contexto?.let { (_, publicacion) ->
+                            n.mensaje.removePrefix("${publicacion.curso} - ").removePrefix("${publicacion.curso}: ")
+                        } ?: n.mensaje,
+                        fecha = fechaLocal(n.createdAt),
+                        hora = horaLocal(n.createdAt),
+                        leida = n.leida,
+                        detalle = contexto?.let { (hijo, publicacion) ->
+                            "${publicacion.curso} · ${hijo.gradoNombre} Sec. ${hijo.seccionNombre} · ${hijo.nombres}"
+                        } ?: ""
+                    )
+                },
+                noLeidas = notificacionesNoLeidasSel.toInt(),
+                cargando = cargandoNotificaciones,
+                onCerrar = { mostrarNotificaciones = false },
+                onMarcarTodas = {
+                    notificacionesSel = notificacionesSel.map { it.copy(leida = true) }
+                    notificacionesNoLeidasSel = 0L
+                    CoroutineScope(Dispatchers.Main).launch {
+                        try { marcarNotificacionesLeidas() } catch (e: Exception) {
+                            aviso("No se pudieron marcar como leídas: ${e.message}")
+                        }
+                    }
+                },
+                onAbrir = { item ->
+                    if (!item.leida) {
+                        notificacionesSel = notificacionesSel.map { if (it.id == item.id) it.copy(leida = true) else it }
+                        notificacionesNoLeidasSel = (notificacionesNoLeidasSel - 1).coerceAtLeast(0L)
+                        CoroutineScope(Dispatchers.Main).launch {
+                            try { marcarNotificacionLeida(item.id) } catch (e: Exception) { }
+                        }
+                    }
+                    mostrarNotificaciones = false
+                    val notificacion = notificacionesSel.find { it.id == item.id }
+                    if (item.tipo == "PUBLICACION" || item.tipo == "CALIFICACION") {
+                        abrirPublicacionDeNotificacion(notificacion?.referenciaId)   // directo al detalle
+                    } else {
+                        irAModuloDeNotificacion(item.tipo)
+                    }
+                }
+            )
         }
     }
+
+    // El botón "atrás" del celular cierra el panel en lugar de salir de la pantalla
+    androidx.activity.compose.BackHandler(enabled = mostrarNotificaciones) { mostrarNotificaciones = false }
+    // Al cambiar de pantalla, el panel se cierra
+    androidx.compose.runtime.LaunchedEffect(currentScreen) { mostrarNotificaciones = false }
 }

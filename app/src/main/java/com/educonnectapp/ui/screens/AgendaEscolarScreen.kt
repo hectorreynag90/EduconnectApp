@@ -35,7 +35,7 @@ data class PublicacionAgendaItem(
     val cursoNombre: String,
     val docenteNombre: String,
     val fechaEntrega: String,
-    val estado: String = "Pendiente",
+    val estado: String = "Pendiente",   // "Pendiente", "Entregada", "No entregada" o "Vencida"
     val archivoAdjunto: String = ""
 )
 
@@ -334,7 +334,7 @@ fun PublicacionAgendaCard(
                 }
             }
             Text(
-                text = "$diasRestantes días",
+                text = textoDiasRestantes(diasRestantes),
                 fontFamily = Roboto,
                 fontWeight = FontWeight.Bold,
                 fontSize = 15.sp,
@@ -382,8 +382,23 @@ fun PublicacionAgendaCard(
     }
 }
 
+// "Hoy", "1 día", "5 días"
+fun textoDiasRestantes(dias: Int): String = when {
+    dias <= 0 -> "Hoy"
+    dias == 1 -> "1 día"
+    else -> "$dias días"
+}
+
 @Composable
 fun EntregadaAgendaCard(item: PublicacionAgendaItem) {
+    val esExamen = item.tipo == "Examen"
+    // Etiqueta y color según el estado del alumno
+    val (etiqueta, colorEstado) = when (item.estado) {
+        "Entregada" -> (if (esExamen) "Rendido" else "Entregada") to StatusGreen
+        "No entregada" -> (if (esExamen) "No rindió" else "No entregada") to StatusErrorRed
+        else -> "Vencida" to TextSecondary
+    }
+
     val fechaDisplay = remember(item.fechaEntrega) {
         try {
             val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
@@ -397,7 +412,11 @@ fun EntregadaAgendaCard(item: PublicacionAgendaItem) {
         modifier = Modifier
             .fillMaxWidth()
             .background(BackgroundWhite, RoundedCornerShape(16.dp))
-            .border(1.8.dp, BorderGreen.copy(alpha = 0.4f), RoundedCornerShape(16.dp))
+            .border(
+                1.8.dp,
+                if (item.estado == "Entregada") BorderGreen.copy(alpha = 0.4f) else colorEstado.copy(alpha = 0.3f),
+                RoundedCornerShape(16.dp)
+            )
             .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
@@ -421,17 +440,19 @@ fun EntregadaAgendaCard(item: PublicacionAgendaItem) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            Image(
-                painter = painterResource(id = R.drawable.check_green_dark),
-                contentDescription = null,
-                modifier = Modifier.size(18.dp)
-            )
+            if (item.estado == "Entregada") {
+                Image(
+                    painter = painterResource(id = R.drawable.check_green_dark),
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
             Text(
-                text = "Entregada",
+                text = etiqueta,
                 fontFamily = Roboto,
                 fontWeight = FontWeight.Bold,
                 fontSize = 14.sp,
-                color = StatusGreen
+                color = colorEstado
             )
         }
     }
@@ -448,7 +469,8 @@ fun AgendaEscolarPreview() {
             publicaciones = listOf(
                 PublicacionAgendaItem(1L, "Ejercicios Cap. 5", "Resolver los 5 ejercicios del 1 al 20 del capítulo 5.", "Tarea", "Matemáticas", "Eduardo Carranza", "2026-05-23", "Pendiente"),
                 PublicacionAgendaItem(2L, "Ejercicios Cap. 6", "Resolver los ejercicios del 1 al 10 del cap. 6.", "Tarea", "Matemáticas", "Eduardo Carranza", "2026-05-26", "Pendiente"),
-                PublicacionAgendaItem(3L, "Lectura Cap. 8", "Leer capítulo 8.", "Tarea", "Comunicación", "Rosa A.", "2026-05-16", "Entregada")
+                PublicacionAgendaItem(3L, "Lectura Cap. 8", "Leer capítulo 8.", "Tarea", "Comunicación", "Rosa A.", "2026-05-16", "Entregada"),
+                PublicacionAgendaItem(4L, "Práctica 2", "Resolver la práctica.", "Examen", "Ciencias", "Rosa A.", "2026-05-12", "Vencida")
             )
         )
     }

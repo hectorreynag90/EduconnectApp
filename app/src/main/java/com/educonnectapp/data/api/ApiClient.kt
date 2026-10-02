@@ -235,6 +235,41 @@ interface EduConnectApi {
         @Query("desde") desde: String? = null,
         @Query("hasta") hasta: String? = null
     ): HistorialHijoResponse
+
+    // Publicaciones docente (tareas y evaluaciones)
+    @GET("api/docente/publicaciones")
+    suspend fun publicacionesDocente(
+        @Query("seccionId") seccionId: Long? = null,
+        @Query("cursoId") cursoId: Long? = null,
+        @Query("tipo") tipo: String? = null
+    ): List<PublicacionDocenteResponse>
+
+    @POST("api/docente/publicaciones")
+    suspend fun crearPublicacion(@Body body: CrearPublicacionRequest): PublicacionDocenteResponse
+
+    // Agenda del padre
+    @GET("api/padre/hijos/{alumnoId}/agenda")
+    suspend fun agendaHijo(
+        @Path("alumnoId") alumnoId: Long,
+        @Query("desde") desde: String? = null,
+        @Query("hasta") hasta: String? = null
+    ): AgendaHijoResponse
+
+    @POST("api/padre/publicaciones/{id}/leido")
+    suspend fun marcarPublicacionLeida(@Path("id") id: Long)
+
+    @GET("api/padre/hijos/{alumnoId}/publicaciones/{id}")
+    suspend fun publicacionHijo(@Path("alumnoId") alumnoId: Long, @Path("id") id: Long): PublicacionPadreResponse
+
+    // Bandeja de notificaciones (docente y padre)
+    @GET("api/notificaciones")
+    suspend fun bandeja(): BandejaResponse
+
+    @PUT("api/notificaciones/leidas")
+    suspend fun marcarNotificacionesLeidas()
+
+    @PUT("api/notificaciones/{id}/leida")
+    suspend fun marcarNotificacionLeida(@Path("id") id: Long)
 }
 
 // =====================================================================
@@ -803,3 +838,158 @@ fun horaLocal(iso: String?): String = aFechaHoraLocal(iso)?.let {
 fun isoLocalSinZona(iso: String?): String? = aFechaHoraLocal(iso)?.withNano(0)?.toString()?.let {
     if (it.length == 16) "$it:00" else it   // LocalDateTime omite los segundos si son 00
 }
+
+// =====================================================================
+// DATA CLASSES PUBLICACIONES (tareas y evaluaciones)
+// =====================================================================
+
+// tipo: "TAREA" | "EVALUACION" | "PUBLICACION"
+@Serializable
+data class CrearPublicacionRequest(
+    val seccionId: Long,
+    val cursoId: Long,
+    val tipo: String,
+    val titulo: String,
+    val descripcion: String,
+    val fechaEntrega: String? = null,      // "yyyy-MM-dd"
+    val puntajeMaximo: Double? = null,
+    val archivoId: Long? = null
+)
+
+// estado: "ACTIVA" | "CERRADA" | "ANULADA"
+@Serializable
+data class PublicacionDocenteResponse(
+    val id: Long,
+    val tipo: String = "",
+    val titulo: String = "",
+    val descripcion: String = "",
+    val gradoId: Long = 0,
+    val grado: String = "",
+    val seccionId: Long = 0,
+    val seccion: String = "",
+    val cursoId: Long = 0,
+    val curso: String = "",
+    val fechaEntrega: String? = null,
+    val puntajeMaximo: Double? = null,
+    val archivo: ArchivoResponse? = null,
+    val estado: String = "ACTIVA",
+    val publicadoEn: String = "",
+    val totalAlumnos: Long = 0,
+    val calificados: Long = 0,
+    val lecturas: Long = 0
+)
+
+// estado: "PENDIENTE" | "ENTREGADO" | "NO_ENTREGADO" | "RENDIDO" | "NO_RINDIO" | "CALIFICADO"
+@Serializable
+data class CalificacionHijoResponse(
+    val estado: String = "PENDIENTE",
+    val notaNumerica: Double? = null,
+    val notaLiteral: String? = null,
+    val observacion: String? = null,
+    val calificadoEn: String? = null
+)
+
+@Serializable
+data class PublicacionPadreResponse(
+    val id: Long,
+    val tipo: String = "",
+    val titulo: String = "",
+    val descripcion: String = "",
+    val cursoId: Long = 0,
+    val curso: String = "",
+    val docente: String = "",
+    val fechaEntrega: String? = null,
+    val puntajeMaximo: Double? = null,
+    val archivo: ArchivoResponse? = null,
+    val estado: String = "ACTIVA",
+    val publicadoEn: String = "",
+    val leido: Boolean = false,
+    val leidoEn: String? = null,
+    val calificacionHijo: CalificacionHijoResponse? = null
+)
+
+@Serializable
+data class AgendaHijoResponse(
+    val alumnoId: Long,
+    val desde: String? = null,
+    val hasta: String? = null,
+    val noLeidas: Int = 0,
+    val publicaciones: List<PublicacionPadreResponse> = emptyList()
+)
+
+// =====================================================================
+// DATA CLASSES NOTIFICACIONES
+// =====================================================================
+
+// tipo: "ASISTENCIA" | "COMUNICADO" | "PUBLICACION" | "CALIFICACION" | "AVISO"
+@Serializable
+data class NotificacionResponse(
+    val id: Long,
+    val tipo: String = "",
+    val titulo: String = "",
+    val mensaje: String = "",
+    val referenciaId: Long? = null,
+    val leida: Boolean = false,
+    val createdAt: String = ""
+)
+
+@Serializable
+data class BandejaResponse(
+    val noLeidas: Long = 0,
+    val notificaciones: List<NotificacionResponse> = emptyList()
+)
+
+// =====================================================================
+// PUBLICACIONES DOCENTE (el backend notifica por push a los padres)
+// =====================================================================
+
+suspend fun obtenerPublicacionesDocente(
+    seccionId: Long? = null, cursoId: Long? = null, tipo: String? = null
+): List<PublicacionDocenteResponse> = llamar { api.publicacionesDocente(seccionId, cursoId, tipo) }
+
+suspend fun crearPublicacion(
+    seccionId: Long, cursoId: Long, tipo: String, titulo: String, descripcion: String,
+    fechaEntrega: String?, archivoId: Long?
+): PublicacionDocenteResponse = llamar {
+    api.crearPublicacion(
+        CrearPublicacionRequest(
+            seccionId = seccionId,
+            cursoId = cursoId,
+            tipo = tipo,
+            titulo = titulo.trim(),
+            descripcion = descripcion.trim(),
+            fechaEntrega = fechaEntrega?.ifBlank { null },
+            archivoId = archivoId
+        )
+    )
+}
+
+// =====================================================================
+// AGENDA DEL PADRE
+// =====================================================================
+
+// Tareas y evaluaciones del hijo en un rango de fechas.
+// Si el backend rechaza el rango (400), se pide con su rango por defecto.
+suspend fun obtenerAgendaHijo(alumnoId: Long, desde: String?, hasta: String?): AgendaHijoResponse =
+    try {
+        llamar { api.agendaHijo(alumnoId, desde, hasta) }
+    } catch (e: ApiException) {
+        if (e.codigo == 400 && (desde != null || hasta != null)) llamar { api.agendaHijo(alumnoId) }
+        else throw e
+    }
+
+suspend fun marcarPublicacionLeida(publicacionId: Long) = llamar { api.marcarPublicacionLeida(publicacionId) }
+
+// Una publicación de un hijo (para abrirla desde una notificación fuera del rango de la agenda)
+suspend fun obtenerPublicacionHijo(alumnoId: Long, publicacionId: Long): PublicacionPadreResponse =
+    llamar { api.publicacionHijo(alumnoId, publicacionId) }
+
+// =====================================================================
+// NOTIFICACIONES (bandeja)
+// =====================================================================
+
+suspend fun obtenerBandeja(): BandejaResponse = llamar { api.bandeja() }
+
+suspend fun marcarNotificacionesLeidas() = llamar { api.marcarNotificacionesLeidas() }
+
+suspend fun marcarNotificacionLeida(notificacionId: Long) = llamar { api.marcarNotificacionLeida(notificacionId) }

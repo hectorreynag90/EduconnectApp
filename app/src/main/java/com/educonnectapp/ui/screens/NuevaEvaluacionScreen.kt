@@ -28,6 +28,9 @@ import com.educonnectapp.ui.theme.*
 import java.text.SimpleDateFormat
 import java.util.*
 
+// Límite del adjunto (el mismo que valida el backend)
+private const val MAXIMO_ADJUNTO_BYTES = 10L * 1024 * 1024   // 10 MB
+
 @Composable
 fun NuevaEvaluacionScreen(
     listaDestinatarios: List<SeccionDestinatario> = emptyList(),
@@ -54,12 +57,15 @@ fun NuevaEvaluacionScreen(
             .format(Date()).replaceFirstChar { it.uppercase() }
     }
 
-    var destinatarioSeleccionado by remember { mutableStateOf<SeccionDestinatario?>(null) }
+    // Si solo hay un destinatario (el curso elegido en la pantalla anterior), ya viene seleccionado
+    var destinatarioSeleccionado by remember { mutableStateOf<SeccionDestinatario?>(listaDestinatarios.singleOrNull()) }
     var dropdownExpanded by remember { mutableStateOf(false) }
     var titulo by remember { mutableStateOf("") }
     var descripcion by remember { mutableStateOf("") }
     var archivoUri by remember { mutableStateOf<Uri?>(null) }
     var nombreArchivo by remember { mutableStateOf("") }
+    // Datos del archivo rechazado por tamaño: si no es null, se muestra la alerta
+    var archivoRechazado by remember { mutableStateOf<Pair<String, Long>?>(null) }
     var mostrarDatePicker by remember { mutableStateOf(false) }
     var fechaExamen by remember { mutableStateOf("") }
     var fechaExamenDisplay by remember { mutableStateOf("Seleccionar fecha") }
@@ -81,6 +87,8 @@ fun NuevaEvaluacionScreen(
             calendario.get(Calendar.DAY_OF_MONTH)
         ).also {
             it.datePicker.minDate = System.currentTimeMillis()
+            // Si se cancela, no volver a abrir el calendario en la siguiente recomposición
+            it.setOnDismissListener { mostrarDatePicker = false }
             it.show()
         }
     }
@@ -89,9 +97,86 @@ fun NuevaEvaluacionScreen(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
         uri?.let {
-            archivoUri = it
-            nombreArchivo = it.lastPathSegment ?: "archivo"
+            // Nombre visible (ej. "practica.pdf") y tamaño en bytes, sin leer el archivo completo
+            var nombre: String? = null
+            var tamano: Long? = null
+            context.contentResolver.query(
+                it,
+                arrayOf(android.provider.OpenableColumns.DISPLAY_NAME, android.provider.OpenableColumns.SIZE),
+                null, null, null
+            )?.use { c ->
+                if (c.moveToFirst()) {
+                    nombre = c.getString(0)
+                    if (!c.isNull(1)) tamano = c.getLong(1)
+                }
+            }
+            val nombreFinal = nombre ?: it.lastPathSegment ?: "archivo"
+            val tamanoFinal = tamano
+            if (tamanoFinal != null && tamanoFinal > MAXIMO_ADJUNTO_BYTES) {
+                archivoRechazado = nombreFinal to tamanoFinal   // no se adjunta: se avisa con la alerta
+            } else {
+                archivoUri = it
+                nombreArchivo = nombreFinal
+            }
         }
+    }
+
+    // ALERTA: ARCHIVO DEMASIADO GRANDE
+    archivoRechazado?.let { (nombre, tamano) ->
+        AlertDialog(
+            onDismissRequest = { archivoRechazado = null },
+            icon = {
+                Image(
+                    painter = painterResource(id = R.drawable.paperclip_lightgray),
+                    contentDescription = null,
+                    modifier = Modifier.size(36.dp)
+                )
+            },
+            title = {
+                Text(
+                    text = "Archivo demasiado grande",
+                    fontFamily = Roboto,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 20.sp,
+                    color = TextBlue
+                )
+            },
+            text = {
+                Text(
+                    text = "\"$nombre\" pesa ${String.format(Locale.US, "%.1f", tamano / (1024.0 * 1024.0))} MB.\n\n" +
+                            "El tamaño máximo permitido es 10 MB. Elige un archivo más liviano o comprímelo antes de adjuntarlo.",
+                    fontFamily = Roboto,
+                    fontSize = 16.sp,
+                    color = TextPrimary
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = { archivoRechazado = null; archivoLauncher.launch("*/*") },
+                    shape = RoundedCornerShape(20.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = EduconnectBlue)
+                ) {
+                    Text(
+                        text = "Elegir otro",
+                        fontFamily = Roboto,
+                        fontWeight = FontWeight.SemiBold,
+                        color = TextWhite
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { archivoRechazado = null }) {
+                    Text(
+                        text = "Entendido",
+                        fontFamily = Roboto,
+                        fontWeight = FontWeight.SemiBold,
+                        color = EduconnectBlue
+                    )
+                }
+            },
+            containerColor = BackgroundWhite,
+            shape = RoundedCornerShape(16.dp)
+        )
     }
 
     Column(
@@ -394,8 +479,13 @@ fun NuevaEvaluacionScreen(
             // BOTÓN PUBLICAR
             Button(
                 onClick = {
-                    val dest = destinatarioSeleccionado ?: return@Button
-                    if (titulo.isBlank() || descripcion.isBlank() || fechaExamen.isBlank()) return@Button
+                    val dest = destinatarioSeleccionado
+                    if (dest == null || titulo.isBlank() || descripcion.isBlank() || fechaExamen.isBlank()) {
+                        android.widget.Toast.makeText(
+                            context, "Completa sección, título, instrucciones y fecha del examen", android.widget.Toast.LENGTH_SHORT
+                        ).show()
+                        return@Button
+                    }
                     val fechaPub = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
                     val hora = SimpleDateFormat("hh:mm a", Locale.getDefault()).format(Date())
                     onPublicar(titulo, descripcion, archivoUri?.toString() ?: "", dest, fechaExamen, fechaPub, hora)
