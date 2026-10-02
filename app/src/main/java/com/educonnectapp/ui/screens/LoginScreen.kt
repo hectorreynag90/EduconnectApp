@@ -320,11 +320,10 @@ fun LoginScreen(
                     Text(text = "Iniciando sesión...", fontFamily = Roboto,
                         fontWeight = FontWeight.SemiBold, fontSize = 22.sp, color = TextWhite)
                 } else {
-
-                    Image(painter = painterResource(id = R.drawable.login_white),
-                        contentDescription = null, modifier = Modifier.size(58.dp))
                     Text(text = "Iniciar sesión", fontFamily = Roboto,
                         fontWeight = FontWeight.SemiBold, fontSize = 22.sp, color = TextWhite)
+                    Image(painter = painterResource(id = R.drawable.logout_white),
+                        contentDescription = null, modifier = Modifier.size(40.dp))
                 }
             }
 

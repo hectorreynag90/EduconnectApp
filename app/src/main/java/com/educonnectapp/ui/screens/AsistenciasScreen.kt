@@ -58,12 +58,13 @@ fun AsistenciasScreen(
     onAvisos: () -> Unit = {},
     onPerfilDocente: () -> Unit = {},
     onNotificaciones: () -> Unit = {},
+    realizados: Int = 0,
+    pendientes: Int = 0,
+    porcentajeAsistencias: Int = 0
 ) {
-    // obtiene la fecha actual del dispositivo en español
     val fechaActual = remember {
         val sdf = SimpleDateFormat("EEEE, dd 'de' MMMM yyyy", Locale("es", "PE"))
-        sdf.format(Date())
-            .replaceFirstChar { it.uppercase() } // pone la primera letra en mayúscula
+        sdf.format(Date()).replaceFirstChar { it.uppercase() }
     }
 
     Column(
@@ -85,11 +86,11 @@ fun AsistenciasScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ){
-                Column () {
-                    IconButton(onClick = onBack
-                            ,modifier = Modifier
-                            .size(32.dp)
-                            .offset(x = (-5).dp)) {
+                Column {
+                    IconButton(
+                        onClick = onBack,
+                        modifier = Modifier.size(32.dp).offset(x = (-5).dp)
+                    ) {
                         Image(
                             painter = painterResource(id = R.drawable.arrowleft_white),
                             contentDescription = "Back",
@@ -98,8 +99,7 @@ fun AsistenciasScreen(
                     }
                 }
 
-                Column (modifier = Modifier.weight(1f)) {
-
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = "Asistencias",
                         fontFamily = Roboto,
@@ -107,7 +107,6 @@ fun AsistenciasScreen(
                         fontSize = 22.sp,
                         color = TextWhite
                     )
-
                     Text(
                         text = "Gestión de asistencias alumnos",
                         fontFamily = Roboto,
@@ -115,9 +114,8 @@ fun AsistenciasScreen(
                         fontSize = 16.sp,
                         color = TextWhite
                     )
-
                     Text(
-                        text = fechaActual, // fecha actual
+                        text = fechaActual,
                         fontFamily = Roboto,
                         fontWeight = FontWeight.Normal,
                         fontSize = 13.sp,
@@ -139,7 +137,6 @@ fun AsistenciasScreen(
 
         Spacer(modifier = Modifier.height(29.dp))
 
-        //CONTENIDO PRINCIPAL
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -160,7 +157,7 @@ fun AsistenciasScreen(
 
             Spacer(modifier = Modifier.height(25.dp))
 
-            //TARJETA REGISTRAR ASISTENCIA
+            // TARJETA REGISTRAR ASISTENCIA
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -199,22 +196,6 @@ fun AsistenciasScreen(
                         fontSize = 15.sp,
                         color = TextSecondary
                     )
-                    //Spacer(modifier = Modifier.height(4.dp))
-                    // Badge pendientes
-                    /*Box(
-                        modifier = Modifier
-                            .background(AccentOrange.copy(alpha = 0.15f), RoundedCornerShape(20.dp))
-                            .border(1.dp, AccentOrange, RoundedCornerShape(20.dp))
-                            .padding(horizontal = 10.dp, vertical = 3.dp)
-                    ) {
-                        Text(
-                            text = "2 secciones pendientes",
-                            fontFamily = Roboto,
-                            fontWeight = FontWeight.Medium,
-                            fontSize = 11.sp,
-                            color = AccentOrange
-                        )
-                    }*/
                 }
 
                 Image(
@@ -226,7 +207,7 @@ fun AsistenciasScreen(
 
             Spacer(modifier = Modifier.height(25.dp))
 
-            //TARJETA HISTORIAL
+            // TARJETA HISTORIAL
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -265,21 +246,6 @@ fun AsistenciasScreen(
                         fontSize = 15.sp,
                         color = TextSecondary
                     )
-                   // Spacer(modifier = Modifier.height(4.dp))
-                    // Badge porcentaje
-                    /*Box(
-                        modifier = Modifier
-                            .background(AsistenciaPresente, RoundedCornerShape(20.dp))
-                            .padding(horizontal = 10.dp, vertical = 3.dp)
-                    ) {
-                        Text(
-                            text = "Mayo 95% asistencias",
-                            fontFamily = Roboto,
-                            fontWeight = FontWeight.Medium,
-                            fontSize = 11.sp,
-                            color = StatusGreen
-                        )
-                    }*/
                 }
 
                 Image(
@@ -291,7 +257,7 @@ fun AsistenciasScreen(
 
             Spacer(modifier = Modifier.height(120.dp))
 
-            //RESUMEN DEL DÍA
+            // RESUMEN DEL DÍA
             Text(
                 text = "RESUMEN DEL DIA",
                 fontFamily = Roboto,
@@ -307,12 +273,13 @@ fun AsistenciasScreen(
                     .background(BackgroundWhite, RoundedCornerShape(12.dp))
                     .border(1.dp, BorderLight, RoundedCornerShape(12.dp))
                     .padding(16.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 // Realizado
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        text = "1",
+                        text = "$realizados",
                         fontFamily = Roboto,
                         fontWeight = FontWeight.Bold,
                         fontSize = 32.sp,
@@ -326,18 +293,12 @@ fun AsistenciasScreen(
                         color = TextSecondary
                     )
                 }
-                // Divisor
-                Box(
-                    modifier = Modifier
-                        .width(1.dp)
-                        .height(60.dp)
-                        .background(BorderLight)
-                )
+                Box(modifier = Modifier.width(1.dp).height(60.dp).background(BorderLight))
 
                 // Pendientes
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        text = "2",
+                        text = "$pendientes",
                         fontFamily = Roboto,
                         fontWeight = FontWeight.Bold,
                         fontSize = 32.sp,
@@ -351,18 +312,12 @@ fun AsistenciasScreen(
                         color = TextSecondary
                     )
                 }
-                // Divisor
-                Box(
-                    modifier = Modifier
-                        .width(1.dp)
-                        .height(60.dp)
-                        .background(BorderLight)
-                )
+                Box(modifier = Modifier.width(1.dp).height(60.dp).background(BorderLight))
 
-                // Asistencias
+                // Asistencias %
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        text = "95%",
+                        text = "$porcentajeAsistencias%",
                         fontFamily = Roboto,
                         fontWeight = FontWeight.Bold,
                         fontSize = 32.sp,
@@ -379,7 +334,6 @@ fun AsistenciasScreen(
             }
         }
 
-        //NAVBAR INFERIOR
         BottomNavBarDocente(
             onInicio = onHomeDocente,
             onAlumnos = onAlumnos,

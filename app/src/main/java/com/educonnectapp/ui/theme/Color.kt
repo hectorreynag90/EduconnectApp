@@ -11,6 +11,8 @@ val EduconnectBlueLight = Color(0xFF42A5F5)   // Azul degradado
 val AccentOrange = Color(0xFFFF4625)       // acento orange fuerte
 val AccentOrangeLight = Color(0xFFFFB476)  // acento orange degradado suave
 
+val AsistentTardanza = Color(0xFFFCEADC)
+
 //Estados
 val StatusGreen = Color(0xFF04834C)       // Presente
 val StatusErrorRed = Color(0xFFC22105)    // Ausente

@@ -36,6 +36,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.graphics.Color
 import com.educonnectapp.R
 import com.educonnectapp.ui.theme.AccentOrange
 import com.educonnectapp.ui.theme.BackgroundLight
@@ -112,9 +113,9 @@ fun SeleccionarEstudianteScreen(
                         contentDescription = "Volver", modifier = Modifier.size(18.dp))
                 }
                 Column {
-                    Text(text = "LISTA ESTUDIANTES", fontFamily = Roboto,
+                    Text(text = "ASISTENCIAS", fontFamily = Roboto,
                         fontWeight = FontWeight.Bold, fontSize = 20.sp, color = TextWhite)
-                    Text(text = "Asignado a $padreNombre", fontFamily = Roboto,
+                    Text(text = "Asignados a $padreNombre", fontFamily = Roboto,
                         fontWeight = FontWeight.Normal, fontSize = 17.sp,
                         color = TextWhite.copy(alpha = 0.85f))
                     Text(text = fechaActual, fontFamily = Roboto,
@@ -208,13 +209,22 @@ fun SeleccionarEstudianteScreen(
             }
 
             if (listaHijos.isEmpty()) {
-                Box(modifier = Modifier.fillMaxWidth()
-                    .background(BackgroundWhite, RoundedCornerShape(12.dp))
-                    .border(1.dp, BorderLight, RoundedCornerShape(12.dp))
-                    .padding(20.dp),
-                    contentAlignment = Alignment.Center) {
-                    Text(text = "¡No tienes hijos registrados!", fontFamily = Roboto,
-                        fontWeight = FontWeight.Normal, fontSize = 15.sp, color = TextSecondary)
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Image(
+                        painter = painterResource(id = R.drawable.ic_no_records),
+                        contentDescription = null,
+                        modifier = Modifier.size(36.dp)
+                    )
+                    Text(
+                        text = "No se tiene asignado ningún estudiante",
+                        fontFamily = Roboto,
+                        fontSize = 13.sp,
+                        color = Color(0xFFB0BEC5)
+                    )
                 }
             }
 

@@ -54,7 +54,8 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-private val ConfirmRed   = Color(0xFFE53935)
+private val ConfirmRed       = Color(0xFFE53935)
+private val TardanzaAmarillo = Color(0xFFFF4625)
 
 @Composable
 fun ConfirmacionAsistenciaScreen(
@@ -64,11 +65,12 @@ fun ConfirmacionAsistenciaScreen(
     seccion: String,
     totalPresentes: Int,
     totalAusentes: Int,
+    totalTardanzas: Int = 0,
     onNuevaAsistencia: () -> Unit = {},
     onVerHistorial: () -> Unit = {},
     onClose: () -> Unit = {}
 ) {
-    val totalNotificados = totalPresentes + totalAusentes
+    val totalNotificados = totalPresentes + totalAusentes + totalTardanzas
 
     val fechaDisplay = remember {
         SimpleDateFormat("EEEE, dd 'de' MMMM yyyy", Locale("es", "PE"))
@@ -148,8 +150,6 @@ fun ConfirmacionAsistenciaScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
 
-            Spacer(modifier = Modifier.height(5.dp))
-
             // ÍCONO CHECK VERDE
             Box(
                 modifier = Modifier
@@ -159,7 +159,7 @@ fun ConfirmacionAsistenciaScreen(
                 Image(
                     painter = painterResource(id = R.drawable.checkcircle_green),
                     contentDescription = null,
-                    modifier = Modifier.size(120.dp)
+                    modifier = Modifier.size(95.dp)
                 )
             }
 
@@ -203,8 +203,6 @@ fun ConfirmacionAsistenciaScreen(
                     color = TextSecondary
                 )
             }
-
-            Spacer(modifier = Modifier.height(4.dp))
 
             //DATOS DE REGISTRO
             Column(
@@ -266,6 +264,12 @@ fun ConfirmacionAsistenciaScreen(
                     label = "Presentes",
                     valor = "$totalPresentes",
                     colorValor = StatusGreen
+                )
+                FilaRegistro(
+                    iconRes = R.drawable.clock_tardanza,
+                    label = "Tardanzas",
+                    valor = "$totalTardanzas",
+                    colorValor = TardanzaAmarillo
                 )
                 FilaRegistro(
                     iconRes = R.drawable.close_red,
@@ -382,6 +386,7 @@ fun ConfirmacionAsistenciaPreview() {
             seccion = "A",
             totalPresentes = 25,
             totalAusentes = 3,
+            totalTardanzas = 2,
             onNuevaAsistencia = {},
             onVerHistorial = {},
             onClose = {}

@@ -19,10 +19,12 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -30,13 +32,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.BlendMode.Companion.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.graphics.Color
 import com.educonnectapp.R
 import com.educonnectapp.ui.theme.AccentOrange
+import com.educonnectapp.ui.theme.TextOrange
 import com.educonnectapp.ui.theme.BackgroundLight
 import com.educonnectapp.ui.theme.BackgroundWhite
 import com.educonnectapp.ui.theme.BorderLight
@@ -80,6 +85,7 @@ fun SeleccionarSeccionScreen(
     var gradoSeleccionado by remember { mutableStateOf<GradoItem?>(null) }
     var seccionSeleccionada by remember { mutableStateOf<SeccionItem?>(null) }
     var cursoSeleccionado by remember { mutableStateOf<CursoItem?>(null) }
+    var mostrarDialogSinAlumnos by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -101,25 +107,37 @@ fun SeleccionarSeccionScreen(
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Column {
-                    IconButton(onClick = onBack,
-                        modifier = Modifier.size(32.dp).offset(x = (-5).dp)) {
-                        Image(painter = painterResource(id = R.drawable.arrowleft_white),
-                            contentDescription = "Back", modifier = Modifier.size(18.dp))
+                    IconButton(
+                        onClick = onBack,
+                        modifier = Modifier.size(32.dp).offset(x = (-5).dp)
+                    ) {
+                        Image(
+                            painter = painterResource(id = R.drawable.arrowleft_white),
+                            contentDescription = "Back", modifier = Modifier.size(18.dp)
+                        )
                     }
                 }
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(text = "Seleccionar Sección", fontFamily = Roboto,
-                        fontWeight = FontWeight.Bold, fontSize = 22.sp, color = TextWhite)
-                    Text(text = "Elige grado, sección y curso", fontFamily = Roboto,
-                        fontWeight = FontWeight.Normal, fontSize = 16.sp, color = TextWhite)
-                    Text(text = fechaActual, fontFamily = Roboto,
-                        fontWeight = FontWeight.Normal, fontSize = 14.sp, color = TextWhite)
+                    Text(
+                        text = "Seleccionar Sección", fontFamily = Roboto,
+                        fontWeight = FontWeight.Bold, fontSize = 22.sp, color = TextWhite
+                    )
+                    Text(
+                        text = "Elige grado, sección y curso", fontFamily = Roboto,
+                        fontWeight = FontWeight.Normal, fontSize = 16.sp, color = TextWhite
+                    )
+                    Text(
+                        text = fechaActual, fontFamily = Roboto,
+                        fontWeight = FontWeight.Normal, fontSize = 14.sp, color = TextWhite
+                    )
                 }
             }
             Column {
                 IconButton(onClick = onNotificaciones) {
-                    Image(painter = painterResource(id = R.drawable.notification_white),
-                        contentDescription = "Notificaciones", modifier = Modifier.size(35.dp))
+                    Image(
+                        painter = painterResource(id = R.drawable.notification_white),
+                        contentDescription = "Notificaciones", modifier = Modifier.size(35.dp)
+                    )
                 }
             }
         }
@@ -136,8 +154,10 @@ fun SeleccionarSeccionScreen(
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
             // SELECTOR GRADO
-            Text(text = "SELECCIONE GRADO", fontFamily = Roboto,
-                fontWeight = FontWeight.Bold, fontSize = 15.sp, color = TextBlue)
+            Text(
+                text = "SELECCIONE GRADO", fontFamily = Roboto,
+                fontWeight = FontWeight.Bold, fontSize = 15.sp, color = TextBlue
+            )
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 listaGrados.forEach { grado ->
                     val seleccionado = grado.id == gradoSeleccionado?.id
@@ -145,10 +165,13 @@ fun SeleccionarSeccionScreen(
                         modifier = Modifier
                             .background(
                                 if (seleccionado) EduconnectBlue else BackgroundWhite,
-                                RoundedCornerShape(30.dp))
-                            .border(1.5.dp,
+                                RoundedCornerShape(30.dp)
+                            )
+                            .border(
+                                1.5.dp,
                                 if (seleccionado) EduconnectBlue else BorderLight,
-                                RoundedCornerShape(30.dp))
+                                RoundedCornerShape(30.dp)
+                            )
                             .clickable {
                                 gradoSeleccionado = grado
                                 seccionSeleccionada = null
@@ -157,17 +180,21 @@ fun SeleccionarSeccionScreen(
                             }
                             .padding(horizontal = 16.dp, vertical = 4.dp)
                     ) {
-                        Text(text = grado.nombre, fontFamily = Roboto,
+                        Text(
+                            text = grado.nombre, fontFamily = Roboto,
                             fontWeight = if (seleccionado) FontWeight.Bold else FontWeight.Normal,
                             fontSize = 15.sp,
-                            color = if (seleccionado) TextWhite else TextSecondary)
+                            color = if (seleccionado) TextWhite else TextSecondary
+                        )
                     }
                 }
             }
 
             // SELECTOR SECCIÓN
-            Text(text = "SELECCIONE SECCIÓN", fontFamily = Roboto,
-                fontWeight = FontWeight.Bold, fontSize = 15.sp, color = TextBlue)
+            Text(
+                text = "SELECCIONE SECCIÓN", fontFamily = Roboto,
+                fontWeight = FontWeight.Bold, fontSize = 15.sp, color = TextBlue
+            )
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 listaSecciones.forEach { seccion ->
                     val seleccionada = seccion.id == seccionSeleccionada?.id
@@ -176,10 +203,13 @@ fun SeleccionarSeccionScreen(
                             .size(38.dp)
                             .background(
                                 if (seleccionada) EduconnectBlue else BackgroundWhite,
-                                RoundedCornerShape(22.dp))
-                            .border(1.5.dp,
+                                RoundedCornerShape(22.dp)
+                            )
+                            .border(
+                                1.5.dp,
                                 if (seleccionada) EduconnectBlue else BorderLight,
-                                RoundedCornerShape(22.dp))
+                                RoundedCornerShape(22.dp)
+                            )
                             .clickable {
                                 seccionSeleccionada = seccion
                                 cursoSeleccionado = null
@@ -187,17 +217,20 @@ fun SeleccionarSeccionScreen(
                             },
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(text = seccion.nombre, fontFamily = Roboto,
+                        Text(
+                            text = seccion.nombre, fontFamily = Roboto,
                             fontWeight = if (seleccionada) FontWeight.Bold else FontWeight.Normal,
                             fontSize = 18.sp,
-                            color = if (seleccionada) TextWhite else TextSecondary)
+                            color = if (seleccionada) TextWhite else TextSecondary
+                        )
                     }
                 }
             }
-
             // SELECTOR CURSO
-            Text(text = "SELECCIONE CURSO", fontFamily = Roboto,
-                fontWeight = FontWeight.Bold, fontSize = 15.sp, color = TextBlue)
+            Text(
+                text = "SELECCIONE CURSO", fontFamily = Roboto,
+                fontWeight = FontWeight.Bold, fontSize = 15.sp, color = TextBlue
+            )
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 listaCursos.forEach { curso ->
                     val seleccionado = curso.id == cursoSeleccionado?.id
@@ -206,26 +239,34 @@ fun SeleccionarSeccionScreen(
                             .fillMaxWidth()
                             .background(
                                 if (seleccionado) EduconnectBlue.copy(alpha = 0.08f) else BackgroundWhite,
-                                RoundedCornerShape(10.dp))
+                                RoundedCornerShape(10.dp)
+                            )
                             .border(
                                 if (seleccionado) 1.5.dp else 1.dp,
                                 if (seleccionado) EduconnectBlue else BorderLight,
-                                RoundedCornerShape(10.dp))
+                                RoundedCornerShape(10.dp)
+                            )
                             .clickable { cursoSeleccionado = curso }
                             .padding(horizontal = 16.dp, vertical = 14.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(text = curso.nombre, fontFamily = Roboto,
+                        Text(
+                            text = curso.nombre, fontFamily = Roboto,
                             fontWeight = if (seleccionado) FontWeight.Bold else FontWeight.Normal,
                             fontSize = 18.sp,
-                            color = if (seleccionado) EduconnectBlue else TextSecondary)
+                            color = if (seleccionado) EduconnectBlue else TextSecondary
+                        )
                         if (seleccionado) {
-                            Box(modifier = Modifier.size(24.dp)
-                                .background(EduconnectBlue, RoundedCornerShape(12.dp)),
-                                contentAlignment = Alignment.Center) {
-                                Text(text = "✓", fontSize = 16.sp, color = TextWhite,
-                                    fontWeight = FontWeight.Bold)
+                            Box(
+                                modifier = Modifier.size(24.dp)
+                                    .background(EduconnectBlue, RoundedCornerShape(12.dp)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "✓", fontSize = 16.sp, color = TextWhite,
+                                    fontWeight = FontWeight.Bold
+                                )
                             }
                         }
                     }
@@ -233,13 +274,17 @@ fun SeleccionarSeccionScreen(
             }
 
             if (listaCursos.isEmpty() && seccionSeleccionada != null) {
-                Box(modifier = Modifier.fillMaxWidth()
-                    .background(BackgroundWhite, RoundedCornerShape(10.dp))
-                    .border(1.dp, BorderLight, RoundedCornerShape(10.dp))
-                    .padding(16.dp)) {
-                    Text(text = "No tiene curso asignado a dicho grado y sección",
+                Box(
+                    modifier = Modifier.fillMaxWidth()
+                        .background(BackgroundWhite, RoundedCornerShape(10.dp))
+                        .border(1.dp, BorderLight, RoundedCornerShape(10.dp))
+                        .padding(16.dp)
+                ) {
+                    Text(
+                        text = "No tiene curso asignado a dicho grado y sección",
                         fontFamily = Roboto, fontWeight = FontWeight.Normal,
-                        fontSize = 15.sp, color = TextSecondary)
+                        fontSize = 15.sp, color = TextSecondary
+                    )
                 }
             }
         }
@@ -270,18 +315,66 @@ fun SeleccionarSeccionScreen(
                 }
             }
 
+            val habilitado = gradoSeleccionado != null && seccionSeleccionada != null && cursoSeleccionado != null
+
+            if (mostrarDialogSinAlumnos) {
+                AlertDialog(
+                    onDismissRequest = { mostrarDialogSinAlumnos = false },
+                    icon = {
+                        Image(
+                            painter = painterResource(id = R.drawable.students_blue),
+                            contentDescription = null,
+                            modifier = Modifier.size(40.dp)
+                        )
+                    },
+                    title = {
+                        Text(
+                            text = "Sin alumnos registrados",
+                            fontFamily = Roboto, fontWeight = FontWeight.Bold,
+                            fontSize = 18.sp, color = TextOrange
+                        )
+                    },
+                    text = {
+                        Text(
+                            text = "No se encontraron alumnos registrados para el grado, sección y curso seleccionado.",
+                            fontFamily = Roboto, fontWeight = FontWeight.Normal,
+                            fontSize = 15.sp, color = TextSecondary
+                        )
+                    },
+                    confirmButton = {
+                        TextButton(onClick = { mostrarDialogSinAlumnos = false }) {
+                            Text(
+                                text = "Entendido",
+                                fontFamily = Roboto, fontWeight = FontWeight.Bold,
+                                color = EduconnectBlue
+                            )
+                        }
+                    },
+                    containerColor = androidx.compose.ui.graphics.Color.White,
+                    shape = RoundedCornerShape(16.dp)
+                )
+            }
+
             Button(
                 onClick = {
                     val g = gradoSeleccionado
                     val s = seccionSeleccionada
                     val c = cursoSeleccionado
                     if (g != null && s != null && c != null) {
-                        onContinuar(g.id, s.id, c.id, g.nombre, s.nombre, c.nombre)
+                        if (cantidadAlumnos == 0) {
+                            mostrarDialogSinAlumnos = true
+                        } else {
+                            onContinuar(g.id, s.id, c.id, g.nombre, s.nombre, c.nombre)
+                        }
                     }
                 },
+                enabled = habilitado,
                 modifier = Modifier.fillMaxWidth().height(52.dp),
                 shape = RoundedCornerShape(28.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = AccentOrange)
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = AccentOrange,
+                    disabledContainerColor = Color(0xFFB0BEC5)
+                )
             ) {
                 Image(painter = painterResource(id = R.drawable.goasistent_white),
                     contentDescription = null, modifier = Modifier.size(35.dp))

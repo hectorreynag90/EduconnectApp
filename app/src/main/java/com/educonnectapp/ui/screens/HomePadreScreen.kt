@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -30,6 +31,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.IntOffset
 import com.educonnectapp.R
 import com.educonnectapp.ui.theme.AccentOrange
 import com.educonnectapp.ui.theme.BackgroundLight
@@ -50,6 +53,7 @@ import java.util.Locale
 @Composable
 fun HomePadreScreen(
     usuarioNombre: String,
+    tieneNotificaciones: Boolean = false,
     onAsistencias: () -> Unit = {},
     onComunicados: () -> Unit = {},
     onAgenda: () -> Unit = {},
@@ -129,12 +133,21 @@ fun HomePadreScreen(
                 }
             }
 
-            Column {
+            Box {
                 IconButton(onClick = onNotificaciones) {
                     Image(
                         painter = painterResource(id = R.drawable.notification_white),
                         contentDescription = "Notificaciones",
                         modifier = Modifier.size(35.dp)
+                    )
+                }
+                if (tieneNotificaciones) {
+                    Box(
+                        modifier = Modifier
+                            .size(10.dp)
+                            .background(color = Color.Red, shape = CircleShape)
+                            .align(Alignment.TopEnd)
+                            .offset(x = (-4).dp, y = 4.dp)
                     )
                 }
             }

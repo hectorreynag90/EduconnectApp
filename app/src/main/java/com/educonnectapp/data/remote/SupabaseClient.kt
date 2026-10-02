@@ -1,14 +1,46 @@
 package com.educonnectapp.data.remote
 
 import com.educonnectapp.BuildConfig
+import com.educonnectapp.ui.screens.DetalleAlumnoItem
+import io.github.jan.supabase.functions.Functions
 import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.auth.Auth
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.providers.builtin.Email
 import io.github.jan.supabase.postgrest.Postgrest
+import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Columns
 import kotlinx.serialization.Serializable
+
+import io.github.jan.supabase.functions.functions
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+
+@Serializable
+data class ConfiguracionInstitucionRow(
+    val id: Long,
+    val nombre: String? = null,
+    val correo_director: String? = null
+)
+
+@Serializable
+data class EstadoUpdate(
+    val estado: String
+)
+
+@Serializable
+data class CambioAsistenciaInsert(
+    val alumno_id: Long,
+    val asistencia_id: Long,
+    val docente_id: String,
+    val estado_anterior: String,
+    val estado_nuevo: String,
+    val motivo: String,
+    val grado_id: Long,
+    val seccion_id: Long,
+    val curso_id: Long
+)
 
 val supabase = createSupabaseClient(
     supabaseUrl = BuildConfig.SUPABASE_URL,
@@ -16,6 +48,7 @@ val supabase = createSupabaseClient(
 ) {
     install(Auth)
     install(Postgrest)
+    install(Functions)
 }
 
 // CLASSES
@@ -148,6 +181,13 @@ suspend fun obtenerGradoPorId(gradoId: Long): GradoRow? {
         .firstOrNull()
 }
 
+suspend fun obtenerGradosPorIds(ids: List<Long>): List<GradoRow> {
+    if (ids.isEmpty()) return emptyList()
+    return supabase.postgrest["grados"]
+        .select(Columns.ALL) { filter { isIn("id", ids) } }
+        .decodeList<GradoRow>()
+}
+
 suspend fun obtenerGradoPorNombre(nombre: String): GradoRow? {
     return supabase.postgrest["grados"]
         .select(Columns.ALL) { filter { eq("nombre", nombre) } }
@@ -168,6 +208,13 @@ suspend fun obtenerSeccionPorId(seccionId: Long): SeccionRow? {
         .select(Columns.ALL) { filter { eq("id", seccionId) } }
         .decodeList<SeccionRow>()
         .firstOrNull()
+}
+
+suspend fun obtenerSeccionesPorIds(ids: List<Long>): List<SeccionRow> {
+    if (ids.isEmpty()) return emptyList()
+    return supabase.postgrest["secciones"]
+        .select(Columns.ALL) { filter { isIn("id", ids) } }
+        .decodeList<SeccionRow>()
 }
 
 suspend fun obtenerSeccionesPorGrado(gradoId: Long): List<SeccionRow> {
@@ -242,6 +289,11 @@ suspend fun insertarAsistencia(asistencia: AsistenciaInsert) {
     supabase.postgrest["asistencias"].insert(asistencia)
 }
 
+suspend fun insertarAsistenciasEnLote(asistencias: List<AsistenciaInsert>) {
+    if (asistencias.isEmpty()) return
+    supabase.postgrest["asistencias"].insert(asistencias)
+}
+
 suspend fun actualizarAsistencia(alumnoId: Long, cursoId: Long, docenteId: String, fecha: String, estado: String) {
     supabase.postgrest["asistencias"]
         .update(mapOf("estado" to estado)) {
@@ -302,6 +354,13 @@ suspend fun obtenerCursoPorId(cursoId: Long): CursoRow? {
         .select(Columns.ALL) { filter { eq("id", cursoId) } }
         .decodeList<CursoRow>()
         .firstOrNull()
+}
+
+suspend fun obtenerCursosPorIds(ids: List<Long>): List<CursoRow> {
+    if (ids.isEmpty()) return emptyList()
+    return supabase.postgrest["cursos"]
+        .select(Columns.ALL) { filter { isIn("id", ids) } }
+        .decodeList<CursoRow>()
 }
 
 suspend fun obtenerCursoPorNombre(nombre: String): CursoRow? {
@@ -676,4 +735,290 @@ suspend fun contarTareasPendientes(
 ): Int {
     return obtenerPublicacionesPorAlumno(seccionId, gradoId)
         .count { it.tipo == "Tarea" && it.estado == "Pendiente" }
+}
+
+suspend fun obtenerAsistenciasPorDocente(docenteId: String, cursoId: Long): List<AsistenciaHistorialRow> {
+    return supabase.postgrest["asistencias"]
+        .select(Columns.ALL) {
+            filter {
+                eq("docente_id", docenteId)
+                eq("curso_id", cursoId)
+            }
+        }
+        .decodeList<AsistenciaHistorialRow>()
+}
+
+suspend fun obtenerCorreoDirector(): String {
+    return supabase.postgrest["configuracion_institucion"]
+        .select(Columns.ALL)
+        .decodeList<ConfiguracionInstitucionRow>()
+        .firstOrNull()?.correo_director ?: ""
+}
+
+suspend fun guardarCambios(
+    alumnosOriginales: List<DetalleAlumnoItem>,
+    alumnosEditados: List<DetalleAlumnoItem>,
+    asistenciaId: Long,
+    docenteId: String,
+    docenteNombre: String,
+    motivo: String,
+    cursoId: Long,
+    fecha: String,
+    gradoId: Long,
+    seccionId: Long,
+    gradoNombre: String,
+    seccionNombre: String,
+    cursoNombre: String
+) {
+    val correoDirector = obtenerCorreoDirector()
+
+    alumnosOriginales.forEachIndexed { i, original ->
+        val editado = alumnosEditados[i]
+        if (original.estado != editado.estado) {
+
+            // 1. Actualizar estado en asistencias
+            supabase.postgrest["asistencias"]
+                .update(EstadoUpdate(estado = editado.estado)) {
+                    filter {
+                        eq("alumno_id", original.id)
+                        eq("curso_id", cursoId)
+                        eq("docente_id", docenteId)
+                        eq("fecha", fecha)
+                    }
+                }
+
+            // 2. Registrar en cambio_asistencia
+            supabase.postgrest["cambio_asistencia"]
+                .insert(CambioAsistenciaInsert(
+                    alumno_id       = original.id,
+                    asistencia_id   = asistenciaId,
+                    docente_id      = docenteId,
+                    estado_anterior = original.estado,
+                    estado_nuevo    = editado.estado,
+                    motivo          = motivo,
+                    grado_id        = gradoId,
+                    seccion_id      = seccionId,
+                    curso_id        = cursoId
+                ))
+
+            // 3. Llamar Edge Function para correo al director
+            val estadoAnteriorTexto = when(original.estado) { "A" -> "Presente"; "T" -> "Tardanza"; else -> "Ausente" }
+            val estadoNuevoTexto    = when(editado.estado)  { "A" -> "Presente"; "T" -> "Tardanza"; else -> "Ausente" }
+            supabase.functions.invoke(
+                function = "notificar-cambio-asistencia",
+                body = buildJsonObject {
+                    put("correoDirector", correoDirector)
+                    put("alumno", "${original.apellidos}, ${original.nombres}")
+                    put("estadoAnterior", estadoAnteriorTexto)
+                    put("estadoNuevo", estadoNuevoTexto)
+                    put("motivo", motivo)
+                    put("docente", docenteNombre)
+                    put("grado", gradoNombre)
+                    put("seccion", seccionNombre)
+                    put("curso", cursoNombre)
+                }
+            )
+
+            // 4. Enviar push al padre del alumno
+            val fcmTokenPadre = obtenerFcmTokenPadre(original.id)
+            if (!fcmTokenPadre.isNullOrEmpty()) {
+                val emoji = when(editado.estado) { "A" -> "✅"; "T" -> "⚠️"; else -> "❌" }
+                val horaActual = java.text.SimpleDateFormat("hh:mma", java.util.Locale.getDefault()).format(java.util.Date())
+                supabase.functions.invoke(
+                    function = "send-notification",
+                    body = buildJsonObject {
+                        put("token", fcmTokenPadre)
+                        put("title", "Asistencia Actualizada $estadoNuevoTexto $emoji $fecha $horaActual")
+                        put("body", "Alumno: ${original.apellidos}, ${original.nombres} — $gradoNombre Sec. $seccionNombre\nCurso: $cursoNombre\nAntes: $estadoAnteriorTexto → Ahora: $estadoNuevoTexto")
+                        put("data", buildJsonObject {
+                            put("tipo", "actualizacion_asistencia")
+                            put("alumno", "${original.apellidos}, ${original.nombres}")
+                            put("grado", gradoNombre)
+                            put("seccion", seccionNombre)
+                            put("curso", cursoNombre)
+                            put("estadoAnterior", estadoAnteriorTexto)
+                            put("estadoNuevo", estadoNuevoTexto)
+                            put("fecha", fecha)
+                            put("hora", horaActual)
+                        })
+                    }
+                )
+            }
+
+        }
+    }
+}
+
+suspend fun obtenerResumenAsistenciasDocente(docenteId: String): Triple<Int, Int, Int> {
+    val fechaHoy = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date())
+
+    val relaciones = obtenerDocenteSecciones(docenteId)
+    val totalCursos = relaciones.size
+    if (totalCursos == 0) return Triple(0, 0, 0)
+
+    // Todas las asistencias de hoy del docente — 1 consulta
+    val asistenciasHoy = supabase.postgrest["asistencias"]
+        .select(Columns.ALL) {
+            filter {
+                eq("docente_id", docenteId)
+                eq("fecha", fechaHoy)
+            }
+        }
+        .decodeList<AsistenciaHistorialRow>()
+
+    if (asistenciasHoy.isEmpty()) return Triple(0, totalCursos, 0)
+
+    // Todos los alumnos de todas las secciones del docente — 1 consulta en lugar de N
+    val todasSeccionIds = relaciones.map { it.seccion_id }.distinct()
+    val todosAlumnos = supabase.postgrest["alumnos"]
+        .select(Columns.ALL) { filter { isIn("seccion_id", todasSeccionIds) } }
+        .decodeList<AlumnoSeccionRow>()
+
+    // Mapa seccion_id → lista de alumno ids (en memoria, sin más consultas)
+    val alumnosPorSeccion = todosAlumnos.groupBy({ it.seccion_id }, { it.id })
+
+    var cursosRealizados = 0
+    for (rel in relaciones) {
+        val alumnosDeLaSeccion = alumnosPorSeccion[rel.seccion_id] ?: emptyList()
+        val tieneAsistencia = asistenciasHoy.any {
+            it.curso_id == rel.curso_id && it.alumno_id in alumnosDeLaSeccion
+        }
+        if (tieneAsistencia) cursosRealizados++
+    }
+
+    val pendientes = (totalCursos - cursosRealizados).coerceAtLeast(0)
+    val presentes = asistenciasHoy.count { it.estado == "A" }
+    val porcentaje = if (asistenciasHoy.isNotEmpty()) (presentes * 100) / asistenciasHoy.size else 0
+
+    return Triple(cursosRealizados, pendientes, porcentaje)
+}
+
+// FCM Token del usuario actual
+suspend fun guardarFcmToken(token: String) {
+    val userId = supabase.auth.currentUserOrNull()?.id ?: return
+    supabase.postgrest["usuarios"].update(
+        mapOf("fcm_token" to token)
+    ) {
+        filter { eq("id", userId) }
+    }
+}
+
+// Obtener FCM token del padre de un alumno
+suspend fun obtenerFcmTokenPadre(alumnoId: Long): String? {
+    // Buscar el padre asociado al alumno
+    val resultado = supabase.postgrest["alumnos"]
+        .select(Columns.list("padre_id")) {
+            filter { eq("id", alumnoId) }
+        }
+        .decodeList<AlumnoPadreRow>()
+    val padreId = resultado.firstOrNull()?.padre_id ?: return null
+
+    val padreRow = supabase.postgrest["usuarios"]
+        .select(Columns.list("fcm_token")) {
+            filter { eq("id", padreId) }
+        }
+        .decodeList<UsuarioFcmRow>()
+    return padreRow.firstOrNull()?.fcm_token
+}
+
+@Serializable
+data class AlumnoPadreRow(val padre_id: String)
+
+@Serializable
+data class UsuarioFcmRow(val fcm_token: String? = null)
+
+// Guardar notificación en tabla y enviar push
+suspend fun enviarNotificacionAsistencia(
+    padreId: String,
+    alumnoNombre: String,
+    grado: String,
+    seccion: String,
+    curso: String,
+    estado: String,
+    hora: String,
+    fecha: String,
+    fcmToken: String?,
+    esActualizacion: Boolean = false
+) {
+    // 1. Guardar en tabla notificaciones
+    supabase.postgrest["notificaciones"].insert(
+        mapOf(
+            "padre_id" to padreId,
+            "alumno_nombre" to alumnoNombre,
+            "grado" to grado,
+            "seccion" to seccion,
+            "curso" to curso,
+            "estado" to estado,
+            "hora" to hora,
+            "fecha" to fecha
+        )
+    )
+
+    // 2. Enviar push via Supabase Edge Function (si hay token)
+    if (!fcmToken.isNullOrEmpty()) {
+        val estadoTexto = when (estado) { "A" -> "Presente"; "T" -> "Tardanza"; else -> "Ausente" }
+        val emoji = when (estado) { "A" -> "✅"; "T" -> "⚠️"; else -> "❌" }
+        val titulo = if (esActualizacion)
+            "Asistencia Actualizada $estadoTexto $emoji $fecha $hora"
+        else
+            "Asistencia Registrada $estadoTexto $emoji $fecha $hora"
+        supabase.functions.invoke(
+            function = "send-notification",
+            body = buildJsonObject {
+                put("token", fcmToken)
+                put("title", titulo)
+                put("body", "Alumno: $alumnoNombre — $grado Sec. $seccion\nCurso: $curso")
+                put("data", buildJsonObject {
+                    put("tipo", "asistencia")
+                    put("alumno", alumnoNombre)
+                    put("grado", grado)
+                    put("seccion", seccion)
+                    put("curso", curso)
+                    put("estado", estadoTexto)
+                    put("fecha", fecha)
+                    put("hora", hora)
+                })
+            }
+        )
+    }
+}
+
+// Contar notificaciones no leídas del padre
+suspend fun contarNotificacionesNoLeidas(padreId: String): Int {
+    val resultado = supabase.postgrest["notificaciones"]
+        .select(Columns.list("id")) {
+            filter {
+                eq("padre_id", padreId)
+                eq("leida", false)
+            }
+        }
+        .decodeList<NotificacionIdRow>()
+    return resultado.size
+}
+
+@Serializable
+data class NotificacionIdRow(val id: String)
+
+// Obtener padre_id de un alumno via tabla padre_alumnos
+suspend fun obtenerPadreIdDeAlumno(alumnoId: Long): String? {
+    // Primero obtener el codigo_estudiante del alumno
+    val alumno = obtenerAlumnoPorId(alumnoId) ?: return null
+    // Buscar en padre_alumnos por codigo_estudiante
+    val padreLink = supabase.postgrest["padre_alumnos"]
+        .select(Columns.ALL) {
+            filter { eq("codigo_estudiante", alumno.codigo_estudiante) }
+        }
+        .decodeList<PadreAlumnoRow2>()
+        .firstOrNull()
+    return padreLink?.padre_id
+}
+
+// Obtener FCM token del padre por padre_id
+suspend fun obtenerFcmTokenPorPadreId(padreId: String): String? {
+    return supabase.postgrest["usuarios"]
+        .select(Columns.list("fcm_token")) {
+            filter { eq("id", padreId) }
+        }
+        .decodeList<UsuarioFcmRow>()
+        .firstOrNull()?.fcm_token
 }

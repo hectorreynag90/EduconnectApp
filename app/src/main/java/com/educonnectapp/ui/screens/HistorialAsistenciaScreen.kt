@@ -453,15 +453,26 @@ fun HistorialAsistenciasScreen(
         ) {
 
             if (asistenciasFiltradas.isEmpty()) {
-                Box(modifier = Modifier.fillMaxWidth()
-                    .background(BackgroundWhite, RoundedCornerShape(10.dp))
-                    .border(1.dp, BorderBlue, RoundedCornerShape(10.dp))
-                    .padding(20.dp), contentAlignment = Alignment.Center
+                Column(
+                    modifier = Modifier.fillMaxWidth()
+                        .background(BackgroundWhite, RoundedCornerShape(10.dp))
+                        .border(1.dp, BorderBlue, RoundedCornerShape(10.dp))
+                        .padding(20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
+                    Image(
+                        painter = painterResource(
+                            id = if (cursoSeleccionado == null) R.drawable.task_darkgray
+                            else R.drawable.ic_no_records
+                        ),
+                        contentDescription = null,
+                        modifier = Modifier.size(36.dp)
+                    )
                     Text(
                         text = if (cursoSeleccionado == null) "Selecciona un curso para ver registros"
-                    else if (diaSeleccionado != null) "Sin registro para el día $diaSeleccionado"
-                    else "Sin registros este mes",
+                        else if (diaSeleccionado != null) "Sin registro para el día $diaSeleccionado"
+                        else "Sin registros este mes",
                         fontFamily = Roboto,
                         fontSize = 16.sp,
                         color = TextSecondary,
