@@ -22,6 +22,12 @@ import retrofit2.http.POST
 import retrofit2.http.PUT
 import retrofit2.http.Path
 import retrofit2.http.Query
+import retrofit2.http.Multipart
+import retrofit2.http.Part
+import retrofit2.http.Streaming
+import okhttp3.MultipartBody
+import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.ResponseBody
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 
@@ -194,6 +200,35 @@ interface EduConnectApi {
     ): List<DiaHistorialResponse>
 
     // Asistencias padre
+    // Archivos adjuntos
+    @Multipart
+    @POST("api/archivos")
+    suspend fun subirArchivo(@Part archivo: MultipartBody.Part): ArchivoResponse
+
+    @Streaming
+    @GET("api/archivos/{id}")
+    suspend fun descargarArchivo(@Path("id") id: Long): ResponseBody
+
+    // Comunicados docente
+    @GET("api/docente/comunicados")
+    suspend fun comunicadosDocente(
+        @Query("seccionId") seccionId: Long? = null,
+        @Query("texto") texto: String? = null
+    ): List<ComunicadoDocenteResponse>
+
+    @POST("api/docente/comunicados")
+    suspend fun enviarComunicado(@Body body: EnviarComunicadoRequest): ComunicadoDocenteResponse
+
+    @GET("api/docente/comunicados/{id}")
+    suspend fun detalleComunicadoDocente(@Path("id") id: Long): DetalleComunicadoDocenteResponse
+
+    // Comunicados padre
+    @GET("api/padre/hijos/{alumnoId}/comunicados")
+    suspend fun comunicadosHijo(@Path("alumnoId") alumnoId: Long): ComunicadosHijoResponse
+
+    @POST("api/padre/comunicados/{id}/leido")
+    suspend fun marcarComunicadoLeido(@Path("id") id: Long)
+
     @GET("api/padre/hijos/{alumnoId}/asistencias")
     suspend fun asistenciasHijo(
         @Path("alumnoId") alumnoId: Long,
@@ -598,4 +633,173 @@ fun formatearFechaLarga(fecha: String): String {
         java.text.SimpleDateFormat("EEEE dd 'de' MMMM yyyy", java.util.Locale("es", "PE"))
             .format(d!!).replaceFirstChar { it.uppercase() }
     } catch (e: Exception) { fecha }
+}
+
+// =====================================================================
+// DATA CLASSES ARCHIVOS Y COMUNICADOS
+// =====================================================================
+
+@Serializable
+data class ArchivoResponse(
+    val id: Long,
+    val nombre: String = "",
+    val tipoMime: String = "",
+    val tamanoBytes: Long = 0,
+    val url: String = ""
+)
+
+@Serializable
+data class EnviarComunicadoRequest(
+    val seccionId: Long,
+    val cursoId: Long? = null,
+    val asunto: String,
+    val mensaje: String,
+    val archivoId: Long? = null
+)
+
+@Serializable
+data class ComunicadoDocenteResponse(
+    val id: Long,
+    val gradoId: Long = 0,
+    val grado: String = "",
+    val seccionId: Long = 0,
+    val seccion: String = "",
+    val cursoId: Long? = null,
+    val curso: String? = null,
+    val asunto: String,
+    val mensaje: String = "",
+    val archivo: ArchivoResponse? = null,
+    val enviadoEn: String = "",          // ISO date-time
+    val totalNotificados: Int = 0,
+    val totalLeidos: Long = 0,
+    val porcentajeLectura: Int = 0
+)
+
+@Serializable
+data class LecturaPadreResponse(
+    val padreId: Long,
+    val padre: String = "",
+    val hijos: List<String> = emptyList(),
+    val leido: Boolean = false,
+    val leidoEn: String? = null
+)
+
+@Serializable
+data class DetalleComunicadoDocenteResponse(
+    val comunicado: ComunicadoDocenteResponse,
+    val lecturas: List<LecturaPadreResponse> = emptyList()
+)
+
+@Serializable
+data class ComunicadoPadreResponse(
+    val id: Long,
+    val asunto: String,
+    val mensaje: String = "",
+    val docente: String = "",
+    val cursoId: Long? = null,
+    val curso: String? = null,
+    val archivo: ArchivoResponse? = null,
+    val enviadoEn: String = "",
+    val leido: Boolean = false,
+    val leidoEn: String? = null
+)
+
+@Serializable
+data class ComunicadosHijoResponse(
+    val alumnoId: Long,
+    val noLeidos: Int = 0,
+    val comunicados: List<ComunicadoPadreResponse> = emptyList()
+)
+
+// =====================================================================
+// ARCHIVOS ADJUNTOS
+// =====================================================================
+
+const val TAMANO_MAXIMO_ADJUNTO = 10L * 1024 * 1024   // 10 MB (mismo límite que el backend)
+
+// Lee el archivo elegido por el usuario y lo sube. Devuelve el archivo registrado en el backend.
+suspend fun subirArchivo(resolver: android.content.ContentResolver, uri: android.net.Uri): ArchivoResponse {
+    val nombre = nombreArchivo(resolver, uri)
+    val mime = resolver.getType(uri) ?: "application/octet-stream"
+    val bytes = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        resolver.openInputStream(uri)?.use { it.readBytes() }
+    } ?: throw ApiException(0, "No se pudo leer el archivo seleccionado")
+    if (bytes.size > TAMANO_MAXIMO_ADJUNTO) throw ApiException(413, "El archivo supera los 10 MB")
+    val parte = MultipartBody.Part.createFormData(
+        "archivo", nombre, bytes.toRequestBody(mime.toMediaType())
+    )
+    return llamar { api.subirArchivo(parte) }
+}
+
+// Nombre real del archivo (ej. "tarea.pdf"), no el identificador interno del Uri
+fun nombreArchivo(resolver: android.content.ContentResolver, uri: android.net.Uri): String {
+    resolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
+        if (c.moveToFirst()) {
+            val nombre = c.getString(0)
+            if (!nombre.isNullOrBlank()) return nombre
+        }
+    }
+    return uri.lastPathSegment ?: "archivo"
+}
+
+// Descarga un adjunto (con el token de la sesión) a un archivo local
+suspend fun descargarArchivo(archivoId: Long, destino: java.io.File) {
+    val cuerpo = llamar { api.descargarArchivo(archivoId) }
+    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        destino.parentFile?.mkdirs()
+        cuerpo.byteStream().use { entrada -> destino.outputStream().use { salida -> entrada.copyTo(salida) } }
+    }
+}
+
+// =====================================================================
+// COMUNICADOS DOCENTE (el backend envía el push a los padres)
+// =====================================================================
+
+suspend fun obtenerComunicadosDocente(seccionId: Long? = null): List<ComunicadoDocenteResponse> =
+    llamar { api.comunicadosDocente(seccionId) }
+
+suspend fun enviarComunicado(
+    seccionId: Long, cursoId: Long?, asunto: String, mensaje: String, archivoId: Long?
+): ComunicadoDocenteResponse = llamar {
+    api.enviarComunicado(EnviarComunicadoRequest(seccionId, cursoId, asunto.trim(), mensaje.trim(), archivoId))
+}
+
+suspend fun obtenerDetalleComunicadoDocente(id: Long): DetalleComunicadoDocenteResponse =
+    llamar { api.detalleComunicadoDocente(id) }
+
+// =====================================================================
+// COMUNICADOS PADRE
+// =====================================================================
+
+suspend fun obtenerComunicadosHijo(alumnoId: Long): ComunicadosHijoResponse =
+    llamar { api.comunicadosHijo(alumnoId) }
+
+suspend fun marcarComunicadoLeido(comunicadoId: Long) = llamar { api.marcarComunicadoLeido(comunicadoId) }
+
+// =====================================================================
+// FECHAS ISO DEL BACKEND -> HORA LOCAL DEL CELULAR
+// =====================================================================
+
+// "2026-10-02T15:15:41Z" o "2026-10-02T10:15:41-05:00" -> LocalDateTime en la zona del celular
+fun aFechaHoraLocal(iso: String?): java.time.LocalDateTime? {
+    if (iso.isNullOrBlank()) return null
+    return try {
+        java.time.OffsetDateTime.parse(iso)
+            .atZoneSameInstant(java.time.ZoneId.systemDefault()).toLocalDateTime()
+    } catch (e: Exception) {
+        try { java.time.LocalDateTime.parse(iso) } catch (e2: Exception) { null }
+    }
+}
+
+// -> "yyyy-MM-dd"
+fun fechaLocal(iso: String?): String = aFechaHoraLocal(iso)?.toLocalDate()?.toString() ?: ""
+
+// -> "hh:mm a"
+fun horaLocal(iso: String?): String = aFechaHoraLocal(iso)?.let {
+    it.format(java.time.format.DateTimeFormatter.ofPattern("hh:mm a", java.util.Locale("es", "PE")))
+} ?: ""
+
+// -> "yyyy-MM-dd'T'HH:mm:ss" (formato que leen las pantallas)
+fun isoLocalSinZona(iso: String?): String? = aFechaHoraLocal(iso)?.withNano(0)?.toString()?.let {
+    if (it.length == 16) "$it:00" else it   // LocalDateTime omite los segundos si son 00
 }

@@ -3,11 +3,13 @@ package com.educonnectapp.ui.screens
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -17,6 +19,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -28,6 +31,9 @@ import java.util.*
 @Composable
 fun DetalleComunicadoPadreScreen(
     comunicado: ComunicadoPadreItem? = null,
+    nombreAdjunto: String? = null,          // null = el comunicado no tiene adjunto
+    descargandoAdjunto: Boolean = false,
+    onAbrirAdjunto: () -> Unit = {},
     onBack: () -> Unit = {},
     onHomePadre: () -> Unit = {},
     onAvisos: () -> Unit = {},
@@ -300,6 +306,56 @@ fun DetalleComunicadoPadreScreen(
                     lineHeight = 22.sp
                 )
 
+                // ARCHIVO ADJUNTO
+                if (nombreAdjunto != null) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(BackgroundWhite, RoundedCornerShape(10.dp))
+                            .border(1.dp, BorderBlue, RoundedCornerShape(10.dp))
+                            .clickable(enabled = !descargandoAdjunto) { onAbrirAdjunto() }
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Image(
+                            painter = painterResource(id = R.drawable.paperclip_lightgray),
+                            contentDescription = null,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = nombreAdjunto,
+                                fontFamily = Roboto,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 15.sp,
+                                color = EduconnectBlue,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                text = if (descargandoAdjunto) "Descargando..." else "Toca para abrir",
+                                fontFamily = Roboto,
+                                fontSize = 13.sp,
+                                color = TextSecondary
+                            )
+                        }
+                        if (descargandoAdjunto) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(22.dp),
+                                color = EduconnectBlue,
+                                strokeWidth = 2.dp
+                            )
+                        } else {
+                            Image(
+                                painter = painterResource(id = R.drawable.document_blue),
+                                contentDescription = "Abrir adjunto",
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                    }
+                }
+
                 HorizontalDivider(color = BorderOrange, thickness = 1.dp)
 
                 // Docente firma
@@ -375,7 +431,8 @@ fun DetalleComunicadoPadrePreview() {
                 cursoNombre = "Matemáticas",
                 leido = true,
                 leidoEn = "2026-05-23T11:17:00"
-            )
+            ),
+            nombreAdjunto = "Cronograma_reunion.pdf"
         )
     }
 }

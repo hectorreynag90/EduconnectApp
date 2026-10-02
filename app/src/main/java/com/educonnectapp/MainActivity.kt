@@ -63,21 +63,13 @@ import com.educonnectapp.data.remote.obtenerCursoPorId
 import com.educonnectapp.data.remote.obtenerDocenteSecciones
 import com.educonnectapp.data.remote.obtenerDocenteSeccionesPorSeccion
 import com.educonnectapp.data.remote.obtenerHijosPadre
-import com.educonnectapp.data.remote.ComunicadoInsert
-import com.educonnectapp.data.remote.insertarComunicado
-import com.educonnectapp.data.remote.obtenerResumenComunicados
 import com.educonnectapp.ui.screens.SeccionDestinatario
-import com.educonnectapp.data.remote.obtenerCantidadComunicadosPorSeccion
-import com.educonnectapp.data.remote.obtenerComunicadosPorSeccionConLecturas
-import com.educonnectapp.data.remote.obtenerLecturasConPadre
-import com.educonnectapp.data.remote.obtenerPadresSinLeer
 import com.educonnectapp.ui.screens.SeleccionarComunicadoScreen
 import com.educonnectapp.ui.screens.BusquedaComunicadoScreen
 import com.educonnectapp.ui.screens.DetalleComunicadoScreen
 import com.educonnectapp.ui.screens.SeccionComunicadoItem
 import com.educonnectapp.ui.screens.ComunicadoResumenItem
 import com.educonnectapp.ui.screens.PadreLecturaItem
-import com.educonnectapp.data.remote.obtenerLecturasComunicado
 import com.educonnectapp.data.remote.PublicacionInsert
 import com.educonnectapp.data.remote.contarNotificacionesNoLeidas
 import com.educonnectapp.data.remote.insertarPublicacion
@@ -93,9 +85,6 @@ import com.educonnectapp.ui.screens.AgendaEscolarScreen
 import com.educonnectapp.ui.screens.DetalleAgendaScreen
 import com.educonnectapp.ui.screens.HijoAgendaItem
 import com.educonnectapp.ui.screens.PublicacionAgendaItem
-import com.educonnectapp.data.remote.marcarComunicadoLeido
-import com.educonnectapp.data.remote.obtenerComunicadosPadre
-import com.educonnectapp.data.remote.supabase
 import com.educonnectapp.ui.screens.ComunicadosPadresScreen
 import com.educonnectapp.ui.screens.SeleccionarEstudianteComunicadoScreen
 import com.educonnectapp.ui.screens.ComunicadosRecibidosScreen
@@ -135,12 +124,24 @@ import com.educonnectapp.data.api.formatearHora
 import com.educonnectapp.data.api.formatearFechaLarga
 import com.educonnectapp.data.api.porcentajeAsistencia
 import com.educonnectapp.data.api.inicioAnioEscolar
+import com.educonnectapp.data.api.ArchivoResponse
+import com.educonnectapp.data.api.ComunicadoDocenteResponse
+import com.educonnectapp.data.api.subirArchivo
+import com.educonnectapp.data.api.descargarArchivo
+import com.educonnectapp.data.api.enviarComunicado
+import com.educonnectapp.data.api.obtenerComunicadosDocente
+import com.educonnectapp.data.api.obtenerDetalleComunicadoDocente
+import com.educonnectapp.data.api.obtenerComunicadosHijo
+import com.educonnectapp.data.api.marcarComunicadoLeido
+import com.educonnectapp.data.api.fechaLocal
+import com.educonnectapp.data.api.horaLocal
+import com.educonnectapp.data.api.isoLocalSinZona
+import com.educonnectapp.data.api.aFechaHoraLocal
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import com.educonnectapp.data.remote.obtenerUsuario
 
-import io.github.jan.supabase.postgrest.postgrest
 
 enum class Screen {
     WELCOME,
@@ -309,6 +310,11 @@ fun EduConnectApp() {
     // Asistencias
     var fechaHojaSel by remember { mutableStateOf("") }   // fecha de la hoja cargada (servidor)
     var asistenciasHijoSel by remember { mutableStateOf<List<AsistenciaHijoResponse>>(emptyList()) }
+    // Comunicados
+    var enviandoComunicado by remember { mutableStateOf(false) }
+    var comunicadosDocenteSel by remember { mutableStateOf<List<ComunicadoDocenteResponse>>(emptyList()) }
+    var adjuntosComunicadoSel by remember { mutableStateOf<Map<Long, ArchivoResponse>>(emptyMap()) }
+    var descargandoAdjunto by remember { mutableStateOf(false) }
 
     fun aviso(mensaje: String) { Toast.makeText(context, mensaje, Toast.LENGTH_SHORT).show() }
 
@@ -345,6 +351,54 @@ fun EduConnectApp() {
         resumenPorcentajeSel = resumen.third
     }
 
+    // Comunicados de cada hijo del padre: 1 petición por hijo, en paralelo
+    suspend fun cargarComunicadosPadre() {
+        val hijos = obtenerHijos()
+        val respuestas = coroutineScope {
+            hijos.map { h -> async { obtenerComunicadosHijo(h.alumnoId) } }.awaitAll()
+        }
+        hijosComunicadoSel = hijos.mapIndexed { i, h ->
+            HijoComunicadoItem(
+                id = h.alumnoId,
+                nombres = h.nombres,
+                apellidos = h.apellidos,
+                gradoNombre = h.grado,
+                seccionNombre = h.seccion,
+                seccionId = h.seccionId,
+                sinLeer = respuestas[i].noLeidos,
+                total = respuestas[i].comunicados.size
+            )
+        }
+    }
+
+    // Descarga el adjunto (con el token de sesión) y lo abre con la app que corresponda
+    fun abrirAdjunto(archivo: ArchivoResponse) {
+        if (descargandoAdjunto) return
+        descargandoAdjunto = true
+        CoroutineScope(Dispatchers.Main).launch {
+            try {
+                val nombreSeguro = archivo.nombre.replace(Regex("[^A-Za-z0-9._-]"), "_")
+                val destino = java.io.File(context.cacheDir, "adjuntos/${archivo.id}_$nombreSeguro")
+                if (!destino.exists() || destino.length() == 0L) descargarArchivo(archivo.id, destino)
+                val uri = androidx.core.content.FileProvider.getUriForFile(
+                    context, "${context.packageName}.fileprovider", destino
+                )
+                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
+                    setDataAndType(uri, archivo.tipoMime.ifBlank { "*/*" })
+                    addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(intent)
+            } catch (e: android.content.ActivityNotFoundException) {
+                aviso("No hay una aplicación para abrir este tipo de archivo")
+            } catch (e: Exception) {
+                aviso("No se pudo abrir el adjunto: ${e.message}")
+            } finally {
+                descargandoAdjunto = false
+            }
+        }
+    }
+
     // Al cerrar sesión: borrar datos del usuario anterior (otra cuenta no debe verlos)
     fun limpiarDatosSesion() {
         usuarioLogueado = null
@@ -360,6 +414,13 @@ fun EduConnectApp() {
         todasAsistenciasSel = emptyList()
         asistenciasHijoSel = emptyList()
         actualizarResumen(Triple(0, 0, 0))
+        comunicadosDocenteSel = emptyList()
+        comunicadosListaSel = emptyList()
+        padresLecturaSel = emptyList()
+        hijosComunicadoSel = emptyList()
+        comunicadosPadreSel = emptyList()
+        comunicadoPadreSel = null
+        adjuntosComunicadoSel = emptyMap()
     }
 
 
@@ -779,12 +840,16 @@ fun EduConnectApp() {
 
                 Screen.COMUNICADOS -> {
                     androidx.compose.runtime.LaunchedEffect(Unit) {
-                        val docenteId = usuarioLogueado?.id ?: return@LaunchedEffect
+                        if (usuarioLogueado == null) return@LaunchedEffect
                         try {
-                            val (total, hoy, sinLeer) = obtenerResumenComunicados(docenteId)
-                            totalEnviadosSel = total
-                            totalHoySel = hoy
-                            sinLeerSel = sinLeer
+                            // Resumen del día: 1 petición (el backend ya trae notificados y leídos)
+                            val hoy = java.time.LocalDate.now().toString()
+                            val deHoy = obtenerComunicadosDocente().filter { fechaLocal(it.enviadoEn) == hoy }
+                            totalHoySel = deHoy.size
+                            totalEnviadosSel = deHoy.sumOf { it.totalNotificados }
+                            sinLeerSel = deHoy.sumOf { (it.totalNotificados - it.totalLeidos).coerceAtLeast(0).toInt() }
+                        } catch (e: kotlinx.coroutines.CancellationException) {
+                            throw e
                         } catch (e: Exception) {
                             aviso("Error cargando resumen: ${e.message}")
                         }
@@ -808,26 +873,25 @@ fun EduConnectApp() {
 
                 Screen.NUEVO_COMUNICADO -> {
                     androidx.compose.runtime.LaunchedEffect(Unit) {
-                        val docenteId = usuarioLogueado?.id ?: return@LaunchedEffect
+                        if (usuarioLogueado == null) return@LaunchedEffect
                         try {
-                            val relaciones = obtenerDocenteSecciones(docenteId)
-                            val lista = mutableListOf<SeccionDestinatario>()
-                            relaciones.forEach { rel ->
-                                val grado = obtenerGradoPorId(rel.grado_id) ?: return@forEach
-                                val seccion = obtenerSeccionPorId(rel.seccion_id) ?: return@forEach
-                                val curso = obtenerCursoPorId(rel.curso_id) ?: return@forEach
-                                val totalPadres = obtenerAlumnosPorSeccion(rel.seccion_id).size
-                                lista.add(SeccionDestinatario(
-                                    gradoId = rel.grado_id,
-                                    seccionId = rel.seccion_id,
-                                    cursoId = rel.curso_id,
-                                    gradoNombre = grado.nombre,
-                                    seccionNombre = seccion.nombre,
-                                    cursoNombre = curso.nombre,
-                                    totalPadres = totalPadres
-                                ))
+                            // Destinatarios = asignaciones del docente (ya traen nombres y cantidad de alumnos)
+                            val asignaciones = asignacionesApiSel.ifEmpty {
+                                obtenerAsignaciones().also { aplicarAsignaciones(it) }
                             }
-                            listaDestinatariosSel = lista
+                            listaDestinatariosSel = asignaciones.map {
+                                SeccionDestinatario(
+                                    gradoId = it.gradoId,
+                                    seccionId = it.seccionId,
+                                    cursoId = it.cursoId,
+                                    gradoNombre = it.grado,
+                                    seccionNombre = it.seccion,
+                                    cursoNombre = it.curso,
+                                    totalPadres = it.cantidadAlumnos.toInt()
+                                )
+                            }
+                        } catch (e: kotlinx.coroutines.CancellationException) {
+                            throw e
                         } catch (e: Exception) { aviso("Error cargando destinatarios: ${e.message}") }
                     }
                     NuevoComunicadoScreen(
@@ -840,34 +904,39 @@ fun EduConnectApp() {
                         { currentScreen = Screen.COMUNICADOS },
                         onPerfilDocente = { currentScreen = Screen.PERFIL_DOCENTE },
                         onNotificaciones = {},
-                        onEnviado = { asunto, mensaje, adjunto, destinatario, curso, total, hora, fecha ->
+                        onEnviado = { asunto, mensaje, adjunto, destinatario, curso, _, _, _ ->
+                            if (enviandoComunicado) return@NuevoComunicadoScreen   // evita doble envío
+                            // Sección + curso (una sección puede tener varios cursos del mismo docente)
+                            val dest = listaDestinatariosSel.find {
+                                "${it.gradoNombre} Sec. ${it.seccionNombre}" == destinatario && it.cursoNombre == curso
+                            } ?: return@NuevoComunicadoScreen
+                            enviandoComunicado = true
+                            aviso(if (adjunto.isNotEmpty()) "Subiendo adjunto y enviando..." else "Enviando comunicado...")
                             CoroutineScope(Dispatchers.Main).launch {
                                 try {
-                                    val docenteId = usuarioLogueado?.id ?: return@launch
-                                    val dest = listaDestinatariosSel.find {
-                                        "${it.gradoNombre} Sec. ${it.seccionNombre}" == destinatario
-                                    } ?: return@launch
-                                    insertarComunicado(ComunicadoInsert(
-                                        docente_id = docenteId,
-                                        grado_id = dest.gradoId,
-                                        seccion_id = dest.seccionId,
-                                        curso_id = dest.cursoId,
-                                        asunto = asunto,
-                                        mensaje = mensaje,
-                                        archivo_adjunto = adjunto,
-                                        fecha = fecha,
-                                        hora = hora,
-                                        total_notificados = total
-                                    ))
-                                    comunicadoAsuntoSel = asunto
+                                    // 1) Subir el adjunto (si hay) y obtener su id
+                                    val archivoId = if (adjunto.isNotEmpty())
+                                        subirArchivo(context.contentResolver, android.net.Uri.parse(adjunto)).id
+                                    else null
+                                    // 2) Enviar el comunicado: el backend notifica por push a los padres
+                                    val enviado = enviarComunicado(dest.seccionId, dest.cursoId, asunto, mensaje, archivoId)
+                                    comunicadoAsuntoSel = enviado.asunto
                                     comunicadoDestinatarioSel = destinatario
                                     comunicadoCursoSel = curso
-                                    comunicadoNotificadosSel = total
-                                    comunicadoHoraSel = hora
-                                    comunicadoFechaSel = fecha
+                                    comunicadoNotificadosSel = enviado.totalNotificados
+                                    comunicadoHoraSel = horaLocal(enviado.enviadoEn)
+                                    comunicadoFechaSel = fechaLocal(enviado.enviadoEn)
                                     currentScreen = Screen.CONFIRMACION_COMUNICADO
+                                } catch (e: ApiException) {
+                                    aviso(when (e.codigo) {
+                                        413 -> "El archivo supera los 10 MB"
+                                        415 -> "Tipo de archivo no permitido (PDF, Word, Excel, TXT o imagen)"
+                                        else -> "Error al enviar: ${e.message}"
+                                    })
                                 } catch (e: Exception) {
                                     aviso("Error al enviar: ${e.message}")
+                                } finally {
+                                    enviandoComunicado = false
                                 }
                             }
                         }
@@ -883,7 +952,7 @@ fun EduConnectApp() {
                     hora = comunicadoHoraSel,
                     fecha = comunicadoFechaSel,
                     onNuevoComunicado = { currentScreen = Screen.NUEVO_COMUNICADO },
-                    onVerHistorial = {},
+                    onVerHistorial = { currentScreen = Screen.SELECCIONAR_COMUNICADO },
                     onClose = { currentScreen = Screen.HOME_DOCENTE }
                 )
 
@@ -1063,26 +1132,25 @@ fun EduConnectApp() {
 
                 Screen.SELECCIONAR_COMUNICADO -> {
                     androidx.compose.runtime.LaunchedEffect(usuarioLogueado?.id) {
-                        val docenteId = usuarioLogueado?.id ?: return@LaunchedEffect
+                        if (usuarioLogueado == null) return@LaunchedEffect
                         try {
-                            val asignaciones = obtenerDocenteSecciones(docenteId)
-                            val lista = mutableListOf<SeccionComunicadoItem>()
-                            asignaciones.forEach { asig ->
-                                val grado = obtenerGradoPorId(asig.grado_id) ?: return@forEach
-                                val seccion = obtenerSeccionPorId(asig.seccion_id) ?: return@forEach
-                                val curso = obtenerCursoPorId(asig.curso_id) ?: return@forEach
-                                val alumnos = obtenerAlumnosPorSeccion(asig.seccion_id)
-                                val cantComunicados = obtenerCantidadComunicadosPorSeccion(docenteId, asig.seccion_id)
-                                lista.add(SeccionComunicadoItem(
-                                    seccionId = asig.seccion_id,
-                                    gradoNombre = grado.nombre,
-                                    seccionNombre = seccion.nombre,
-                                    cursoNombre = curso.nombre,
-                                    cantidadAlumnos = alumnos.size,
-                                    cantidadComunicados = cantComunicados
-                                ))
+                            // 2 peticiones en total: asignaciones (si no están) + todos los comunicados del docente
+                            val asignaciones = asignacionesApiSel.ifEmpty {
+                                obtenerAsignaciones().also { aplicarAsignaciones(it) }
                             }
-                            seccionesComunicadoSel = lista
+                            val porSeccion = obtenerComunicadosDocente().groupingBy { it.seccionId }.eachCount()
+                            seccionesComunicadoSel = asignaciones.map { a ->
+                                SeccionComunicadoItem(
+                                    seccionId = a.seccionId,
+                                    gradoNombre = a.grado,
+                                    seccionNombre = a.seccion,
+                                    cursoNombre = a.curso,
+                                    cantidadAlumnos = a.cantidadAlumnos.toInt(),
+                                    cantidadComunicados = porSeccion[a.seccionId] ?: 0
+                                )
+                            }
+                        } catch (e: kotlinx.coroutines.CancellationException) {
+                            throw e
                         } catch (e: Exception) { aviso("Error cargando secciones: ${e.message}") }
                     }
                     SeleccionarComunicadoScreen(
@@ -1105,20 +1173,22 @@ fun EduConnectApp() {
 
                 Screen.BUSQUEDA_COMUNICADO -> {
                     androidx.compose.runtime.LaunchedEffect(seccionIdSel) {
-                        val docenteId = usuarioLogueado?.id ?: return@LaunchedEffect
                         try {
-                            val comunicados = obtenerComunicadosPorSeccionConLecturas(docenteId, seccionIdSel)
+                            // 1 petición: cada comunicado ya trae notificados y leídos
+                            val comunicados = obtenerComunicadosDocente(seccionIdSel)
+                            comunicadosDocenteSel = comunicados
                             comunicadosListaSel = comunicados.map { com ->
-                                val leidos = obtenerLecturasComunicado(com.id)
                                 ComunicadoResumenItem(
                                     id = com.id,
                                     asunto = com.asunto,
                                     mensaje = com.mensaje,
-                                    fecha = com.fecha,
-                                    totalNotificados = com.total_notificados,
-                                    totalLeidos = leidos
+                                    fecha = fechaLocal(com.enviadoEn),
+                                    totalNotificados = com.totalNotificados,
+                                    totalLeidos = com.totalLeidos.toInt()
                                 )
-                            }
+                            }.sortedByDescending { it.fecha }
+                        } catch (e: kotlinx.coroutines.CancellationException) {
+                            throw e
                         } catch (e: Exception) { aviso("Error cargando comunicados: ${e.message}") }
                     }
                     BusquedaComunicadoScreen(
@@ -1141,32 +1211,31 @@ fun EduConnectApp() {
 
                 Screen.DETALLE_COMUNICADO -> {
                     androidx.compose.runtime.LaunchedEffect(comunicadoIdSel) {
+                        // Mostrar de inmediato lo que ya se tiene de la lista
+                        comunicadosDocenteSel.find { it.id == comunicadoIdSel }?.let { c ->
+                            comunicadoAsuntoSel = c.asunto
+                            comunicadoMensajeSel = c.mensaje
+                            comunicadoTotalNotifSel = c.totalNotificados
+                            comunicadoHoraSel = horaLocal(c.enviadoEn)
+                        }
+                        padresLecturaSel = emptyList()
                         try {
-                            val comunicado = comunicadosListaSel.find { it.id == comunicadoIdSel }
-                            comunicadoAsuntoSel = comunicado?.asunto ?: ""
-                            comunicadoMensajeSel = comunicado?.mensaje ?: ""
-                            comunicadoTotalNotifSel = comunicado?.totalNotificados ?: 0
-
-                            val lecturas = obtenerLecturasConPadre(comunicadoIdSel)
-                            val padresSinLeer = obtenerPadresSinLeer(comunicadoIdSel, seccionIdSel)
-
-                            val padresLeidos = lecturas.map { l ->
+                            // 1 petición: padres que leyeron y que no, con sus hijos
+                            val detalle = obtenerDetalleComunicadoDocente(comunicadoIdSel)
+                            comunicadoAsuntoSel = detalle.comunicado.asunto
+                            comunicadoMensajeSel = detalle.comunicado.mensaje
+                            comunicadoTotalNotifSel = detalle.comunicado.totalNotificados
+                            comunicadoHoraSel = horaLocal(detalle.comunicado.enviadoEn)
+                            padresLecturaSel = detalle.lecturas.map { l ->
                                 PadreLecturaItem(
-                                    padreId = l.padre_id,
-                                    nombrePadre = l.nombrecompleto,
-                                    nombreHijo = "",
-                                    leidoEn = l.leido_en
+                                    padreId = l.padreId.toString(),
+                                    nombrePadre = l.padre,
+                                    nombreHijo = l.hijos.joinToString(", "),
+                                    leidoEn = if (l.leido) (isoLocalSinZona(l.leidoEn) ?: "") else null
                                 )
                             }
-                            val padresSinLeerList = padresSinLeer.map { p ->
-                                PadreLecturaItem(
-                                    padreId = p.id,
-                                    nombrePadre = p.nombrecompleto,
-                                    nombreHijo = "",
-                                    leidoEn = null
-                                )
-                            }
-                            padresLecturaSel = padresLeidos + padresSinLeerList
+                        } catch (e: kotlinx.coroutines.CancellationException) {
+                            throw e
                         } catch (e: Exception) { aviso("Error cargando detalle: ${e.message}") }
                     }
                     DetalleComunicadoScreen(
@@ -1186,7 +1255,8 @@ fun EduConnectApp() {
                         onPerfilDocente = { currentScreen = Screen.PERFIL_DOCENTE },
                         onNotificaciones = {},
                         onReenviar = {
-                            aviso("Reenviando a ${padresLecturaSel.count { it.leidoEn == null }} padres sin leer...")
+                            // Pendiente: el backend aún no tiene endpoint de reenvío
+                            aviso("Reenvío disponible próximamente")
                         }
                     )
                 }
@@ -1479,33 +1549,14 @@ fun EduConnectApp() {
 
                 Screen.COMUNICADOS_PADRE -> {
                     androidx.compose.runtime.LaunchedEffect(usuarioLogueado?.id) {
-                        val padreId = usuarioLogueado?.id ?: return@LaunchedEffect
+                        if (usuarioLogueado == null) return@LaunchedEffect
                         try {
-                            val relaciones = obtenerHijosPadre(padreId)
-                            var sinLeer = 0
-                            var leidos = 0
-                            var total = 0
-                            relaciones.forEach { rel ->
-                                val alumno = buscarAlumnoPorCodigo(rel.codigo_estudiante) ?: return@forEach
-                                val comunicados = obtenerComunicadosPadre(alumno.seccion_id)
-                                comunicados.forEach { com ->
-                                    val lecturas = obtenerLecturasComunicado(com.id)
-                                    val yaLeido = supabase.postgrest["comunicado_lecturas"]
-                                        .select(io.github.jan.supabase.postgrest.query.Columns.ALL) {
-                                            filter {
-                                                eq("comunicado_id", com.id)
-                                                eq("padre_id", padreId)
-                                            }
-                                        }
-                                        .decodeList<com.educonnectapp.data.remote.ComunicadoLecturaRow>()
-                                        .isNotEmpty()
-                                    if (yaLeido) leidos++ else sinLeer++
-                                    total++
-                                }
-                            }
-                            sinLeerPadreSel = sinLeer
-                            leidosPadreSel = leidos
-                            totalPadreSel = total
+                            cargarComunicadosPadre()
+                            sinLeerPadreSel = hijosComunicadoSel.sumOf { it.sinLeer }
+                            totalPadreSel = hijosComunicadoSel.sumOf { it.total }
+                            leidosPadreSel = totalPadreSel - sinLeerPadreSel
+                        } catch (e: kotlinx.coroutines.CancellationException) {
+                            throw e
                         } catch (e: Exception) { aviso("Error: ${e.message}") }
                     }
                     ComunicadosPadresScreen(
@@ -1525,40 +1576,11 @@ fun EduConnectApp() {
 
                 Screen.SELECCIONAR_ESTUDIANTE_COMUNICADO -> {
                     androidx.compose.runtime.LaunchedEffect(usuarioLogueado?.id) {
-                        val padreId = usuarioLogueado?.id ?: return@LaunchedEffect
+                        if (usuarioLogueado == null) return@LaunchedEffect
                         try {
-                            val relaciones = obtenerHijosPadre(padreId)
-                            val lista = mutableListOf<HijoComunicadoItem>()
-                            relaciones.forEach { rel ->
-                                val alumno = buscarAlumnoPorCodigo(rel.codigo_estudiante) ?: return@forEach
-                                val grado = obtenerGradoPorId(alumno.grado_id) ?: return@forEach
-                                val seccion = obtenerSeccionPorId(alumno.seccion_id) ?: return@forEach
-                                val comunicados = obtenerComunicadosPadre(alumno.seccion_id)
-                                var sinLeer = 0
-                                comunicados.forEach { com ->
-                                    val yaLeido = supabase.postgrest["comunicado_lecturas"]
-                                        .select(io.github.jan.supabase.postgrest.query.Columns.ALL) {
-                                            filter {
-                                                eq("comunicado_id", com.id)
-                                                eq("padre_id", padreId)
-                                            }
-                                        }
-                                        .decodeList<com.educonnectapp.data.remote.ComunicadoLecturaRow>()
-                                        .isNotEmpty()
-                                    if (!yaLeido) sinLeer++
-                                }
-                                lista.add(HijoComunicadoItem(
-                                    id = alumno.id,
-                                    nombres = alumno.nombres,
-                                    apellidos = alumno.apellidos,
-                                    gradoNombre = grado.nombre,
-                                    seccionNombre = seccion.nombre,
-                                    seccionId = alumno.seccion_id,
-                                    sinLeer = sinLeer,
-                                    total = comunicados.size
-                                ))
-                            }
-                            hijosComunicadoSel = lista
+                            cargarComunicadosPadre()   // actualiza los "sin leer" de cada hijo
+                        } catch (e: kotlinx.coroutines.CancellationException) {
+                            throw e
                         } catch (e: Exception) { aviso("Error: ${e.message}") }
                     }
                     SeleccionarEstudianteComunicadoScreen(
@@ -1578,40 +1600,32 @@ fun EduConnectApp() {
 
                 Screen.COMUNICADOS_RECIBIDOS -> {
                     androidx.compose.runtime.LaunchedEffect(hijoComunicadoSel?.id) {
-                        val padreId = usuarioLogueado?.id ?: return@LaunchedEffect
                         val hijo = hijoComunicadoSel ?: return@LaunchedEffect
                         try {
-                            val comunicados = obtenerComunicadosPadre(hijo.seccionId)
-                            val lista = mutableListOf<ComunicadoPadreItem>()
-                            comunicados.forEach { com ->
-                                val docente = obtenerUsuario(com.docente_id)
-                                val grado = obtenerGradoPorId(com.grado_id)
-                                val seccion = obtenerSeccionPorId(com.seccion_id)
-                                val curso = obtenerCursoPorId(com.curso_id)
-                                val lecturas = supabase.postgrest["comunicado_lecturas"]
-                                    .select(io.github.jan.supabase.postgrest.query.Columns.ALL) {
-                                        filter {
-                                            eq("comunicado_id", com.id)
-                                            eq("padre_id", padreId)
-                                        }
-                                    }
-                                    .decodeList<com.educonnectapp.data.remote.ComunicadoLecturaRow>()
-                                val leido = lecturas.isNotEmpty()
-                                lista.add(ComunicadoPadreItem(
-                                    id = com.id,
-                                    asunto = com.asunto,
-                                    mensaje = com.mensaje,
-                                    fecha = com.fecha,
-                                    hora = com.hora,
-                                    docenteNombre = docente.nombrecompleto,
-                                    gradoNombre = grado?.nombre ?: "",
-                                    seccionNombre = seccion?.nombre ?: "",
-                                    cursoNombre = curso?.nombre ?: "",
-                                    leido = leido,
-                                    leidoEn = lecturas.firstOrNull()?.leido_en
-                                ))
-                            }
-                            comunicadosPadreSel = lista.sortedBy { it.leido }
+                            // 1 petición: comunicados del hijo con su estado de lectura y adjunto
+                            val respuesta = obtenerComunicadosHijo(hijo.id)
+                            adjuntosComunicadoSel = respuesta.comunicados
+                                .mapNotNull { c -> c.archivo?.let { c.id to it } }.toMap()
+                            // Más recientes primero; luego los no leídos arriba (sortedBy es estable)
+                            comunicadosPadreSel = respuesta.comunicados
+                                .sortedByDescending { aFechaHoraLocal(it.enviadoEn) }
+                                .map { c ->
+                                    ComunicadoPadreItem(
+                                        id = c.id,
+                                        asunto = c.asunto,
+                                        mensaje = c.mensaje,
+                                        fecha = fechaLocal(c.enviadoEn),
+                                        hora = horaLocal(c.enviadoEn),
+                                        docenteNombre = c.docente,
+                                        gradoNombre = hijo.gradoNombre,
+                                        seccionNombre = hijo.seccionNombre,
+                                        cursoNombre = c.curso ?: "General",
+                                        leido = c.leido,
+                                        leidoEn = isoLocalSinZona(c.leidoEn)
+                                    )
+                                }.sortedBy { it.leido }
+                        } catch (e: kotlinx.coroutines.CancellationException) {
+                            throw e
                         } catch (e: Exception) { aviso("Error: ${e.message}") }
                     }
                     ComunicadosRecibidosScreen(
@@ -1634,18 +1648,24 @@ fun EduConnectApp() {
 
                 Screen.DETALLE_COMUNICADO_PADRE -> {
                     androidx.compose.runtime.LaunchedEffect(comunicadoPadreSel?.id) {
-                        val padreId = usuarioLogueado?.id ?: return@LaunchedEffect
-                        val comunicadoId = comunicadoPadreSel?.id ?: return@LaunchedEffect
+                        val comunicado = comunicadoPadreSel ?: return@LaunchedEffect
+                        if (comunicado.leido) return@LaunchedEffect   // ya estaba leído
                         try {
-                            marcarComunicadoLeido(comunicadoId, padreId)
-                            // Actualizar estado leído en la lista
-                            comunicadosPadreSel = comunicadosPadreSel.map {
-                                if (it.id == comunicadoId) it.copy(leido = true) else it
-                            }
-                        } catch (e: Exception) { }
+                            marcarComunicadoLeido(comunicado.id)
+                            val ahora = java.time.LocalDateTime.now().withNano(0).toString()
+                            val actualizado = comunicado.copy(leido = true, leidoEn = ahora)
+                            comunicadoPadreSel = actualizado
+                            comunicadosPadreSel = comunicadosPadreSel.map { if (it.id == comunicado.id) actualizado else it }
+                        } catch (e: kotlinx.coroutines.CancellationException) {
+                            throw e
+                        } catch (e: Exception) { /* se reintentará al abrirlo de nuevo */ }
                     }
+                    val adjunto = comunicadoPadreSel?.let { adjuntosComunicadoSel[it.id] }
                     DetalleComunicadoPadreScreen(
                         comunicado = comunicadoPadreSel,
+                        nombreAdjunto = adjunto?.nombre,
+                        descargandoAdjunto = descargandoAdjunto,
+                        onAbrirAdjunto = { adjunto?.let { abrirAdjunto(it) } },
                         onBack = { currentScreen = Screen.COMUNICADOS_RECIBIDOS },
                         onHomePadre = { currentScreen = Screen.HOME_PADRE },
                         onAvisos = {},

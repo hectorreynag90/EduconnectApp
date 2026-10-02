@@ -24,6 +24,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
@@ -33,6 +34,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -40,6 +42,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
@@ -61,6 +64,9 @@ import com.educonnectapp.ui.theme.TextWhite
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+
+// Límite del adjunto (el mismo que valida el backend)
+private const val TAMANO_MAXIMO_BYTES = 10L * 1024 * 1024   // 10 MB
 
 // Data class para destinatario sin Room
 data class SeccionDestinatario(
@@ -97,14 +103,95 @@ fun NuevoComunicadoScreen(
     var mensaje by remember { mutableStateOf("") }
     var archivoUri by remember { mutableStateOf<Uri?>(null) }
     var nombreArchivo by remember { mutableStateOf("") }
+    // Datos del archivo rechazado por tamaño: si no es null, se muestra la alerta
+    var archivoRechazado by remember { mutableStateOf<Pair<String, Long>?>(null) }
+    val context = LocalContext.current
 
     val archivoLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
         uri?.let {
-            archivoUri = it
-            nombreArchivo = it.lastPathSegment ?: "archivo"
+            // Nombre visible (ej. "tarea.pdf") y tamaño en bytes, sin leer el archivo completo
+            var nombre: String? = null
+            var tamano: Long? = null
+            context.contentResolver.query(
+                it,
+                arrayOf(android.provider.OpenableColumns.DISPLAY_NAME, android.provider.OpenableColumns.SIZE),
+                null, null, null
+            )?.use { c ->
+                if (c.moveToFirst()) {
+                    nombre = c.getString(0)
+                    if (!c.isNull(1)) tamano = c.getLong(1)
+                }
+            }
+            val nombreFinal = nombre ?: it.lastPathSegment ?: "archivo"
+            val tamanoFinal = tamano
+            if (tamanoFinal != null && tamanoFinal > TAMANO_MAXIMO_BYTES) {
+                // Se rechaza al elegirlo: no queda adjunto y se avisa con la alerta
+                archivoRechazado = nombreFinal to tamanoFinal
+            } else {
+                archivoUri = it
+                nombreArchivo = nombreFinal
+            }
         }
+    }
+
+    // ALERTA: ARCHIVO DEMASIADO GRANDE
+    archivoRechazado?.let { (nombre, tamano) ->
+        AlertDialog(
+            onDismissRequest = { archivoRechazado = null },
+            icon = {
+                Image(
+                    painter = painterResource(id = R.drawable.paperclip_lightgray),
+                    contentDescription = null,
+                    modifier = Modifier.size(36.dp)
+                )
+            },
+            title = {
+                Text(
+                    text = "Archivo demasiado grande",
+                    fontFamily = Roboto,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 20.sp,
+                    color = TextBlue
+                )
+            },
+            text = {
+                Text(
+                    text = "\"$nombre\" pesa ${String.format(Locale.US, "%.1f", tamano / (1024.0 * 1024.0))} MB.\n\n" +
+                            "El tamaño máximo permitido es 10 MB. Elige un archivo más liviano o comprímelo antes de adjuntarlo.",
+                    fontFamily = Roboto,
+                    fontSize = 16.sp,
+                    color = TextPrimary
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = { archivoRechazado = null; archivoLauncher.launch("*/*") },
+                    shape = RoundedCornerShape(20.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = EduconnectBlue)
+                ) {
+                    Text(
+                        text = "Elegir otro",
+                        fontFamily = Roboto,
+                        fontWeight = FontWeight.SemiBold,
+                        color = TextWhite
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { archivoRechazado = null }) {
+                    Text(
+                        text = "Entendido",
+                        fontFamily = Roboto,
+                        fontWeight = FontWeight.SemiBold,
+                        color = EduconnectBlue
+                    )
+                }
+            },
+            containerColor = BackgroundWhite,
+            shape = RoundedCornerShape(16.dp)
+        )
     }
 
     Column(
@@ -237,7 +324,7 @@ fun NuevoComunicadoScreen(
                     modifier = Modifier
                         .matchParentSize()
                         .padding(end = 48.dp)
-                    .clickable { dropdownExpanded = true }
+                        .clickable { dropdownExpanded = true }
                 )
                 DropdownMenu(expanded = dropdownExpanded,
                     onDismissRequest = { dropdownExpanded = false }
