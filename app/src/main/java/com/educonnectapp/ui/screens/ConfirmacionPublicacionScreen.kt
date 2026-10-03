@@ -90,7 +90,7 @@ fun ConfirmacionPublicacionScreen(
                         color = TextWhite
                     )
                     Text(
-                        text = if (tipo == "Tarea") "¡Confirmación tarea!" else "¡Confirmación examen!",
+                        text = if (tipo == "Tarea") "¡Confirmación tarea!" else "¡Confirmación evaluación!",
                         fontFamily = Roboto,
                         fontWeight = FontWeight.Normal,
                         fontSize = 16.sp,
@@ -137,7 +137,7 @@ fun ConfirmacionPublicacionScreen(
 
             // TÍTULO CONFIRMACIÓN
             Text(
-                text = if (tipo == "Tarea") "¡Tarea publicada!" else "¡Examen publicado!",
+                text = if (tipo == "Tarea") "¡Tarea publicada!" else "¡Aviso de evaluación publicado!",
                 fontFamily = Roboto,
                 fontWeight = FontWeight.Bold,
                 fontSize = 24.sp,
@@ -235,7 +235,7 @@ fun ConfirmacionPublicacionScreen(
 
                 FilaRegistro(
                     iconRes = R.drawable.agenda_darkgray,
-                    label = if (tipo == "Tarea") "Fecha Límite" else "Fecha Examen",
+                    label = if (tipo == "Tarea") "Fecha Límite" else "Fecha Evaluación",
                     valor = fechaEntregaDisplay,
                     colorValor = StatusErrorRed
                 )
@@ -263,7 +263,7 @@ fun ConfirmacionPublicacionScreen(
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = if (tipo == "Tarea") "Nueva Tarea" else "Nuevo Examen",
+                    text = if (tipo == "Tarea") "Nueva Tarea" else "Nueva Evaluación",
                     fontFamily = Roboto,
                     fontWeight = FontWeight.Bold,
                     fontSize = 20.sp,

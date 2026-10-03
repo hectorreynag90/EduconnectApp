@@ -35,7 +35,7 @@ data class PublicacionAgendaItem(
     val cursoNombre: String,
     val docenteNombre: String,
     val fechaEntrega: String,
-    val estado: String = "Pendiente",   // "Pendiente", "Entregada", "No entregada" o "Vencida"
+    val estado: String = "Pendiente",   // Tarea: "Pendiente", "Entregada", "No entregada", "Vencida" | Evaluación: "Pendiente", "Realizado"
     val archivoAdjunto: String = ""
 )
 
@@ -67,7 +67,7 @@ fun AgendaEscolarScreen(
     val publicacionesFiltradas = publicaciones.filter { item ->
         when (tabSeleccionado) {
             "Tareas" -> item.tipo == "Tarea"
-            "Exámenes" -> item.tipo == "Examen"
+            "Evaluaciones" -> item.tipo == "Evaluación"
             else -> true
         }
     }.sortedWith(compareBy(
@@ -153,7 +153,7 @@ fun AgendaEscolarScreen(
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                listOf("Todos", "Tareas", "Exámenes").forEachIndexed { index, tab ->
+                listOf("Todos", "Tareas", "Evaluaciones").forEachIndexed { index, tab ->
                     val isActive = tabSeleccionado == tab
                     Box(
                         modifier = Modifier
@@ -365,17 +365,19 @@ fun PublicacionAgendaCard(
                     color = TextOrange
                 )
             }
+            // Tarea: "Pendiente" (por entregar) | Evaluación: "Programada" (solo aviso)
+            val colorChip = if (item.tipo == "Evaluación") EduconnectBlue else StatusErrorRed
             Box(
                 modifier = Modifier
-                    .background(StatusErrorRed.copy(alpha = 0.08f), RoundedCornerShape(20.dp))
+                    .background(colorChip.copy(alpha = 0.08f), RoundedCornerShape(20.dp))
                     .padding(horizontal = 12.dp, vertical = 4.dp)
             ) {
                 Text(
-                    text = "Pendiente",
+                    text = if (item.tipo == "Evaluación") "Programada" else "Pendiente",
                     fontFamily = Roboto,
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 14.sp,
-                    color = StatusErrorRed
+                    color = colorChip
                 )
             }
         }
@@ -391,11 +393,11 @@ fun textoDiasRestantes(dias: Int): String = when {
 
 @Composable
 fun EntregadaAgendaCard(item: PublicacionAgendaItem) {
-    val esExamen = item.tipo == "Examen"
-    // Etiqueta y color según el estado del alumno
+    // Etiqueta y color según el estado (las evaluaciones solo pueden estar "Realizado")
     val (etiqueta, colorEstado) = when (item.estado) {
-        "Entregada" -> (if (esExamen) "Rendido" else "Entregada") to StatusGreen
-        "No entregada" -> (if (esExamen) "No rindió" else "No entregada") to StatusErrorRed
+        "Entregada" -> "Entregada" to StatusGreen
+        "No entregada" -> "No entregada" to StatusErrorRed
+        "Realizado" -> "Realizada" to TextSecondary
         else -> "Vencida" to TextSecondary
     }
 
@@ -470,7 +472,7 @@ fun AgendaEscolarPreview() {
                 PublicacionAgendaItem(1L, "Ejercicios Cap. 5", "Resolver los 5 ejercicios del 1 al 20 del capítulo 5.", "Tarea", "Matemáticas", "Eduardo Carranza", "2026-05-23", "Pendiente"),
                 PublicacionAgendaItem(2L, "Ejercicios Cap. 6", "Resolver los ejercicios del 1 al 10 del cap. 6.", "Tarea", "Matemáticas", "Eduardo Carranza", "2026-05-26", "Pendiente"),
                 PublicacionAgendaItem(3L, "Lectura Cap. 8", "Leer capítulo 8.", "Tarea", "Comunicación", "Rosa A.", "2026-05-16", "Entregada"),
-                PublicacionAgendaItem(4L, "Práctica 2", "Resolver la práctica.", "Examen", "Ciencias", "Rosa A.", "2026-05-12", "Vencida")
+                PublicacionAgendaItem(4L, "Práctica 2", "Resolver la práctica.", "Evaluación", "Ciencias", "Rosa A.", "2026-05-12", "Vencida")
             )
         )
     }

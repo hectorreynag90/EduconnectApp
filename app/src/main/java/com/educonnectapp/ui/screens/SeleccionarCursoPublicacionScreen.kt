@@ -72,7 +72,7 @@ fun SeleccionarCursoPublicacionScreen(
                 }
                 Column {
                     Text(
-                        text = if (tipo == "Tarea") "Publicar tarea" else "Publicar examen",
+                        text = if (tipo == "Tarea") "Publicar tarea" else "Publicar evaluación",
                         fontFamily = Roboto,
                         fontWeight = FontWeight.Bold,
                         fontSize = 22.sp,

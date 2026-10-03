@@ -214,19 +214,23 @@ private suspend fun cargarDetalleDia(seccionId: Long, cursoId: Long, fecha: Stri
     }
 
 // Agenda del padre: publicación del backend -> tarjeta de AgendaEscolarScreen
-// estado en la pantalla: "Pendiente" (por entregar), "Entregada", "No entregada" o "Vencida"
+// Tarea (entregable): "Pendiente" (por entregar), "Entregada", "No entregada" o "Vencida"
+// Evaluación (solo aviso): "Pendiente" (próximo) o "Realizado" (la fecha ya pasó)
 private fun PublicacionPadreResponse.aPublicacionAgendaItem(hoy: String): PublicacionAgendaItem {
     val fecha = fechaEntrega ?: ""
-    val estadoUi = when (calificacionHijo?.estado) {
-        "ENTREGADO", "RENDIDO", "CALIFICADO" -> "Entregada"
-        "NO_ENTREGADO", "NO_RINDIO" -> "No entregada"
-        else -> if (fecha.isNotEmpty() && fecha < hoy) "Vencida" else "Pendiente"
+    val yaPaso = fecha.isNotEmpty() && fecha < hoy
+    val estadoUi = if (tipo == "EVALUACION") {
+        if (yaPaso) "Realizado" else "Pendiente"
+    } else when (calificacionHijo?.estado) {
+        "ENTREGADO", "CALIFICADO" -> "Entregada"
+        "NO_ENTREGADO" -> "No entregada"
+        else -> if (yaPaso) "Vencida" else "Pendiente"
     }
     return PublicacionAgendaItem(
         id = id,
         titulo = titulo,
         descripcion = descripcion,
-        tipo = if (tipo == "EVALUACION") "Examen" else "Tarea",
+        tipo = if (tipo == "EVALUACION") "Evaluación" else "Tarea",
         cursoNombre = curso,
         docenteNombre = docente,
         fechaEntrega = fecha,
@@ -461,7 +465,7 @@ fun EduConnectApp() {
                 gradoId = h.gradoId,
                 seccionId = h.seccionId,
                 tareasPendientes = items.count { it.tipo == "Tarea" && it.estado == "Pendiente" },
-                examenesPendientes = items.count { it.tipo == "Examen" && it.estado == "Pendiente" }
+                examenesPendientes = items.count { it.tipo == "Evaluación" && it.estado == "Pendiente" }
             )
         }
         agendaCargada = true
@@ -578,7 +582,7 @@ fun EduConnectApp() {
         }
     }
 
-    // Hijo y publicación a los que apunta una notificación de tarea/examen (busca en la agenda ya cargada)
+    // Hijo y publicación a los que apunta una notificación de tarea/evaluación (busca en la agenda ya cargada)
     fun contextoPublicacion(publicacionId: Long?): Pair<HijoAgendaItem, PublicacionPadreResponse>? {
         if (publicacionId == null) return null
         for ((alumnoId, publicaciones) in agendaPorHijoSel) {
@@ -589,7 +593,7 @@ fun EduConnectApp() {
         return null
     }
 
-    // Notificación de tarea/examen: abre directamente su detalle (DETALLE_AGENDA).
+    // Notificación de tarea/evaluación: abre directamente su detalle (DETALLE_AGENDA).
     // Si no está en la agenda cargada, la pide al backend; si no se encuentra, abre la Agenda.
     fun abrirPublicacionDeNotificacion(publicacionId: Long?) {
         CoroutineScope(Dispatchers.Main).launch {
@@ -1656,7 +1660,7 @@ fun EduConnectApp() {
                     val hoy = java.time.LocalDate.now().toString()
                     PublicacionesScreen(
                         totalTareas = vigentes.count { it.tipo == "TAREA" },
-                        totalExamenes = vigentes.count { it.tipo == "EVALUACION" },
+                        totalEvaluaciones = vigentes.count { it.tipo == "EVALUACION" },
                         venceHoy = vigentes.count { it.fechaEntrega == hoy },
                         totalPublicacionesHoy = vigentes.count { fechaLocal(it.publicadoEn) == hoy },
                         onBack = { currentScreen = Screen.HOME_DOCENTE },
@@ -1672,8 +1676,8 @@ fun EduConnectApp() {
                             tipoPublicacionSel = "Tarea"
                             currentScreen = Screen.SELECCIONAR_CURSO_PUBLICACION
                         },
-                        onNuevoExamen = {
-                            tipoPublicacionSel = "Examen"
+                        onNuevaEvaluacion = {
+                            tipoPublicacionSel = "Evaluación"
                             currentScreen = Screen.SELECCIONAR_CURSO_PUBLICACION
                         },
                         onHistorial = { currentScreen = Screen.HISTORIAL_PUBLICACIONES }
@@ -1786,8 +1790,8 @@ fun EduConnectApp() {
                             },
                             onPerfilDocente = { currentScreen = Screen.PERFIL_DOCENTE },
                             onNotificaciones = {},
-                            onPublicar = { titulo, descripcion, adjunto, seccion, fechaExamen, _, hora ->
-                                publicar("EVALUACION", titulo, descripcion, adjunto, seccion, fechaExamen, hora)
+                            onPublicar = { titulo, descripcion, adjunto, seccion, fechaEvaluacion, _, hora ->
+                                publicar("EVALUACION", titulo, descripcion, adjunto, seccion, fechaEvaluacion, hora)
                             }
                         )
                     }
@@ -1828,7 +1832,7 @@ fun EduConnectApp() {
                             .map { p ->
                                 PublicacionHistorialItem(
                                     id = p.id,
-                                    tipo = if (p.tipo == "EVALUACION") "Examen" else "Tarea",
+                                    tipo = if (p.tipo == "EVALUACION") "Evaluación" else "Tarea",
                                     titulo = p.titulo,
                                     cursoNombre = p.curso,
                                     gradoNombre = p.grado,
@@ -1878,7 +1882,7 @@ fun EduConnectApp() {
                         publicacion = detalle?.publicacion?.let { p ->
                             DetallePublicacionItem(
                                 titulo = p.titulo,
-                                tipo = if (p.tipo == "EVALUACION") "Examen" else "Tarea",
+                                tipo = if (p.tipo == "EVALUACION") "Evaluación" else "Tarea",
                                 cursoNombre = p.curso,
                                 gradoNombre = p.grado,
                                 seccionNombre = p.seccion,
@@ -1938,7 +1942,7 @@ fun EduConnectApp() {
                                     publicacionesDocenteSel = publicacionesDocenteSel.map {
                                         if (it.id == respuesta.publicacion.id) respuesta.publicacion else it
                                     }
-                                    aviso(if (cambios.size == 1) "Calificación guardada" else "${cambios.size} calificaciones guardadas")
+                                    // El mensaje de éxito lo muestra la pantalla (popup "Calificación Guardada")
                                 } catch (e: ApiException) {
                                     aviso(if (e.codigo == 400) "Datos no válidos: ${e.message}" else "No se pudo guardar: ${e.message}")
                                 } catch (e: Exception) {

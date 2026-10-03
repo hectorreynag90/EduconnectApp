@@ -29,7 +29,7 @@ import java.util.*
 
 data class PublicacionHistorialItem(
     val id: Long,
-    val tipo: String,              // "Tarea" | "Examen"
+    val tipo: String,              // "Tarea" | "Evaluación"
     val titulo: String,
     val cursoNombre: String,
     val gradoNombre: String,
@@ -64,7 +64,7 @@ fun HistorialPublicacionesScreen(
     val filtradas = publicaciones.filter {
         when (tabSeleccionado) {
             "Tareas" -> it.tipo == "Tarea"
-            "Exámenes" -> it.tipo == "Examen"
+            "Evaluaciones" -> it.tipo == "Evaluación"
             else -> true
         }
     }
@@ -143,7 +143,7 @@ fun HistorialPublicacionesScreen(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.Center
             ) {
-                listOf("Todas", "Tareas", "Exámenes").forEachIndexed { index, tab ->
+                listOf("Todas", "Tareas", "Evaluaciones").forEachIndexed { index, tab ->
                     val activo = tabSeleccionado == tab
                     Box(
                         modifier = Modifier
@@ -219,7 +219,7 @@ private fun fechaCortaHistorial(fecha: String): String = try {
 
 @Composable
 fun PublicacionHistorialCard(item: PublicacionHistorialItem, onClick: () -> Unit) {
-    val esExamen = item.tipo == "Examen"
+    val esEvaluacion = item.tipo == "Evaluación"
     val anulada = item.estado == "ANULADA"
     val completo = item.totalAlumnos > 0 && item.calificados >= item.totalAlumnos
 
@@ -239,11 +239,11 @@ fun PublicacionHistorialCard(item: PublicacionHistorialItem, onClick: () -> Unit
             Box(
                 modifier = Modifier
                     .size(46.dp)
-                    .background(if (esExamen) EduconnectBlue else EduconnectBlueMedium, RoundedCornerShape(12.dp)),
+                    .background(if (esEvaluacion) EduconnectBlue else EduconnectBlueMedium, RoundedCornerShape(12.dp)),
                 contentAlignment = Alignment.Center
             ) {
                 Image(
-                    painter = painterResource(id = if (esExamen) R.drawable.exam_white else R.drawable.task_white),
+                    painter = painterResource(id = if (esEvaluacion) R.drawable.exam_white else R.drawable.task_white),
                     contentDescription = null,
                     modifier = Modifier.size(32.dp)
                 )
@@ -278,9 +278,9 @@ fun PublicacionHistorialCard(item: PublicacionHistorialItem, onClick: () -> Unit
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Fecha límite / del examen
+            // Fecha límite / de la evaluación
             Text(
-                text = (if (esExamen) "Examen: " else "Entrega: ") +
+                text = (if (esEvaluacion) "Evaluación: " else "Entrega: ") +
                         (if (item.fechaEntrega.isNotEmpty()) fechaCortaHistorial(item.fechaEntrega) else "—"),
                 fontFamily = Roboto,
                 fontWeight = FontWeight.SemiBold,
@@ -297,10 +297,15 @@ fun PublicacionHistorialCard(item: PublicacionHistorialItem, onClick: () -> Unit
         }
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            ChipHistorial(
-                texto = "${item.calificados}/${item.totalAlumnos} calificados",
-                color = if (completo) StatusGreen else AccentOrange
-            )
+            // Solo las tareas son entregables; las evaluaciones son avisos
+            if (esEvaluacion) {
+                ChipHistorial(texto = "Aviso", color = TextSecondary)
+            } else {
+                ChipHistorial(
+                    texto = "${item.calificados}/${item.totalAlumnos} registrados",
+                    color = if (completo) StatusGreen else AccentOrange
+                )
+            }
             ChipHistorial(texto = "${item.lecturas} lecturas", color = EduconnectBlue)
         }
     }
@@ -330,7 +335,7 @@ fun HistorialPublicacionesPreview() {
         HistorialPublicacionesScreen(
             publicaciones = listOf(
                 PublicacionHistorialItem(1L, "Tarea", "Ejercicios Cap. 5 - Fracciones", "Matemáticas", "1er", "A", "2026-10-08", "2026-10-02", 28, 10, 20),
-                PublicacionHistorialItem(2L, "Examen", "Examen bimestral", "Comunicación", "1er", "A", "2026-10-07", "2026-10-02", 28, 28, 25),
+                PublicacionHistorialItem(2L, "Evaluación", "Práctica calificada 2", "Comunicación", "1er", "A", "2026-10-07", "2026-10-02", 28, 28, 25),
                 PublicacionHistorialItem(3L, "Tarea", "Lectura Cap. 8", "Ciencias", "2do", "B", "2026-10-01", "2026-09-28", 30, 0, 5, "ANULADA")
             )
         )

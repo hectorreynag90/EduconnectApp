@@ -1,8 +1,5 @@
 package com.educonnectapp.ui.screens
 
-import android.net.Uri
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -28,9 +25,8 @@ import com.educonnectapp.ui.theme.*
 import java.text.SimpleDateFormat
 import java.util.*
 
-// Límite del adjunto (el mismo que valida el backend)
-private const val MAXIMO_ADJUNTO_BYTES = 10L * 1024 * 1024   // 10 MB
-
+// Aviso de evaluación: el docente solo informa fecha y temario a los padres.
+// No se sube ningún archivo ni se registran notas.
 @Composable
 fun NuevaEvaluacionScreen(
     listaDestinatarios: List<SeccionDestinatario> = emptyList(),
@@ -44,9 +40,9 @@ fun NuevaEvaluacionScreen(
     onPublicar: (
         titulo: String,
         descripcion: String,
-        adjunto: String,
+        adjunto: String,              // siempre "" (las evaluaciones no llevan adjunto)
         seccionDestinatario: SeccionDestinatario,
-        fechaExamen: String,
+        fechaEvaluacion: String,
         fechaPublicacion: String,
         hora: String
     ) -> Unit = { _, _, _, _, _, _, _ -> }
@@ -62,23 +58,19 @@ fun NuevaEvaluacionScreen(
     var dropdownExpanded by remember { mutableStateOf(false) }
     var titulo by remember { mutableStateOf("") }
     var descripcion by remember { mutableStateOf("") }
-    var archivoUri by remember { mutableStateOf<Uri?>(null) }
-    var nombreArchivo by remember { mutableStateOf("") }
-    // Datos del archivo rechazado por tamaño: si no es null, se muestra la alerta
-    var archivoRechazado by remember { mutableStateOf<Pair<String, Long>?>(null) }
     var mostrarDatePicker by remember { mutableStateOf(false) }
-    var fechaExamen by remember { mutableStateOf("") }
-    var fechaExamenDisplay by remember { mutableStateOf("Seleccionar fecha") }
+    var fechaEvaluacion by remember { mutableStateOf("") }
+    var fechaEvaluacionDisplay by remember { mutableStateOf("Seleccionar fecha") }
 
     if (mostrarDatePicker) {
         val calendario = Calendar.getInstance()
         android.app.DatePickerDialog(
             context,
             { _, anio, mes, dia ->
-                fechaExamen = String.format("%04d-%02d-%02d", anio, mes + 1, dia)
+                fechaEvaluacion = String.format("%04d-%02d-%02d", anio, mes + 1, dia)
                 val cal = Calendar.getInstance()
                 cal.set(anio, mes, dia)
-                fechaExamenDisplay = SimpleDateFormat("EEEE, dd 'de' MMMM yyyy", Locale("es", "PE"))
+                fechaEvaluacionDisplay = SimpleDateFormat("EEEE, dd 'de' MMMM yyyy", Locale("es", "PE"))
                     .format(cal.time).replaceFirstChar { it.uppercase() }
                 mostrarDatePicker = false
             },
@@ -91,92 +83,6 @@ fun NuevaEvaluacionScreen(
             it.setOnDismissListener { mostrarDatePicker = false }
             it.show()
         }
-    }
-
-    val archivoLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri ->
-        uri?.let {
-            // Nombre visible (ej. "practica.pdf") y tamaño en bytes, sin leer el archivo completo
-            var nombre: String? = null
-            var tamano: Long? = null
-            context.contentResolver.query(
-                it,
-                arrayOf(android.provider.OpenableColumns.DISPLAY_NAME, android.provider.OpenableColumns.SIZE),
-                null, null, null
-            )?.use { c ->
-                if (c.moveToFirst()) {
-                    nombre = c.getString(0)
-                    if (!c.isNull(1)) tamano = c.getLong(1)
-                }
-            }
-            val nombreFinal = nombre ?: it.lastPathSegment ?: "archivo"
-            val tamanoFinal = tamano
-            if (tamanoFinal != null && tamanoFinal > MAXIMO_ADJUNTO_BYTES) {
-                archivoRechazado = nombreFinal to tamanoFinal   // no se adjunta: se avisa con la alerta
-            } else {
-                archivoUri = it
-                nombreArchivo = nombreFinal
-            }
-        }
-    }
-
-    // ALERTA: ARCHIVO DEMASIADO GRANDE
-    archivoRechazado?.let { (nombre, tamano) ->
-        AlertDialog(
-            onDismissRequest = { archivoRechazado = null },
-            icon = {
-                Image(
-                    painter = painterResource(id = R.drawable.paperclip_lightgray),
-                    contentDescription = null,
-                    modifier = Modifier.size(36.dp)
-                )
-            },
-            title = {
-                Text(
-                    text = "Archivo demasiado grande",
-                    fontFamily = Roboto,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 20.sp,
-                    color = TextBlue
-                )
-            },
-            text = {
-                Text(
-                    text = "\"$nombre\" pesa ${String.format(Locale.US, "%.1f", tamano / (1024.0 * 1024.0))} MB.\n\n" +
-                            "El tamaño máximo permitido es 10 MB. Elige un archivo más liviano o comprímelo antes de adjuntarlo.",
-                    fontFamily = Roboto,
-                    fontSize = 16.sp,
-                    color = TextPrimary
-                )
-            },
-            confirmButton = {
-                Button(
-                    onClick = { archivoRechazado = null; archivoLauncher.launch("*/*") },
-                    shape = RoundedCornerShape(20.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = EduconnectBlue)
-                ) {
-                    Text(
-                        text = "Elegir otro",
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.SemiBold,
-                        color = TextWhite
-                    )
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { archivoRechazado = null }) {
-                    Text(
-                        text = "Entendido",
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.SemiBold,
-                        color = EduconnectBlue
-                    )
-                }
-            },
-            containerColor = BackgroundWhite,
-            shape = RoundedCornerShape(16.dp)
-        )
     }
 
     Column(
@@ -210,7 +116,7 @@ fun NuevaEvaluacionScreen(
                 }
                 Column {
                     Text(
-                        text = "Nuevo Examen",
+                        text = "Aviso de evaluación",
                         fontFamily = Roboto,
                         fontWeight = FontWeight.Bold,
                         fontSize = 22.sp,
@@ -311,7 +217,7 @@ fun NuevaEvaluacionScreen(
 
             // TÍTULO
             Text(
-                text = "TÍTULO DEL EXAMEN",
+                text = "EVALUACIÓN",
                 fontFamily = Roboto,
                 fontWeight = FontWeight.Bold,
                 fontSize = 16.sp,
@@ -320,7 +226,7 @@ fun NuevaEvaluacionScreen(
             OutlinedTextField(
                 value = titulo,
                 onValueChange = { titulo = it },
-                placeholder = { Text(text = "Ingrese el título", color = TextSecondary, fontSize = 16.sp) },
+                placeholder = { Text(text = "Ej. Práctica calificada N° 2", color = TextSecondary, fontSize = 16.sp) },
                 shape = RoundedCornerShape(10.dp),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = EduconnectBlue,
@@ -334,9 +240,9 @@ fun NuevaEvaluacionScreen(
                 singleLine = true
             )
 
-            // INSTRUCCIONES
+            // TEMARIO
             Text(
-                text = "INSTRUCCIONES",
+                text = "TEMARIO",
                 fontFamily = Roboto,
                 fontWeight = FontWeight.Bold,
                 fontSize = 16.sp,
@@ -345,7 +251,7 @@ fun NuevaEvaluacionScreen(
             OutlinedTextField(
                 value = descripcion,
                 onValueChange = { descripcion = it },
-                placeholder = { Text(text = "Instrucciones del examen...", color = TextSecondary, fontSize = 16.sp) },
+                placeholder = { Text(text = "Temas que entran y materiales que debe traer...", color = TextSecondary, fontSize = 16.sp) },
                 shape = RoundedCornerShape(10.dp),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = EduconnectBlue,
@@ -355,13 +261,13 @@ fun NuevaEvaluacionScreen(
                     focusedContainerColor = BackgroundWhite,
                     unfocusedContainerColor = BackgroundWhite
                 ),
-                modifier = Modifier.fillMaxWidth().height(80.dp),
-                maxLines = 6
+                modifier = Modifier.fillMaxWidth().heightIn(min = 110.dp),
+                maxLines = 8
             )
 
-            // FECHA DEL EXAMEN
+            // FECHA DE LA EVALUACIÓN
             Text(
-                text = "FECHA DEL EXAMEN",
+                text = "FECHA DE LA EVALUACIÓN",
                 fontFamily = Roboto,
                 fontWeight = FontWeight.Bold,
                 fontSize = 16.sp,
@@ -387,11 +293,11 @@ fun NuevaEvaluacionScreen(
                         modifier = Modifier.size(22.dp)
                     )
                     Text(
-                        text = fechaExamenDisplay,
+                        text = fechaEvaluacionDisplay,
                         fontFamily = Roboto,
                         fontSize = 15.sp,
-                        color = if (fechaExamen.isEmpty()) TextSecondary else TextBlue,
-                        fontWeight = if (fechaExamen.isEmpty()) FontWeight.Normal else FontWeight.SemiBold
+                        color = if (fechaEvaluacion.isEmpty()) TextSecondary else TextBlue,
+                        fontWeight = if (fechaEvaluacion.isEmpty()) FontWeight.Normal else FontWeight.SemiBold
                     )
                 }
                 Image(
@@ -401,94 +307,21 @@ fun NuevaEvaluacionScreen(
                 )
             }
 
-            // ADJUNTO
-            Text(
-                text = "ADJUNTO",
-                fontFamily = Roboto,
-                fontWeight = FontWeight.Bold,
-                fontSize = 16.sp,
-                color = TextBlue
-            )
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(BackgroundWhite, RoundedCornerShape(10.dp))
-                    .border(1.dp, BorderBlue, RoundedCornerShape(10.dp))
-                    .padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.paperclip_lightgray),
-                        contentDescription = null,
-                        modifier = Modifier.size(22.dp)
-                    )
-                    Text(
-                        text = if (nombreArchivo.isNotEmpty()) nombreArchivo else "Añadir archivo",
-                        fontFamily = Roboto,
-                        fontSize = 15.sp,
-                        color = if (nombreArchivo.isNotEmpty()) EduconnectBlue else TextSecondary
-                    )
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(32.dp)) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        modifier = Modifier.clickable { archivoLauncher.launch("*/*") }
-                    ) {
-                        Image(
-                            painter = painterResource(id = R.drawable.document_blue),
-                            contentDescription = null,
-                            modifier = Modifier.size(24.dp)
-                        )
-                        Text(
-                            text = "Archivos",
-                            fontFamily = Roboto,
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 16.sp,
-                            color = EduconnectBlue
-                        )
-                    }
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        modifier = Modifier.clickable { archivoLauncher.launch("image/*") }
-                    ) {
-                        Image(
-                            painter = painterResource(id = R.drawable.camera_blue),
-                            contentDescription = null,
-                            modifier = Modifier.size(24.dp)
-                        )
-                        Text(
-                            text = "Fotos",
-                            fontFamily = Roboto,
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 16.sp,
-                            color = EduconnectBlue
-                        )
-                    }
-                }
-            }
-
             Spacer(modifier = Modifier.height(8.dp))
 
             // BOTÓN PUBLICAR
             Button(
                 onClick = {
                     val dest = destinatarioSeleccionado
-                    if (dest == null || titulo.isBlank() || descripcion.isBlank() || fechaExamen.isBlank()) {
+                    if (dest == null || titulo.isBlank() || descripcion.isBlank() || fechaEvaluacion.isBlank()) {
                         android.widget.Toast.makeText(
-                            context, "Completa sección, título, instrucciones y fecha del examen", android.widget.Toast.LENGTH_SHORT
+                            context, "Completa sección, evaluación, temario y fecha", android.widget.Toast.LENGTH_SHORT
                         ).show()
                         return@Button
                     }
                     val fechaPub = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
                     val hora = SimpleDateFormat("hh:mm a", Locale.getDefault()).format(Date())
-                    onPublicar(titulo, descripcion, archivoUri?.toString() ?: "", dest, fechaExamen, fechaPub, hora)
+                    onPublicar(titulo, descripcion, "", dest, fechaEvaluacion, fechaPub, hora)
                 },
                 modifier = Modifier.fillMaxWidth().height(54.dp),
                 shape = RoundedCornerShape(28.dp),
@@ -501,7 +334,7 @@ fun NuevaEvaluacionScreen(
                 )
                 Spacer(modifier = Modifier.width(10.dp))
                 Text(
-                    text = "Publicar examen",
+                    text = "Publicar aviso",
                     fontFamily = Roboto,
                     fontWeight = FontWeight.Bold,
                     fontSize = 22.sp,

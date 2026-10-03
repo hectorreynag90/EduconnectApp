@@ -57,7 +57,7 @@ fun HomePadreScreen(
     onAsistencias: () -> Unit = {},
     onComunicados: () -> Unit = {},
     onAgenda: () -> Unit = {},
-    onEstadoAcademico: () -> Unit = {},
+    onEstadoAcademico: () -> Unit = {},   // ya no se usa (se deja para no tocar MainActivity)
     onAvisos: () -> Unit = {},
     onPerfil: () -> Unit = {},
     onNotificaciones: () -> Unit = {}
@@ -304,55 +304,7 @@ fun HomePadreScreen(
                         color = TextBlue
                     )
                     Text(
-                        text = "Tareas y exámenes",
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.Medium,
-                        fontSize = 16.sp,
-                        color = TextSecondary
-                    )
-                }
-                Image(
-                    painter = painterResource(id = R.drawable.next_gray),
-                    contentDescription = null,
-                    modifier = Modifier.size(30.dp)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(15.dp))
-
-            //TARJETA ESTADO ACADÉMICO
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(BackgroundWhite, RoundedCornerShape(28.dp))
-                    .border(1.5.dp, BorderBlue, RoundedCornerShape(28.dp))
-                    .clickable { onEstadoAcademico() }
-                    .padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(78.dp)
-                        .background(AccentOrange, RoundedCornerShape(30.dp)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.gotoassistance_white),
-                        contentDescription = null,
-                        modifier = Modifier.size(65.dp)
-                    )
-                }
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "Estado Académico",
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 22.sp,
-                        color = TextBlue
-                    )
-                    Text(
-                        text = "Avance bimestral",
+                        text = "Tareas - Evaluaciones",
                         fontFamily = Roboto,
                         fontWeight = FontWeight.Medium,
                         fontSize = 16.sp,

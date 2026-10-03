@@ -27,7 +27,7 @@ import java.util.*
 @Composable
 fun PublicacionesScreen(
     totalTareas: Int = 0,
-    totalExamenes: Int = 0,
+    totalEvaluaciones: Int = 0,
     venceHoy: Int = 0,
     totalPublicacionesHoy: Int = 0,
     onBack: () -> Unit = {},
@@ -37,7 +37,7 @@ fun PublicacionesScreen(
     onPerfilDocente: () -> Unit = {},
     onNotificaciones: () -> Unit = {},
     onNuevaTarea: () -> Unit = {},
-    onNuevoExamen: () -> Unit = {},
+    onNuevaEvaluacion: () -> Unit = {},
     onHistorial: () -> Unit = {}
 ) {
     val fechaActual = remember {
@@ -83,7 +83,7 @@ fun PublicacionesScreen(
                         color = TextWhite
                     )
                     Text(
-                        text = "Publicaciones y Tareas",
+                        text = "Tareas y evaluaciones",
                         fontFamily = Roboto,
                         fontWeight = FontWeight.Bold,
                         fontSize = 16.sp,
@@ -145,7 +145,7 @@ fun PublicacionesScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Image(
-                        painter = painterResource(id = R.drawable.exam_white),
+                        painter = painterResource(id = R.drawable.task_white),
                         contentDescription = null,
                         modifier = Modifier.size(62.dp)
                     )
@@ -172,13 +172,13 @@ fun PublicacionesScreen(
                 )
             }
 
-            // TARJETA PUBLICAR EXAMEN
+            // TARJETA PUBLICAR EVALUACIÓN (aviso)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(BackgroundWhite, RoundedCornerShape(20.dp))
                     .border(1.5.dp, BorderBlue, RoundedCornerShape(20.dp))
-                    .clickable { onNuevoExamen() }
+                    .clickable { onNuevaEvaluacion() }
                     .padding(16.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
@@ -190,21 +190,21 @@ fun PublicacionesScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Image(
-                        painter = painterResource(id = R.drawable.task_white),
+                        painter = painterResource(id = R.drawable.exam_white),
                         contentDescription = null,
                         modifier = Modifier.size(62.dp)
                     )
                 }
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "Publicar Examen",
+                        text = "Publicar Evaluación",
                         fontFamily = Roboto,
                         fontWeight = FontWeight.Bold,
                         fontSize = 20.sp,
                         color = TextBlue
                     )
                     Text(
-                        text = "Nueva evaluación",
+                        text = "Aviso de fecha y temario",
                         fontFamily = Roboto,
                         fontSize = 17.sp,
                         color = TextPrimary
@@ -261,7 +261,7 @@ fun PublicacionesScreen(
                             .padding(horizontal = 10.dp, vertical = 3.dp)
                     ) {
                         Text(
-                            text = "${totalTareas + totalExamenes} publicaciones",
+                            text = "${totalTareas + totalEvaluaciones} publicaciones",
                             fontFamily = Roboto,
                             fontWeight = FontWeight.SemiBold,
                             fontSize = 15.sp,
@@ -293,7 +293,7 @@ fun PublicacionesScreen(
             ) {
                 listOf(
                     Triple("$totalTareas", "Tareas", EduconnectBlue),
-                    Triple("$totalExamenes", "Exámenes", EduconnectBlue),
+                    Triple("$totalEvaluaciones", "Evaluaciones", EduconnectBlue),
                     Triple("$venceHoy", "Vence hoy", StatusErrorRed)
                 ).forEach { (valor, etiqueta, color) ->
                     Column(
@@ -338,7 +338,7 @@ fun PublicacionesPreview() {
     EduConnectAppTheme {
         PublicacionesScreen(
             totalTareas = 3,
-            totalExamenes = 2,
+            totalEvaluaciones = 2,
             venceHoy = 1,
             totalPublicacionesHoy = 2,
         )

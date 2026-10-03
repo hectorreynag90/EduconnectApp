@@ -9,17 +9,16 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -29,6 +28,7 @@ import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -41,10 +41,10 @@ import com.educonnectapp.ui.theme.*
 import java.text.SimpleDateFormat
 import java.util.*
 
-// Datos de la tarea/examen
+// Datos de la tarea/evaluación
 data class DetallePublicacionItem(
     val titulo: String,
-    val tipo: String,               // "Tarea" | "Examen"
+    val tipo: String,               // "Tarea" | "Evaluación"
     val cursoNombre: String,
     val gradoNombre: String,
     val seccionNombre: String,
@@ -54,17 +54,18 @@ data class DetallePublicacionItem(
     val estado: String = "ACTIVA"
 )
 
-// Calificación de un alumno. estado usa los códigos del backend:
+// Entrega de un alumno (solo tareas: las evaluaciones son avisos). estado usa los códigos del backend:
 // "PENDIENTE" | "ENTREGADO" | "NO_ENTREGADO" | "RENDIDO" | "NO_RINDIO" | "CALIFICADO"
+// (notaNumerica, notaLiteral y observacion se mantienen solo por compatibilidad: ya no se usan)
 data class AlumnoCalificacionItem(
     val alumnoId: Long,
     val codigo: String,
     val nombreCompleto: String,
     val estado: String = "PENDIENTE",
     val notaNumerica: Double? = null,
-    val notaLiteral: String? = null,   // "AD" | "A" | "B" | "C"
+    val notaLiteral: String? = null,
     val observacion: String = "",
-    val registrado: Boolean = false    // true si el docente ya guardó una calificación para este alumno
+    val registrado: Boolean = false    // true si el docente ya registró la entrega de este alumno
 )
 
 // Estados que ve el docente (se traducen a los códigos del backend al guardar)
@@ -75,9 +76,6 @@ private const val UI_NO_ENTREGADO = "NO_ENTREGADO"
 private val ESTADOS_ENTREGADO = setOf("ENTREGADO", "RENDIDO", "CALIFICADO")
 private val ESTADOS_NO_ENTREGADO = setOf("NO_ENTREGADO", "NO_RINDIO")
 
-// Nota que se registra automáticamente cuando no entregó (desaprobatoria)
-private const val NOTA_NO_ENTREGADO = "C"
-
 // Código del backend -> estado que ve el docente
 private fun estadoUi(estado: String): String = when (estado) {
     in ESTADOS_ENTREGADO -> UI_ENTREGADO
@@ -85,8 +83,12 @@ private fun estadoUi(estado: String): String = when (estado) {
     else -> UI_PENDIENTE
 }
 
-// Escala literal del MINEDU
-private val LITERALES = listOf("AD", "A", "B", "C")
+// Cada toque pasa al siguiente estado: Pendiente -> Entregado -> No entregado -> Pendiente
+private fun siguienteEstado(estado: String): String = when (estado) {
+    UI_PENDIENTE -> UI_ENTREGADO
+    UI_ENTREGADO -> UI_NO_ENTREGADO
+    else -> UI_PENDIENTE
+}
 
 private fun fechaLargaCalificar(fecha: String): String = try {
     val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
@@ -112,23 +114,20 @@ fun CalificarPublicacionScreen(
     onGuardar: (List<AlumnoCalificacionItem>) -> Unit = {}
 ) {
     val context = LocalContext.current
-    val esExamen = publicacion?.tipo == "Examen"
+    val esEvaluacion = publicacion?.tipo == "Evaluación"
 
-    // MODO: consulta (solo lectura) o calificación (editable)
+    // MODO: consulta (solo lectura) o registro (editable)
     var editando by remember { mutableStateOf(false) }
     // Al llegar la lista actualizada del backend (después de guardar), vuelve a modo consulta
     LaunchedEffect(alumnos) { editando = false }
 
-    // Valores editables (se reinician con cada lista nueva o al cancelar)
+    // Estados editables (se reinician con cada lista nueva o al cancelar)
     var version by remember { mutableStateOf(0) }
     val estadosUi = remember(alumnos, version) {
         mutableStateMapOf<Long, String>().apply { alumnos.forEach { put(it.alumnoId, estadoUi(it.estado)) } }
     }
-    val notas = remember(alumnos, version) {
-        mutableStateMapOf<Long, String>().apply { alumnos.forEach { a -> a.notaLiteral?.let { put(a.alumnoId, it) } } }
-    }
 
-    // POPUPS: confirmación -> "Guardando..." -> "Calificación Guardada"
+    // POPUPS: confirmación -> "Guardando..." -> "Entregas guardadas"
     var cambiosPorConfirmar by remember { mutableStateOf<List<AlumnoCalificacionItem>?>(null) }
     var esperandoGuardado by remember { mutableStateOf(false) }
     var alumnosAlGuardar by remember { mutableStateOf<List<AlumnoCalificacionItem>>(emptyList()) }
@@ -150,8 +149,8 @@ fun CalificarPublicacionScreen(
         }
     }
 
-    // ¿Ya se calificó alguna vez? -> el botón dice "EDITAR CALIFICACIONES" en lugar de "CALIFICAR"
-    val yaCalificada = alumnos.any { it.registrado }
+    // ¿Ya se registró alguna vez? -> el botón dice "EDITAR ENTREGAS"
+    val yaRegistrada = alumnos.any { it.registrado }
     val totalEntregados = alumnos.count { it.estado in ESTADOS_ENTREGADO }
     val totalNoEntregados = alumnos.count { it.estado in ESTADOS_NO_ENTREGADO }
     val totalPendientes = alumnos.size - totalEntregados - totalNoEntregados
@@ -164,24 +163,17 @@ fun CalificarPublicacionScreen(
     // El botón "atrás" del celular cancela la edición en lugar de salir
     BackHandler(enabled = editando) { cancelarEdicion() }
 
-    // Resultado final de un alumno (la observación existente no se toca)
+    // Resultado final de un alumno. Si el docente no cambió su estado, se devuelve tal cual.
+    // Nunca se envían notas.
     fun resultado(a: AlumnoCalificacionItem): AlumnoCalificacionItem {
-        when (estadosUi[a.alumnoId] ?: UI_PENDIENTE) {
-            UI_PENDIENTE ->
-                return a.copy(estado = "PENDIENTE", notaNumerica = null, notaLiteral = null)
-            UI_NO_ENTREGADO ->   // no entregó: se registra con nota C
-                return a.copy(
-                    estado = if (esExamen) "NO_RINDIO" else "NO_ENTREGADO",
-                    notaLiteral = NOTA_NO_ENTREGADO,
-                    notaNumerica = null
-                )
+        val elegido = estadosUi[a.alumnoId] ?: UI_PENDIENTE
+        if (elegido == estadoUi(a.estado)) return a
+        val codigo = when (elegido) {
+            UI_ENTREGADO -> "ENTREGADO"
+            UI_NO_ENTREGADO -> "NO_ENTREGADO"
+            else -> "PENDIENTE"
         }
-        val nota = notas[a.alumnoId]
-        return when {
-            nota != null -> a.copy(estado = "CALIFICADO", notaLiteral = nota, notaNumerica = null)
-            a.estado == "CALIFICADO" && a.notaNumerica != null -> a   // nota numérica antigua: se respeta
-            else -> a.copy(estado = if (esExamen) "RENDIDO" else "ENTREGADO", notaLiteral = null, notaNumerica = null)
-        }
+        return a.copy(estado = codigo, notaNumerica = null, notaLiteral = null)
     }
 
     Column(
@@ -216,10 +208,10 @@ fun CalificarPublicacionScreen(
                 Column {
                     Text(
                         text = when {
-                            editando && yaCalificada -> "Editar calificaciones"
-                            editando -> "Calificar"
-                            esExamen -> "Detalle del examen"
-                            else -> "Detalle de la tarea"
+                            esEvaluacion -> "Aviso de evaluación"
+                            editando && yaRegistrada -> "Editar entregas"
+                            editando -> "Registrar entregas"
+                            else -> "Seguimiento de entregas"
                         },
                         fontFamily = Roboto,
                         fontWeight = FontWeight.Bold,
@@ -254,7 +246,7 @@ fun CalificarPublicacionScreen(
                 contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // TARJETA: título, fecha límite y adjunto
+                // TARJETA: tipo, título, fecha límite y adjunto
                 publicacion?.let { p ->
                     item {
                         Column(
@@ -266,6 +258,13 @@ fun CalificarPublicacionScreen(
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Text(
+                                text = p.tipo.uppercase(),
+                                fontFamily = Roboto,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp,
+                                color = TextSecondary
+                            )
+                            Text(
                                 text = p.titulo,
                                 fontFamily = Roboto,
                                 fontWeight = FontWeight.Bold,
@@ -273,7 +272,7 @@ fun CalificarPublicacionScreen(
                                 color = TextBlue
                             )
                             Text(
-                                text = (if (esExamen) "Fecha del examen: " else "Fecha límite: ") +
+                                text = (if (esEvaluacion) "Fecha de la evaluación: " else "Fecha límite: ") +
                                         (if (p.fechaEntrega.isNotEmpty()) fechaLargaCalificar(p.fechaEntrega) else "—"),
                                 fontFamily = Roboto,
                                 fontWeight = FontWeight.SemiBold,
@@ -317,171 +316,162 @@ fun CalificarPublicacionScreen(
                     }
                 }
 
-                // RESUMEN + ACCIÓN RÁPIDA
-                item {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(
-                            text = "ALUMNOS (${alumnos.size})",
-                            fontFamily = Roboto,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 16.sp,
-                            color = TextBlue
-                        )
-                        if (editando) {
-                            Text(
-                                text = "Todos entregaron",
-                                fontFamily = Roboto,
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 14.sp,
-                                color = EduconnectBlue,
-                                modifier = Modifier
-                                    .clickable {
-                                        alumnos.forEach {
-                                            if (estadosUi[it.alumnoId] == UI_NO_ENTREGADO) notas.remove(it.alumnoId)
-                                            estadosUi[it.alumnoId] = UI_ENTREGADO
-                                        }
-                                    }
-                                    .padding(vertical = 4.dp)
-                            )
-                        } else {
-                            Text(
-                                text = "$totalEntregados entreg. · $totalPendientes pend. · $totalNoEntregados no entreg.",
-                                fontFamily = Roboto,
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 14.sp,
-                                color = TextSecondary
-                            )
-                        }
-                    }
+                // EVALUACIÓN: solo aviso (temario + nota informativa), sin seguimiento
+                if (esEvaluacion) {
+                    item { AvisoEvaluacion(publicacion?.descripcion ?: "") }
                 }
 
-                // ENCABEZADO DE COLUMNAS
-                item {
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        if (editando) {
+                // TAREA: seguimiento de entregas
+                if (!esEvaluacion) {
+                    // RESUMEN + ACCIÓN RÁPIDA
+                    item {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
                             Text(
-                                text = "Toca el estado o la nota para cambiarlos",
+                                text = "ALUMNOS (${alumnos.size})",
                                 fontFamily = Roboto,
-                                fontSize = 13.sp,
-                                color = TextSecondary
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 16.sp,
+                                color = TextBlue
                             )
-                        }
-                        EncabezadoColumnas()
-                    }
-                }
-
-                // LISTA DE ALUMNOS
-                items(alumnos, key = { it.alumnoId }) { a ->
-                    if (editando) {
-                        FilaAlumnoEditable(
-                            alumno = a,
-                            estado = estadosUi[a.alumnoId] ?: UI_PENDIENTE,
-                            nota = notas[a.alumnoId],
-                            // Cada toque pasa al siguiente estado: Pendiente -> Entregado -> No entregado -> Pendiente
-                            onCambiarEstado = {
-                                val anterior = estadosUi[a.alumnoId] ?: UI_PENDIENTE
-                                val nuevo = when (anterior) {
-                                    UI_PENDIENTE -> UI_ENTREGADO
-                                    UI_ENTREGADO -> UI_NO_ENTREGADO
-                                    else -> UI_PENDIENTE
-                                }
-                                estadosUi[a.alumnoId] = nuevo
-                                when (nuevo) {
-                                    UI_NO_ENTREGADO -> notas[a.alumnoId] = NOTA_NO_ENTREGADO   // C automática
-                                    else -> notas.remove(a.alumnoId)
-                                }
-                            },
-                            // Cada toque pasa a la siguiente nota: — -> AD -> A -> B -> C -> —
-                            onCambiarNota = {
-                                val actual = notas[a.alumnoId]
-                                val siguiente = when (val i = LITERALES.indexOf(actual)) {
-                                    -1 -> LITERALES.first()
-                                    LITERALES.lastIndex -> null
-                                    else -> LITERALES[i + 1]
-                                }
-                                if (siguiente == null) notas.remove(a.alumnoId) else notas[a.alumnoId] = siguiente
+                            if (editando) {
+                                Text(
+                                    text = "Todos entregaron",
+                                    fontFamily = Roboto,
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 14.sp,
+                                    color = EduconnectBlue,
+                                    modifier = Modifier
+                                        .clickable { alumnos.forEach { estadosUi[it.alumnoId] = UI_ENTREGADO } }
+                                        .padding(vertical = 4.dp)
+                                )
                             }
-                        )
-                    } else {
-                        FilaAlumnoConsulta(alumno = a)
+                        }
+                    }
+
+                    // CONTADORES (solo en consulta)
+                    if (!editando) {
+                        item {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Contador(totalEntregados, "Entregaron", StatusGreen, Modifier.weight(1f))
+                                Contador(totalPendientes, "Pendientes", EduconnectBlue, Modifier.weight(1f))
+                                Contador(totalNoEntregados, "No entregaron", StatusErrorRed, Modifier.weight(1f))
+                            }
+                        }
+                    }
+
+                    // ENCABEZADO DE COLUMNAS
+                    item {
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            if (editando) {
+                                Text(
+                                    text = "Toca el estado para cambiarlo",
+                                    fontFamily = Roboto,
+                                    fontSize = 13.sp,
+                                    color = TextSecondary
+                                )
+                            }
+                            EncabezadoColumnas()
+                        }
+                    }
+
+                    // LISTA DE ALUMNOS
+                    items(alumnos, key = { it.alumnoId }) { a ->
+                        if (editando) {
+                            val estado = estadosUi[a.alumnoId] ?: UI_PENDIENTE
+                            FilaAlumno(
+                                alumno = a,
+                                borde = colorEstado(estado).copy(alpha = 0.6f)
+                            ) {
+                                EstadoPill(estado, onClick = { estadosUi[a.alumnoId] = siguienteEstado(estado) })
+                            }
+                        } else {
+                            FilaAlumno(
+                                alumno = a,
+                                borde = BorderBlue.copy(alpha = 0.5f)
+                            ) {
+                                EstadoPill(estadoUi(a.estado))
+                            }
+                        }
                     }
                 }
             }
 
-            // BOTONES INFERIORES
-            HorizontalDivider(color = BorderBlue.copy(alpha = 0.4f))
-            if (editando) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 10.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    OutlinedButton(
-                        onClick = { cancelarEdicion() },
-                        enabled = !guardando,
-                        modifier = Modifier.weight(1f).height(52.dp),
-                        shape = RoundedCornerShape(28.dp)
+            // BOTONES INFERIORES (solo tareas)
+            if (!esEvaluacion) {
+                HorizontalDivider(color = BorderBlue.copy(alpha = 0.4f))
+                if (editando) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Text(
-                            text = "Cancelar",
-                            fontFamily = Roboto,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 17.sp,
-                            color = EduconnectBlue
-                        )
-                    }
-                    Button(
-                        onClick = {
-                            val cambios = alumnos.mapNotNull { original ->
-                                resultado(original).takeIf {
-                                    it.estado != original.estado || it.notaNumerica != original.notaNumerica ||
-                                            it.notaLiteral != original.notaLiteral
+                        OutlinedButton(
+                            onClick = { cancelarEdicion() },
+                            enabled = !guardando,
+                            modifier = Modifier.weight(1f).height(52.dp),
+                            shape = RoundedCornerShape(28.dp)
+                        ) {
+                            Text(
+                                text = "Cancelar",
+                                fontFamily = Roboto,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 17.sp,
+                                color = EduconnectBlue
+                            )
+                        }
+                        Button(
+                            onClick = {
+                                val cambios = alumnos.mapNotNull { original ->
+                                    resultado(original).takeIf { it.estado != original.estado }
                                 }
-                            }
-                            if (cambios.isEmpty()) {
-                                Toast.makeText(context, "No hay cambios para guardar", Toast.LENGTH_SHORT).show()
-                                editando = false
-                            } else {
-                                cambiosPorConfirmar = cambios   // primero se confirma
-                            }
-                        },
-                        enabled = !guardando,
-                        modifier = Modifier.weight(1.4f).height(52.dp),
+                                if (cambios.isEmpty()) {
+                                    Toast.makeText(context, "No hay cambios para guardar", Toast.LENGTH_SHORT).show()
+                                    editando = false
+                                } else {
+                                    cambiosPorConfirmar = cambios   // primero se confirma
+                                }
+                            },
+                            enabled = !guardando,
+                            modifier = Modifier.weight(1.4f).height(52.dp),
+                            shape = RoundedCornerShape(28.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = AccentOrange)
+                        ) {
+                            Text(
+                                text = "GUARDAR",
+                                fontFamily = Roboto,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 18.sp,
+                                color = TextWhite
+                            )
+                        }
+                    }
+                } else {
+                    Button(
+                        onClick = { version++; editando = true },
+                        enabled = alumnos.isNotEmpty() && publicacion?.estado != "ANULADA",
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp, vertical = 10.dp)
+                            .height(52.dp),
                         shape = RoundedCornerShape(28.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = AccentOrange)
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (yaRegistrada) EduconnectBlue else AccentOrange
+                        )
                     ) {
                         Text(
-                            text = "GUARDAR",
+                            text = if (yaRegistrada) "EDITAR ENTREGAS" else "REGISTRAR ENTREGAS",
                             fontFamily = Roboto,
                             fontWeight = FontWeight.Bold,
                             fontSize = 18.sp,
                             color = TextWhite
                         )
                     }
-                }
-            } else {
-                Button(
-                    onClick = { version++; editando = true },
-                    enabled = alumnos.isNotEmpty() && publicacion?.estado != "ANULADA",
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp, vertical = 10.dp)
-                        .height(52.dp),
-                    shape = RoundedCornerShape(28.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (yaCalificada) EduconnectBlue else AccentOrange
-                    )
-                ) {
-                    Text(
-                        text = if (yaCalificada) "EDITAR CALIFICACIONES" else "CALIFICAR",
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 18.sp,
-                        color = TextWhite
-                    )
                 }
             }
         }
@@ -497,14 +487,19 @@ fun CalificarPublicacionScreen(
 
     // 1) CONFIRMACIÓN
     cambiosPorConfirmar?.let { cambios ->
-        val entregadosCambio = cambios.count { it.estado in ESTADOS_ENTREGADO }
-        val noEntregadosCambio = cambios.count { it.estado in ESTADOS_NO_ENTREGADO }
-        val conNota = cambios.count { it.notaLiteral != null }
+        val entregaron = cambios.count { it.estado in ESTADOS_ENTREGADO }
+        val noEntregaron = cambios.count { it.estado in ESTADOS_NO_ENTREGADO }
+        val pendientes = cambios.size - entregaron - noEntregaron
+        val detalle = buildList {
+            if (entregaron > 0) add("$entregaron entregaron")
+            if (noEntregaron > 0) add("$noEntregaron no entregaron")
+            if (pendientes > 0) add("$pendientes " + if (pendientes == 1) "pendiente" else "pendientes")
+        }.joinToString(", ")
         AlertDialog(
             onDismissRequest = { cambiosPorConfirmar = null },
             title = {
                 Text(
-                    text = "¿Guardar calificaciones?",
+                    text = "¿Guardar entregas?",
                     fontFamily = Roboto,
                     fontWeight = FontWeight.Bold,
                     fontSize = 20.sp,
@@ -514,7 +509,7 @@ fun CalificarPublicacionScreen(
             text = {
                 Text(
                     text = "Se actualizarán ${cambios.size} " + (if (cambios.size == 1) "alumno" else "alumnos") +
-                            " ($entregadosCambio entregados, $noEntregadosCambio no entregados, $conNota con nota).",
+                            " ($detalle).",
                     fontFamily = Roboto,
                     fontSize = 16.sp,
                     color = TextPrimary
@@ -573,7 +568,7 @@ fun CalificarPublicacionScreen(
         }
     }
 
-    // 3) CALIFICACIÓN GUARDADA (se cierra sola o al tocar)
+    // 3) ENTREGAS GUARDADAS (se cierra sola o al tocar)
     if (mostrarExito) {
         Dialog(onDismissRequest = { mostrarExito = false }) {
             Column(
@@ -590,7 +585,7 @@ fun CalificarPublicacionScreen(
                     modifier = Modifier.size(76.dp)
                 )
                 Text(
-                    text = "Calificación Guardada",
+                    text = "Entregas guardadas",
                     fontFamily = Roboto,
                     fontWeight = FontWeight.Bold,
                     fontSize = 19.sp,
@@ -601,9 +596,88 @@ fun CalificarPublicacionScreen(
     }
 }
 
-// Anchos fijos de las columnas: así todas las filas quedan alineadas
-private val ANCHO_ESTADO = 132.dp
-private val ANCHO_NOTA = 60.dp
+// Evaluación: se muestra el temario y una nota de que no lleva registro de entrega
+@Composable
+private fun AvisoEvaluacion(descripcion: String) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (descripcion.isNotBlank()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(BackgroundWhite, RoundedCornerShape(16.dp))
+                    .border(1.5.dp, BorderBlue, RoundedCornerShape(16.dp))
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Text(
+                    text = "TEMARIO",
+                    fontFamily = Roboto,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp,
+                    color = TextSecondary
+                )
+                Text(
+                    text = descripcion,
+                    fontFamily = Roboto,
+                    fontSize = 15.sp,
+                    color = TextPrimary
+                )
+            }
+        }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(EduconnectBlue.copy(alpha = 0.06f), RoundedCornerShape(12.dp))
+                .border(1.dp, BorderBlue, RoundedCornerShape(12.dp))
+                .padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Image(
+                painter = painterResource(id = R.drawable.notification_white),
+                contentDescription = null,
+                colorFilter = ColorFilter.tint(EduconnectBlue),
+                modifier = Modifier.size(26.dp)
+            )
+            Text(
+                text = "Las evaluaciones se publican como aviso para los padres. No requieren registro de entrega.",
+                fontFamily = Roboto,
+                fontSize = 14.sp,
+                color = TextBlue
+            )
+        }
+    }
+}
+
+// Ancho fijo de la columna ESTADO: así todas las filas quedan alineadas
+private val ANCHO_ESTADO = 140.dp
+
+@Composable
+private fun Contador(valor: Int, texto: String, color: Color, modifier: Modifier) {
+    Column(
+        modifier = modifier
+            .background(color.copy(alpha = 0.08f), RoundedCornerShape(12.dp))
+            .border(1.dp, color.copy(alpha = 0.35f), RoundedCornerShape(12.dp))
+            .padding(vertical = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = valor.toString(),
+            fontFamily = Roboto,
+            fontWeight = FontWeight.Bold,
+            fontSize = 20.sp,
+            color = color
+        )
+        Text(
+            text = texto,
+            fontFamily = Roboto,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 12.sp,
+            color = color,
+            maxLines = 1
+        )
+    }
+}
 
 @Composable
 private fun EncabezadoColumnas() {
@@ -616,7 +690,6 @@ private fun EncabezadoColumnas() {
     ) {
         TextoEncabezado("ALUMNO", Modifier.weight(1f))
         TextoEncabezado("ESTADO", Modifier.width(ANCHO_ESTADO), centrado = true)
-        TextoEncabezado("NOTA", Modifier.width(ANCHO_NOTA), centrado = true)
     }
 }
 
@@ -628,18 +701,17 @@ private fun TextoEncabezado(texto: String, modifier: Modifier, centrado: Boolean
         fontWeight = FontWeight.Bold,
         fontSize = 13.sp,
         color = TextSecondary,
-        textAlign = if (centrado) androidx.compose.ui.text.style.TextAlign.Center else androidx.compose.ui.text.style.TextAlign.Start,
+        textAlign = if (centrado) TextAlign.Center else TextAlign.Start,
         modifier = modifier
     )
 }
 
-// Fila base: tarjeta con nombre (columna flexible) + celdas de ancho fijo
+// Fila: tarjeta con nombre (columna flexible) + celda de estado de ancho fijo
 @Composable
 private fun FilaAlumno(
     alumno: AlumnoCalificacionItem,
     borde: Color,
-    celdaEstado: @Composable () -> Unit,
-    celdaNota: @Composable () -> Unit
+    celdaEstado: @Composable () -> Unit
 ) {
     Row(
         modifier = Modifier
@@ -662,7 +734,6 @@ private fun FilaAlumno(
             modifier = Modifier.weight(1f)
         )
         Box(modifier = Modifier.width(ANCHO_ESTADO), contentAlignment = Alignment.Center) { celdaEstado() }
-        Box(modifier = Modifier.width(ANCHO_NOTA), contentAlignment = Alignment.Center) { celdaNota() }
     }
 }
 
@@ -686,7 +757,7 @@ private fun textoEstado(estado: String): String = when (estado) {
 }
 
 // Estado con ícono: ✓ verde = Entregado | reloj azul = Pendiente | ✕ rojo = No entregado.
-// Relleno (con flecha) si se puede tocar; suave si es solo lectura.
+// Relleno si se puede tocar (modo registro); suave si es solo lectura.
 @Composable
 private fun EstadoPill(estado: String, onClick: (() -> Unit)? = null) {
     val color = colorEstado(estado)
@@ -724,99 +795,6 @@ private fun EstadoPill(estado: String, onClick: (() -> Unit)? = null) {
     }
 }
 
-// MODO CONSULTA: solo lectura
-@Composable
-private fun FilaAlumnoConsulta(alumno: AlumnoCalificacionItem) {
-    val estado = estadoUi(alumno.estado)
-    FilaAlumno(
-        alumno = alumno,
-        borde = BorderBlue.copy(alpha = 0.5f),
-        celdaEstado = { EstadoPill(estado) },
-        celdaNota = {
-            val nota = alumno.notaLiteral
-            Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .background(
-                        when {
-                            nota == null -> BackgroundLight
-                            nota == NOTA_NO_ENTREGADO && estado == UI_NO_ENTREGADO -> StatusErrorRed
-                            else -> EduconnectBlue
-                        },
-                        CircleShape
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = nota ?: "—",
-                    fontFamily = Roboto,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp,
-                    color = if (nota != null) TextWhite else TextSecondary
-                )
-            }
-        }
-    )
-}
-
-// MODO CALIFICACIÓN: el estado y la nota cambian con cada toque
-// (No entregado = nota C fija; Pendiente = sin nota)
-@Composable
-private fun FilaAlumnoEditable(
-    alumno: AlumnoCalificacionItem,
-    estado: String,
-    nota: String?,
-    onCambiarEstado: () -> Unit,
-    onCambiarNota: () -> Unit
-) {
-    val notaEditable = estado == UI_ENTREGADO
-    FilaAlumno(
-        alumno = alumno,
-        borde = colorEstado(estado).copy(alpha = 0.6f),
-        celdaEstado = { EstadoPill(estado, onClick = onCambiarEstado) },
-        celdaNota = {
-            Box(
-                modifier = Modifier
-                    .width(ANCHO_NOTA)
-                    .height(38.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(
-                        when {
-                            estado == UI_NO_ENTREGADO -> StatusErrorRed.copy(alpha = 0.08f)
-                            notaEditable && nota != null -> EduconnectBlue
-                            notaEditable -> BackgroundWhite
-                            else -> BackgroundLight
-                        }
-                    )
-                    .border(
-                        1.5.dp,
-                        when {
-                            estado == UI_NO_ENTREGADO -> StatusErrorRed.copy(alpha = 0.6f)
-                            !notaEditable -> BorderMedium.copy(alpha = 0.5f)
-                            nota != null -> EduconnectBlue
-                            else -> BorderBlue
-                        },
-                        RoundedCornerShape(10.dp)
-                    )
-                    .clickable(enabled = notaEditable) { onCambiarNota() },
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = nota ?: "—",
-                    fontFamily = Roboto,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 17.sp,
-                    color = when {
-                        estado == UI_NO_ENTREGADO -> StatusErrorRed
-                        notaEditable && nota != null -> TextWhite
-                        else -> TextSecondary
-                    }
-                )
-            }
-        }
-    )
-}
-
 @Preview(showBackground = true)
 @Composable
 fun CalificarPublicacionPreview() {
@@ -827,9 +805,9 @@ fun CalificarPublicacionPreview() {
                 "2026-10-08", "Resolver los ejercicios del 1 al 20.", "Practica.pdf"
             ),
             alumnos = listOf(
-                AlumnoCalificacionItem(1L, "PMU0001", "Pérez García, Pedro", "CALIFICADO", notaLiteral = "A", registrado = true),
-                AlumnoCalificacionItem(2L, "PMU0002", "López Ruiz, Ana", "NO_ENTREGADO", notaLiteral = "C", registrado = true),
-                AlumnoCalificacionItem(3L, "PMU0003", "Díaz Soto, Luis", "ENTREGADO", registrado = true)
+                AlumnoCalificacionItem(1L, "PMU0001", "Pérez García, Pedro", "ENTREGADO", registrado = true),
+                AlumnoCalificacionItem(2L, "PMU0002", "López Ruiz, Ana", "NO_ENTREGADO", registrado = true),
+                AlumnoCalificacionItem(3L, "PMU0003", "Díaz Soto, Luis", "PENDIENTE")
             )
         )
     }

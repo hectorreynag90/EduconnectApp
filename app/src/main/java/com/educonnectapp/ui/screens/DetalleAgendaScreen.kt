@@ -18,6 +18,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
@@ -109,7 +111,7 @@ fun DetalleAgendaScreen(
                 }
                 Column {
                     Text(
-                        text = if (publicacion?.tipo == "Examen") "Detalle de Examen" else "Detalle de Tarea",
+                        text = if (publicacion?.tipo == "Evaluación") "Detalle de Evaluación" else "Detalle de Tarea",
                         fontFamily = Roboto,
                         fontWeight = FontWeight.Bold,
                         fontSize = 22.sp,
@@ -150,34 +152,59 @@ fun DetalleAgendaScreen(
                 .padding(horizontal = 20.dp, vertical = 20.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            // BANNER VENCE EN X DÍAS
-            if (publicacion?.estado?.lowercase() == "pendiente") {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(BackgroundWhite, RoundedCornerShape(12.dp))
-                        .border(1.5.dp, BorderOrange, RoundedCornerShape(12.dp))
-                        .padding(horizontal = 14.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.alert_orange),
-                        contentDescription = null,
-                        modifier = Modifier.size(40.dp)
-                    )
-                    Text(
-                        text = when {
-                            diasRestantes <= 0 -> "Vence hoy - $fechaDisplay"
-                            diasRestantes == 1 -> "Vence mañana - $fechaDisplay"
-                            else -> "Vence en $diasRestantes días - $fechaDisplay"
-                        },
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 18.sp,
-                        color = TextOrange
-                    )
-                }
+            // BANNER DE ESTADO
+            // Tarea: lo que registró el docente (o cuánto falta si sigue pendiente)
+            // Evaluación: solo aviso de la fecha
+            val esEvaluacion = publicacion?.tipo == "Evaluación"
+            when (publicacion?.estado?.lowercase()) {
+                "pendiente" -> BannerEstado(
+                    icono = R.drawable.alert_orange,
+                    tinte = null,
+                    texto = when {
+                        esEvaluacion && diasRestantes <= 0 -> "Evaluación hoy - $fechaDisplay"
+                        esEvaluacion && diasRestantes == 1 -> "Evaluación mañana - $fechaDisplay"
+                        esEvaluacion -> "Evaluación en $diasRestantes días - $fechaDisplay"
+                        diasRestantes <= 0 -> "Vence hoy - $fechaDisplay"
+                        diasRestantes == 1 -> "Vence mañana - $fechaDisplay"
+                        else -> "Vence en $diasRestantes días - $fechaDisplay"
+                    },
+                    detalle = if (esEvaluacion) "Ayude a su hijo a prepararse" else null,
+                    color = TextOrange,
+                    borde = BorderOrange
+                )
+                "realizado" -> BannerEstado(
+                    icono = R.drawable.agenda_gray,
+                    tinte = null,
+                    texto = "Evaluación realizada",
+                    detalle = fechaDisplay,
+                    color = TextSecondary,
+                    borde = BorderMedium
+                )
+                "entregada" -> BannerEstado(
+                    icono = R.drawable.checkcircle_green,
+                    tinte = null,
+                    texto = "Tarea entregada",
+                    detalle = "Registrado por el docente",
+                    color = StatusGreen,
+                    borde = StatusGreen
+                )
+                "no entregada" -> BannerEstado(
+                    icono = R.drawable.close_white,
+                    tinte = StatusErrorRed,
+                    texto = "Tarea no entregada",
+                    detalle = "Registrado por el docente",
+                    color = StatusErrorRed,
+                    borde = StatusErrorRed
+                )
+                "vencida" -> BannerEstado(
+                    icono = R.drawable.alert_orange,
+                    tinte = null,
+                    texto = "Plazo vencido - $fechaDisplay",
+                    detalle = "El docente aún no registra la entrega",
+                    color = TextOrange,
+                    borde = BorderOrange
+                )
+                else -> {}
             }
 
             Spacer(modifier = Modifier.height(10.dp))
@@ -204,7 +231,7 @@ fun DetalleAgendaScreen(
                     ) {
                         Image(
                             painter = painterResource(
-                                id = if (publicacion?.tipo == "Examen") R.drawable.exam_white
+                                id = if (publicacion?.tipo == "Evaluación") R.drawable.exam_white
                                 else R.drawable.document_text_white
                             ),
                             contentDescription = null,
@@ -249,7 +276,7 @@ fun DetalleAgendaScreen(
                 // Fila Fecha límite
                 FilaRegistro(
                     iconRes = R.drawable.agenda_darkgray,
-                    label = if (publicacion?.tipo == "Examen") "Fecha Examen" else "Fecha límite",
+                    label = if (publicacion?.tipo == "Evaluación") "Fecha Evaluación" else "Fecha límite",
                     valor = fechaDisplay,
                     colorValor = TextOrange
                 )
@@ -358,6 +385,51 @@ fun DetalleAgendaScreen(
             onPerfil = onPerfil,
             itemActivo = "Agenda"
         )
+    }
+}
+
+// Banner superior del detalle: ícono + texto principal + detalle opcional
+@Composable
+private fun BannerEstado(
+    icono: Int,
+    tinte: Color?,
+    texto: String,
+    detalle: String?,
+    color: Color,
+    borde: Color
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(BackgroundWhite, RoundedCornerShape(12.dp))
+            .border(1.5.dp, borde, RoundedCornerShape(12.dp))
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Image(
+            painter = painterResource(id = icono),
+            contentDescription = null,
+            colorFilter = tinte?.let { ColorFilter.tint(it) },
+            modifier = Modifier.size(40.dp)
+        )
+        Column {
+            Text(
+                text = texto,
+                fontFamily = Roboto,
+                fontWeight = FontWeight.Bold,
+                fontSize = 18.sp,
+                color = color
+            )
+            if (detalle != null) {
+                Text(
+                    text = detalle,
+                    fontFamily = Roboto,
+                    fontSize = 14.sp,
+                    color = TextSecondary
+                )
+            }
+        }
     }
 }
 
