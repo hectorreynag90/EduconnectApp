@@ -247,6 +247,15 @@ interface EduConnectApi {
     @POST("api/docente/publicaciones")
     suspend fun crearPublicacion(@Body body: CrearPublicacionRequest): PublicacionDocenteResponse
 
+    @GET("api/docente/publicaciones/{id}")
+    suspend fun detallePublicacionDocente(@Path("id") id: Long): DetallePublicacionDocenteResponse
+
+    @PUT("api/docente/publicaciones/{id}/calificaciones")
+    suspend fun registrarCalificaciones(
+        @Path("id") id: Long,
+        @Body body: RegistrarCalificacionesRequest
+    ): DetallePublicacionDocenteResponse
+
     // Agenda del padre
     @GET("api/padre/hijos/{alumnoId}/agenda")
     suspend fun agendaHijo(
@@ -993,3 +1002,50 @@ suspend fun obtenerBandeja(): BandejaResponse = llamar { api.bandeja() }
 suspend fun marcarNotificacionesLeidas() = llamar { api.marcarNotificacionesLeidas() }
 
 suspend fun marcarNotificacionLeida(notificacionId: Long) = llamar { api.marcarNotificacionLeida(notificacionId) }
+
+// =====================================================================
+// CALIFICACIONES (docente)
+// estado: "PENDIENTE" | "ENTREGADO" | "NO_ENTREGADO" | "RENDIDO" | "NO_RINDIO" | "CALIFICADO"
+// notaNumerica: 0 a 20 (vigesimal) | notaLiteral: "AD" | "A" | "B" | "C"
+// =====================================================================
+
+@Serializable
+data class CalificacionAlumnoResponse(
+    val alumnoId: Long,
+    val codigoEstudiante: String = "",
+    val nombreCompleto: String = "",
+    val calificacionId: Long? = null,
+    val estado: String = "PENDIENTE",
+    val notaNumerica: Double? = null,
+    val notaLiteral: String? = null,
+    val observacion: String? = null,
+    val calificadoEn: String? = null
+)
+
+@Serializable
+data class DetallePublicacionDocenteResponse(
+    val publicacion: PublicacionDocenteResponse,
+    val calificaciones: List<CalificacionAlumnoResponse> = emptyList()
+)
+
+@Serializable
+data class CalificacionRequest(
+    val alumnoId: Long,
+    val estado: String,
+    val notaNumerica: Double? = null,
+    val notaLiteral: String? = null,
+    val observacion: String? = null
+)
+
+@Serializable
+data class RegistrarCalificacionesRequest(val calificaciones: List<CalificacionRequest>)
+
+// Detalle de una tarea/examen con la calificación de cada alumno de la sección
+suspend fun obtenerDetallePublicacionDocente(publicacionId: Long): DetallePublicacionDocenteResponse =
+    llamar { api.detallePublicacionDocente(publicacionId) }
+
+// Guarda solo los alumnos enviados (el backend notifica al padre)
+suspend fun registrarCalificaciones(
+    publicacionId: Long, calificaciones: List<CalificacionRequest>
+): DetallePublicacionDocenteResponse =
+    llamar { api.registrarCalificaciones(publicacionId, RegistrarCalificacionesRequest(calificaciones)) }

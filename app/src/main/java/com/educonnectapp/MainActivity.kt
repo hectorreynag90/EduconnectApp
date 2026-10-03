@@ -136,6 +136,15 @@ import com.educonnectapp.data.api.marcarNotificacionesLeidas
 import com.educonnectapp.data.api.marcarNotificacionLeida
 import com.educonnectapp.data.api.obtenerPublicacionHijo
 import com.educonnectapp.data.api.ComunicadoPadreResponse
+import com.educonnectapp.data.api.DetallePublicacionDocenteResponse
+import com.educonnectapp.data.api.CalificacionRequest
+import com.educonnectapp.data.api.obtenerDetallePublicacionDocente
+import com.educonnectapp.data.api.registrarCalificaciones
+import com.educonnectapp.ui.screens.HistorialPublicacionesScreen
+import com.educonnectapp.ui.screens.PublicacionHistorialItem
+import com.educonnectapp.ui.screens.CalificarPublicacionScreen
+import com.educonnectapp.ui.screens.DetallePublicacionItem
+import com.educonnectapp.ui.screens.AlumnoCalificacionItem
 import com.educonnectapp.ui.screens.PanelNotificaciones
 import com.educonnectapp.ui.screens.NotificacionItem
 import kotlinx.coroutines.async
@@ -154,7 +163,8 @@ enum class Screen {
     SELECCIONAR_COMUNICADO, BUSQUEDA_COMUNICADO, DETALLE_COMUNICADO,
     PUBLICACIONES, SELECCIONAR_CURSO_PUBLICACION, NUEVA_TAREA, NUEVA_EVALUACION, CONFIRMACION_PUBLICACION,
     SELECCIONAR_HIJO_AGENDA, AGENDA_ESCOLAR, DETALLE_AGENDA,
-    COMUNICADOS_PADRE, SELECCIONAR_ESTUDIANTE_COMUNICADO, COMUNICADOS_RECIBIDOS, DETALLE_COMUNICADO_PADRE
+    COMUNICADOS_PADRE, SELECCIONAR_ESTUDIANTE_COMUNICADO, COMUNICADOS_RECIBIDOS, DETALLE_COMUNICADO_PADRE,
+    HISTORIAL_PUBLICACIONES, CALIFICAR_PUBLICACION
 }
 
 data class UsuarioLogueado(
@@ -350,6 +360,11 @@ fun EduConnectApp() {
     var asignacionPublicacionSel by remember { mutableStateOf<AsignacionResponse?>(null) }
     var publicandoSel by remember { mutableStateOf(false) }
     var publicacionNotificadosSel by remember { mutableStateOf(0) }
+    // Historial y calificaciones (docente)
+    var publicacionIdSel by remember { mutableStateOf(0L) }
+    var detallePublicacionSel by remember { mutableStateOf<DetallePublicacionDocenteResponse?>(null) }
+    var cargandoDetallePublicacion by remember { mutableStateOf(false) }
+    var guardandoCalificaciones by remember { mutableStateOf(false) }
     // Agenda (padre)
     var agendaPorHijoSel by remember { mutableStateOf<Map<Long, List<PublicacionPadreResponse>>>(emptyMap()) }
     var agendaCargada by remember { mutableStateOf(false) }
@@ -731,6 +746,7 @@ fun EduConnectApp() {
         comunicadosHijoCargadoDe = null
         publicacionesDocenteSel = emptyList()
         publicacionesCargadas = false
+        detallePublicacionSel = null
         seccionesPublicacionSel = emptyList()
         asignacionPublicacionSel = null
         agendaPorHijoSel = emptyMap()
@@ -1660,7 +1676,7 @@ fun EduConnectApp() {
                             tipoPublicacionSel = "Examen"
                             currentScreen = Screen.SELECCIONAR_CURSO_PUBLICACION
                         },
-                        onHistorial = { aviso("Historial de publicaciones disponible próximamente") }
+                        onHistorial = { currentScreen = Screen.HISTORIAL_PUBLICACIONES }
                     )
                 }
 
@@ -1789,9 +1805,151 @@ fun EduConnectApp() {
                     onNuevaPublicacion = {
                         currentScreen = Screen.SELECCIONAR_CURSO_PUBLICACION
                     },
-                    onVerHistorial = { aviso("Historial de publicaciones disponible próximamente") },
+                    onVerHistorial = { currentScreen = Screen.HISTORIAL_PUBLICACIONES },
                     onVolver = { currentScreen = Screen.PUBLICACIONES }
                 )
+
+                Screen.HISTORIAL_PUBLICACIONES -> {
+                    androidx.compose.runtime.LaunchedEffect(usuarioLogueado?.id) {
+                        if (usuarioLogueado == null) return@LaunchedEffect
+                        if (publicacionesCargadas) return@LaunchedEffect   // ya cargadas en PUBLICACIONES
+                        try {
+                            publicacionesDocenteSel = obtenerPublicacionesDocente()
+                            publicacionesCargadas = true
+                        } catch (e: kotlinx.coroutines.CancellationException) {
+                            throw e
+                        } catch (e: Exception) { aviso("Error cargando publicaciones: ${e.message}") }
+                    }
+                    HistorialPublicacionesScreen(
+                        // Sin peticiones extra: la lista ya trae alumnos, calificados y lecturas
+                        publicaciones = publicacionesDocenteSel
+                            .filter { it.tipo == "TAREA" || it.tipo == "EVALUACION" }
+                            .sortedByDescending { aFechaHoraLocal(it.publicadoEn) }
+                            .map { p ->
+                                PublicacionHistorialItem(
+                                    id = p.id,
+                                    tipo = if (p.tipo == "EVALUACION") "Examen" else "Tarea",
+                                    titulo = p.titulo,
+                                    cursoNombre = p.curso,
+                                    gradoNombre = p.grado,
+                                    seccionNombre = p.seccion,
+                                    fechaEntrega = p.fechaEntrega ?: "",
+                                    fechaPublicacion = fechaLocal(p.publicadoEn),
+                                    totalAlumnos = p.totalAlumnos.toInt(),
+                                    calificados = p.calificados.toInt(),
+                                    lecturas = p.lecturas.toInt(),
+                                    estado = p.estado
+                                )
+                            },
+                        cargando = !publicacionesCargadas,
+                        onBack = { currentScreen = Screen.PUBLICACIONES },
+                        onHomeDocente = { currentScreen = Screen.HOME_DOCENTE },
+                        onAlumnos = {},
+                        onAvisos = {
+                            comunicadosDocenteCargados = false
+                            currentScreen = Screen.COMUNICADOS
+                        },
+                        onPerfilDocente = { currentScreen = Screen.PERFIL_DOCENTE },
+                        onNotificaciones = {},
+                        onVerDetalle = { item ->
+                            publicacionIdSel = item.id
+                            currentScreen = Screen.CALIFICAR_PUBLICACION
+                        }
+                    )
+                }
+
+                Screen.CALIFICAR_PUBLICACION -> {
+                    androidx.compose.runtime.LaunchedEffect(publicacionIdSel) {
+                        if (detallePublicacionSel?.publicacion?.id != publicacionIdSel) detallePublicacionSel = null
+                        cargandoDetallePublicacion = true
+                        try {
+                            // 1 petición: la publicación con la calificación de cada alumno de la sección
+                            detallePublicacionSel = obtenerDetallePublicacionDocente(publicacionIdSel)
+                        } catch (e: kotlinx.coroutines.CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            aviso("Error cargando la publicación: ${e.message}")
+                        } finally {
+                            cargandoDetallePublicacion = false
+                        }
+                    }
+                    val detalle = detallePublicacionSel?.takeIf { it.publicacion.id == publicacionIdSel }
+                    CalificarPublicacionScreen(
+                        publicacion = detalle?.publicacion?.let { p ->
+                            DetallePublicacionItem(
+                                titulo = p.titulo,
+                                tipo = if (p.tipo == "EVALUACION") "Examen" else "Tarea",
+                                cursoNombre = p.curso,
+                                gradoNombre = p.grado,
+                                seccionNombre = p.seccion,
+                                fechaEntrega = p.fechaEntrega ?: "",
+                                descripcion = p.descripcion,
+                                nombreAdjunto = p.archivo?.nombre,
+                                estado = p.estado
+                            )
+                        },
+                        alumnos = detalle?.calificaciones.orEmpty()
+                            .sortedBy { it.nombreCompleto }
+                            .map { c ->
+                                AlumnoCalificacionItem(
+                                    alumnoId = c.alumnoId,
+                                    codigo = c.codigoEstudiante,
+                                    nombreCompleto = c.nombreCompleto,
+                                    estado = c.estado,
+                                    notaNumerica = c.notaNumerica,
+                                    notaLiteral = c.notaLiteral,
+                                    observacion = c.observacion ?: "",
+                                    registrado = c.calificacionId != null
+                                )
+                            },
+                        cargando = cargandoDetallePublicacion,
+                        guardando = guardandoCalificaciones,
+                        descargandoAdjunto = descargandoAdjunto,
+                        onAbrirAdjunto = { detalle?.publicacion?.archivo?.let { abrirAdjunto(it) } },
+                        onBack = { currentScreen = Screen.HISTORIAL_PUBLICACIONES },
+                        onHomeDocente = { currentScreen = Screen.HOME_DOCENTE },
+                        onAlumnos = {},
+                        onAvisos = {
+                            comunicadosDocenteCargados = false
+                            currentScreen = Screen.COMUNICADOS
+                        },
+                        onPerfilDocente = { currentScreen = Screen.PERFIL_DOCENTE },
+                        onNotificaciones = {},
+                        onGuardar = { cambios ->
+                            if (guardandoCalificaciones) return@CalificarPublicacionScreen   // evita doble envío
+                            guardandoCalificaciones = true
+                            CoroutineScope(Dispatchers.Main).launch {
+                                try {
+                                    // Solo los alumnos que cambiaron; el backend notifica a sus padres
+                                    val respuesta = registrarCalificaciones(
+                                        publicacionIdSel,
+                                        cambios.map { c ->
+                                            CalificacionRequest(
+                                                alumnoId = c.alumnoId,
+                                                estado = c.estado,
+                                                notaNumerica = c.notaNumerica,
+                                                notaLiteral = c.notaLiteral,
+                                                observacion = c.observacion.ifBlank { null }
+                                            )
+                                        }
+                                    )
+                                    detallePublicacionSel = respuesta
+                                    // Actualizar "calificados" en el historial sin volver a pedirlo
+                                    publicacionesDocenteSel = publicacionesDocenteSel.map {
+                                        if (it.id == respuesta.publicacion.id) respuesta.publicacion else it
+                                    }
+                                    aviso(if (cambios.size == 1) "Calificación guardada" else "${cambios.size} calificaciones guardadas")
+                                } catch (e: ApiException) {
+                                    aviso(if (e.codigo == 400) "Datos no válidos: ${e.message}" else "No se pudo guardar: ${e.message}")
+                                } catch (e: Exception) {
+                                    aviso("No se pudo guardar: ${e.message}")
+                                } finally {
+                                    guardandoCalificaciones = false
+                                }
+                            }
+                        }
+                    )
+                }
 
                 Screen.SELECCIONAR_HIJO_AGENDA -> {
                     androidx.compose.runtime.LaunchedEffect(usuarioLogueado?.id) {
