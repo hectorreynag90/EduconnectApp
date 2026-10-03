@@ -135,6 +135,7 @@ import com.educonnectapp.data.api.obtenerBandeja
 import com.educonnectapp.data.api.marcarNotificacionesLeidas
 import com.educonnectapp.data.api.marcarNotificacionLeida
 import com.educonnectapp.data.api.obtenerPublicacionHijo
+import com.educonnectapp.data.api.ComunicadoPadreResponse
 import com.educonnectapp.ui.screens.PanelNotificaciones
 import com.educonnectapp.ui.screens.NotificacionItem
 import kotlinx.coroutines.async
@@ -359,6 +360,8 @@ fun EduConnectApp() {
     var notificacionesNoLeidasSel by remember { mutableStateOf(0L) }
     var cargandoNotificaciones by remember { mutableStateOf(false) }
     var mostrarNotificaciones by remember { mutableStateOf(false) }   // panel debajo de la campana
+    // Comunicados de cada hijo (para ubicar el comunicado de una notificación sin pedirlo de nuevo)
+    var comunicadosPorHijoSel by remember { mutableStateOf<Map<Long, List<ComunicadoPadreResponse>>>(emptyMap()) }
 
     fun aviso(mensaje: String) { Toast.makeText(context, mensaje, Toast.LENGTH_SHORT).show() }
 
@@ -449,6 +452,88 @@ fun EduConnectApp() {
         agendaCargada = true
     }
 
+    // Comunicados de cada hijo del padre: 1 petición por hijo, en paralelo
+    suspend fun cargarComunicadosPadre() {
+        val hijos = hijosDelPadre()
+        val respuestas = coroutineScope {
+            hijos.map { h -> async { obtenerComunicadosHijo(h.alumnoId) } }.awaitAll()
+        }
+        hijosComunicadoSel = hijos.mapIndexed { i, h ->
+            HijoComunicadoItem(
+                id = h.alumnoId,
+                nombres = h.nombres,
+                apellidos = h.apellidos,
+                gradoNombre = h.grado,
+                seccionNombre = h.seccion,
+                seccionId = h.seccionId,
+                sinLeer = respuestas[i].noLeidos,
+                total = respuestas[i].comunicados.size
+            )
+        }
+        comunicadosPorHijoSel = hijos.mapIndexed { i, h -> h.alumnoId to respuestas[i].comunicados }.toMap()
+        comunicadosPadreCargados = true
+    }
+
+    // Lista de comunicados de un hijo (COMUNICADOS_RECIBIDOS): más recientes primero, luego los no leídos arriba
+    fun aplicarComunicadosHijo(hijo: HijoComunicadoItem, comunicados: List<ComunicadoPadreResponse>) {
+        adjuntosComunicadoSel = comunicados.mapNotNull { c -> c.archivo?.let { c.id to it } }.toMap()
+        comunicadosPadreSel = comunicados
+            .sortedByDescending { aFechaHoraLocal(it.enviadoEn) }
+            .map { c ->
+                ComunicadoPadreItem(
+                    id = c.id,
+                    asunto = c.asunto,
+                    mensaje = c.mensaje,
+                    fecha = fechaLocal(c.enviadoEn),
+                    hora = horaLocal(c.enviadoEn),
+                    docenteNombre = c.docente,
+                    gradoNombre = hijo.gradoNombre,
+                    seccionNombre = hijo.seccionNombre,
+                    cursoNombre = c.curso ?: "General",
+                    leido = c.leido,
+                    leidoEn = isoLocalSinZona(c.leidoEn)
+                )
+            }.sortedBy { it.leido }
+        comunicadosHijoCargadoDe = hijo.id
+    }
+
+    // Hijo y comunicado a los que apunta una notificación de comunicado
+    fun contextoComunicado(comunicadoId: Long?): Pair<HijoComunicadoItem, ComunicadoPadreResponse>? {
+        if (comunicadoId == null) return null
+        for ((alumnoId, comunicados) in comunicadosPorHijoSel) {
+            val comunicado = comunicados.find { it.id == comunicadoId } ?: continue
+            val hijo = hijosComunicadoSel.find { it.id == alumnoId } ?: continue
+            return hijo to comunicado
+        }
+        return null
+    }
+
+    // Notificación de comunicado: abre directamente su detalle (DETALLE_COMUNICADO_PADRE).
+    // "Volver" lleva a la lista de comunicados de ese hijo. Si no se encuentra, abre el módulo Comunicados.
+    fun abrirComunicadoDeNotificacion(comunicadoId: Long?) {
+        CoroutineScope(Dispatchers.Main).launch {
+            try {
+                var contexto = contextoComunicado(comunicadoId)
+                if (contexto == null) {
+                    cargarComunicadosPadre()   // puede ser un comunicado nuevo: datos frescos
+                    contexto = contextoComunicado(comunicadoId)
+                }
+                val encontrado = contexto
+                if (encontrado == null) {
+                    irAvisosPadre()
+                } else {
+                    val (hijo, comunicado) = encontrado
+                    hijoComunicadoSel = hijo
+                    aplicarComunicadosHijo(hijo, comunicadosPorHijoSel[hijo.id].orEmpty())
+                    comunicadoPadreSel = comunicadosPadreSel.find { it.id == comunicado.id }
+                    currentScreen = Screen.DETALLE_COMUNICADO_PADRE
+                }
+            } catch (e: Exception) {
+                aviso("No se pudo abrir el comunicado: ${e.message}")
+            }
+        }
+    }
+
     // Campana del padre: abre (o cierra) el panel de notificaciones y carga la bandeja
     fun abrirNotificaciones() {
         if (mostrarNotificaciones) { mostrarNotificaciones = false; return }
@@ -464,6 +549,11 @@ fun EduConnectApp() {
                 val hayPublicaciones = notificacionesSel.any { it.tipo == "PUBLICACION" || it.tipo == "CALIFICACION" }
                 if (hayPublicaciones && !agendaCargada) {
                     try { cargarAgendaPadre() } catch (e: Exception) { /* el panel se muestra sin ese dato */ }
+                }
+                // Curso, grado y sección de los comunicados (1 petición por hijo, solo si no están cargados)
+                val hayComunicados = notificacionesSel.any { it.tipo == "COMUNICADO" }
+                if (hayComunicados && !comunicadosPadreCargados) {
+                    try { cargarComunicadosPadre() } catch (e: Exception) { /* el panel se muestra sin ese dato */ }
                 }
             } catch (e: Exception) {
                 aviso("Error cargando notificaciones: ${e.message}")
@@ -533,26 +623,6 @@ fun EduConnectApp() {
         }
     }
 
-    // Comunicados de cada hijo del padre: 1 petición por hijo, en paralelo
-    suspend fun cargarComunicadosPadre() {
-        val hijos = hijosDelPadre()
-        val respuestas = coroutineScope {
-            hijos.map { h -> async { obtenerComunicadosHijo(h.alumnoId) } }.awaitAll()
-        }
-        hijosComunicadoSel = hijos.mapIndexed { i, h ->
-            HijoComunicadoItem(
-                id = h.alumnoId,
-                nombres = h.nombres,
-                apellidos = h.apellidos,
-                gradoNombre = h.grado,
-                seccionNombre = h.seccion,
-                seccionId = h.seccionId,
-                sinLeer = respuestas[i].noLeidos,
-                total = respuestas[i].comunicados.size
-            )
-        }
-        comunicadosPadreCargados = true
-    }
 
     // Comunicados del docente: 1 petición (todas las secciones); las pantallas filtran localmente
     suspend fun comunicadosDelDocente(): List<ComunicadoDocenteResponse> {
@@ -673,6 +743,7 @@ fun EduConnectApp() {
         notificacionesSel = emptyList()
         notificacionesNoLeidasSel = 0L
         mostrarNotificaciones = false
+        comunicadosPorHijoSel = emptyMap()
     }
 
 
@@ -1863,27 +1934,8 @@ fun EduConnectApp() {
                         try {
                             // 1 petición: comunicados del hijo con su estado de lectura y adjunto
                             val respuesta = obtenerComunicadosHijo(hijo.id)
-                            adjuntosComunicadoSel = respuesta.comunicados
-                                .mapNotNull { c -> c.archivo?.let { c.id to it } }.toMap()
-                            // Más recientes primero; luego los no leídos arriba (sortedBy es estable)
-                            comunicadosPadreSel = respuesta.comunicados
-                                .sortedByDescending { aFechaHoraLocal(it.enviadoEn) }
-                                .map { c ->
-                                    ComunicadoPadreItem(
-                                        id = c.id,
-                                        asunto = c.asunto,
-                                        mensaje = c.mensaje,
-                                        fecha = fechaLocal(c.enviadoEn),
-                                        hora = horaLocal(c.enviadoEn),
-                                        docenteNombre = c.docente,
-                                        gradoNombre = hijo.gradoNombre,
-                                        seccionNombre = hijo.seccionNombre,
-                                        cursoNombre = c.curso ?: "General",
-                                        leido = c.leido,
-                                        leidoEn = isoLocalSinZona(c.leidoEn)
-                                    )
-                                }.sortedBy { it.leido }
-                            comunicadosHijoCargadoDe = hijo.id
+                            comunicadosPorHijoSel = comunicadosPorHijoSel + (hijo.id to respuesta.comunicados)
+                            aplicarComunicadosHijo(hijo, respuesta.comunicados)
                         } catch (e: kotlinx.coroutines.CancellationException) {
                             throw e
                         } catch (e: Exception) { aviso("Error: ${e.message}") }
@@ -2096,6 +2148,9 @@ fun EduConnectApp() {
                     // Tareas y exámenes: "Matemáticas · 2do Grado Sec. A · Carlos"
                     val contexto = if (n.tipo == "PUBLICACION" || n.tipo == "CALIFICACION")
                         contextoPublicacion(n.referenciaId) else null
+                    // Comunicados: "Comunicación · 1er Sec. A · Pedro" ("General" si no tiene curso)
+                    val contextoCom = if (n.tipo == "COMUNICADO") contextoComunicado(n.referenciaId) else null
+                    val cursoCom = contextoCom?.second?.curso ?: "General"
                     NotificacionItem(
                         id = n.id,
                         tipo = n.tipo,
@@ -2103,12 +2158,15 @@ fun EduConnectApp() {
                         // El backend envía "Curso - Entrega: dd/MM/yyyy"; el curso ya va en la línea azul
                         mensaje = contexto?.let { (_, publicacion) ->
                             n.mensaje.removePrefix("${publicacion.curso} - ").removePrefix("${publicacion.curso}: ")
-                        } ?: n.mensaje,
+                        } ?: contextoCom?.let { n.mensaje.removePrefix("$cursoCom - ").removePrefix("$cursoCom: ") }
+                        ?: n.mensaje,
                         fecha = fechaLocal(n.createdAt),
                         hora = horaLocal(n.createdAt),
                         leida = n.leida,
                         detalle = contexto?.let { (hijo, publicacion) ->
                             "${publicacion.curso} · ${hijo.gradoNombre} Sec. ${hijo.seccionNombre} · ${hijo.nombres}"
+                        } ?: contextoCom?.let { (hijo, _) ->
+                            "$cursoCom · ${hijo.gradoNombre} Sec. ${hijo.seccionNombre} · ${hijo.nombres}"
                         } ?: ""
                     )
                 },
@@ -2136,6 +2194,8 @@ fun EduConnectApp() {
                     val notificacion = notificacionesSel.find { it.id == item.id }
                     if (item.tipo == "PUBLICACION" || item.tipo == "CALIFICACION") {
                         abrirPublicacionDeNotificacion(notificacion?.referenciaId)   // directo al detalle
+                    } else if (item.tipo == "COMUNICADO") {
+                        abrirComunicadoDeNotificacion(notificacion?.referenciaId)    // directo al comunicado
                     } else {
                         irAModuloDeNotificacion(item.tipo)
                     }
