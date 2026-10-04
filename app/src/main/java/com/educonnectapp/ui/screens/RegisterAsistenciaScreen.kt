@@ -1,22 +1,12 @@
 package com.educonnectapp.ui.screens
 
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -27,17 +17,13 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateMapOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -50,33 +36,23 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.educonnectapp.R
-import com.educonnectapp.ui.theme.AccentOrange
-import com.educonnectapp.ui.theme.BackgroundLight
-import com.educonnectapp.ui.theme.BackgroundStatusOrangeLight
-import com.educonnectapp.ui.theme.BackgroundWhite
-import com.educonnectapp.ui.theme.BorderBlue
-import com.educonnectapp.ui.theme.BorderLight
-import com.educonnectapp.ui.theme.BorderOrange
-import com.educonnectapp.ui.theme.EduConnectAppTheme
-import com.educonnectapp.ui.theme.EduconnectBlue
-import com.educonnectapp.ui.theme.Roboto
-import com.educonnectapp.ui.theme.TextBlue
-import com.educonnectapp.ui.theme.TextOrange
-import com.educonnectapp.ui.theme.TextSecondary
-import com.educonnectapp.ui.theme.TextWhite
+import com.educonnectapp.ui.theme.*
+import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import java.util.TimeZone
 
 private val AsistenciaVerde      = Color(0xFF26C281)
 private val FaltaRojo            = Color(0xFFE53935)
 private val TardanzaAmarillo     = Color(0xFFF59E0B)
-private val BgVerdeClaro         = Color(0xFFE8F8F2)   // fondo fila presente
-private val BgRojoClaro          = Color(0xFFFDECEC)   // fondo fila falta
-private val BgAmarilloClaro      = Color(0xFFFFF8E1)   // fondo fila tardanza
 private val BorderVerdePresente  = Color(0xFF26C281)
 private val BorderRojoFalta      = Color(0xFFE53935)
 private val BorderAmarilloTard   = Color(0xFFF59E0B)
+
+// Horas que el docente tiene para editar la asistencia desde este módulo (desde que la registró)
+private const val HORAS_EDICION = 12
 
 data class AlumnoItem(
     val id: Long,
@@ -87,6 +63,44 @@ data class AlumnoItem(
 // "Apellidos, Nombres"; si el backend solo envía el nombre completo, lo muestra tal cual
 fun nombreAlumno(apellidos: String, nombres: String): String =
     listOf(apellidos, nombres).filter { it.isNotBlank() }.joinToString(", ")
+
+// Cada toque pasa al siguiente estado: (sin marcar) -> A -> T -> F -> A ...
+private fun siguienteEstadoAsistencia(estado: String): String = when (estado) {
+    "A" -> "T"
+    "T" -> "F"
+    else -> "A"
+}
+
+private fun colorEstadoAsistencia(estado: String): Color? = when (estado) {
+    "A" -> AsistenciaVerde
+    "T" -> TardanzaAmarillo
+    "F" -> FaltaRojo
+    else -> null
+}
+
+// Las fechas y horas de la asistencia son de Perú (el backend trabaja en America/Lima),
+// aunque el celular tenga otra zona horaria configurada
+private val ZONA_PERU: TimeZone = TimeZone.getTimeZone("America/Lima")
+
+private fun formatoPeru(patron: String) =
+    SimpleDateFormat(patron, Locale("es", "PE")).apply { timeZone = ZONA_PERU }
+
+// Momento del registro: fecha de la hoja ("yyyy-MM-dd") + hora ("HH:mm:ss"). null si no se puede calcular.
+private fun momentoRegistro(fecha: String, hora: String?): Date? {
+    if (fecha.isBlank() || hora.isNullOrBlank()) return null
+    return try {
+        val hhmmss = if (hora.length >= 8) hora.take(8) else hora.take(5) + ":00"   // "HH:mm:ss" o "HH:mm"
+        formatoPeru("yyyy-MM-dd HH:mm:ss").parse("$fecha $hhmmss")
+    } catch (e: Exception) { null }
+}
+
+// Límite para editar: registro + 12 h, pero nunca después del fin del día de la clase (23:59)
+private fun limiteEdicion(registro: Date?, fecha: String): Date? {
+    if (registro == null) return null
+    val masDoce = Calendar.getInstance(ZONA_PERU).apply { time = registro; add(Calendar.HOUR_OF_DAY, HORAS_EDICION) }.time
+    val finDelDia = try { formatoPeru("yyyy-MM-dd HH:mm:ss").parse("$fecha 23:59:59") } catch (e: Exception) { null }
+    return if (finDelDia != null && finDelDia.before(masDoce)) finDelDia else masDoce
+}
 
 @Composable
 fun RegistroAsistenciaScreen(
@@ -99,6 +113,9 @@ fun RegistroAsistenciaScreen(
     curso: String,
     listaAlumnos: List<AlumnoItem> = emptyList(),
     asistenciaPrevia: Map<Long, String> = emptyMap(),
+    horaRegistro: String? = null,        // "HH:mm:ss" de la asistencia de hoy (null si aún no se registra)
+    fechaHoja: String = "",              // "yyyy-MM-dd" de la hoja (fecha del servidor)
+    cargando: Boolean = false,
     onBack: () -> Unit = {},
     onHomeDocente: () -> Unit = {},
     onAlumnos: () -> Unit = {},
@@ -107,34 +124,77 @@ fun RegistroAsistenciaScreen(
     onNotificaciones: () -> Unit = {},
     onGuardado: (presentes: Int, ausentes: Int, tardanzas: Int, estados: Map<Long, String>, hora: String, fecha: String) -> Unit = { _, _, _, _, _, _ -> }
 ) {
-    val fechaHoy = remember {
-        SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+    // Fecha de la clase: la de la hoja del servidor (si aún no llega, la de hoy en Perú)
+    val fechaHoy = fechaHoja.ifBlank { formatoPeru("yyyy-MM-dd").format(Date()) }
+    val fechaDisplay = remember(fechaHoy) {
+        try {
+            formatoPeru("EEEE dd 'de' MMMM yyyy").format(formatoPeru("yyyy-MM-dd").parse(fechaHoy)!!)
+                .replaceFirstChar { it.uppercase() }
+        } catch (e: Exception) { fechaHoy }
     }
-    val fechaDisplay = remember {
-        SimpleDateFormat("EEEE dd 'de' MMMM yyyy", Locale("es", "PE"))
-            .format(Date()).replaceFirstChar { it.uppercase() }
-    }
+    // Fecha y hora del aviso, con el mismo formato en ambas filas: "Sáb 03/10/2026 · 07:12 p. m."
+    val formatoFechaHora = remember { formatoPeru("EEE dd/MM/yyyy · hh:mm a") }
+    fun fechaHoraTexto(d: Date) = formatoFechaHora.format(d).replaceFirstChar { it.uppercase() }
 
     val estadoAsistencia = remember { mutableStateMapOf<Long, String>() }
     val context = LocalContext.current
 
-    // Estados para los dialogs del flujo de 3 pasos
+    // Diálogos: confirmación -> guardando
     var mostrarDialogConfirmacion by remember { mutableStateOf(false) }
     var mostrarDialogCargando by remember { mutableStateOf(false) }
 
-    // Precargar estados si hay asistencia previa
+    val hayAsistenciaPrevia = asistenciaPrevia.isNotEmpty()
+
+    // MODO: con asistencia ya registrada, la lista queda bloqueada hasta presionar "Editar asistencia"
+    var editando by remember { mutableStateOf(false) }
+
+    // Reloj: se revisa cada minuto si todavía está dentro del plazo de edición
+    var ahora by remember { mutableStateOf(Date()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(60_000)
+            ahora = Date()
+        }
+    }
+    val registro = remember(horaRegistro, fechaHoy) { momentoRegistro(fechaHoy, horaRegistro) }
+    val limite = remember(registro, fechaHoy) { limiteEdicion(registro, fechaHoy) }
+    val dentroDelPlazo = limite == null || ahora.before(limite)
+
+    // Precargar estados si hay asistencia previa (también al cancelar la edición)
+    fun restaurarPrevia() {
+        estadoAsistencia.clear()
+        estadoAsistencia.putAll(asistenciaPrevia)
+    }
     LaunchedEffect(asistenciaPrevia) {
-        if (asistenciaPrevia.isNotEmpty()) {
-            estadoAsistencia.clear()
-            estadoAsistencia.putAll(asistenciaPrevia)
+        if (hayAsistenciaPrevia) {
+            restaurarPrevia()
+            editando = false
         }
     }
 
-    // Efecto para el loading: espera 2 segundos y luego navega
+    // Si vence el plazo mientras edita, se cancela la edición
+    LaunchedEffect(dentroDelPlazo) {
+        if (!dentroDelPlazo && editando) {
+            restaurarPrevia()
+            editando = false
+            Toast.makeText(context, "Terminó el plazo de edición ($HORAS_EDICION h)", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    fun cancelarEdicion() {
+        restaurarPrevia()
+        editando = false
+    }
+    BackHandler(enabled = editando) { cancelarEdicion() }
+
+    // Se puede tocar la lista: registro nuevo, o edición activa
+    val editable = !hayAsistenciaPrevia || editando
+
+    // Espera 2 segundos (popup "Guardando...") y entrega los estados a MainActivity
     LaunchedEffect(mostrarDialogCargando) {
         if (mostrarDialogCargando) {
-            val horaActual = SimpleDateFormat("hh:mm a", Locale("es", "PE")).format(Date())
-            kotlinx.coroutines.delay(2000)
+            val horaActual = formatoPeru("hh:mm a").format(Date())
+            delay(2000)
             mostrarDialogCargando = false
             onGuardado(
                 estadoAsistencia.values.count { it == "A" },
@@ -147,14 +207,11 @@ fun RegistroAsistenciaScreen(
         }
     }
 
-    val hayAsistenciaPrevia = asistenciaPrevia.isNotEmpty()
-
     // Forzar que Compose observe TODOS los cambios del map (size + values)
     val snapshotEstados = estadoAsistencia.toMap()
 
     val huboCambios = hayAsistenciaPrevia &&
-            snapshotEstados.any { (id, estado) -> asistenciaPrevia[id] != estado } ||
-            (hayAsistenciaPrevia && listaAlumnos.any { snapshotEstados[it.id] != asistenciaPrevia[it.id] })
+            listaAlumnos.any { (snapshotEstados[it.id] ?: "") != (asistenciaPrevia[it.id] ?: "") }
 
     val totalAlumnos = listaAlumnos.size
     val presentes  = snapshotEstados.values.count { it == "A" }
@@ -174,19 +231,9 @@ fun RegistroAsistenciaScreen(
     if (mostrarDialogConfirmacion) {
         AlertDialog(
             onDismissRequest = { mostrarDialogConfirmacion = false },
-            icon = {
-                Image(
-                    painter = painterResource(id = R.drawable.save_white),
-                    contentDescription = null,
-                    modifier = Modifier
-                        .size(44.dp)
-                        .background(AccentOrange, RoundedCornerShape(22.dp))
-                        .padding(10.dp)
-                )
-            },
             title = {
                 Text(
-                    text = "¿Confirmar registro?",
+                    text = if (hayAsistenciaPrevia) "¿Confirmar cambios?" else "¿Confirmar registro?",
                     fontFamily = Roboto,
                     fontWeight = FontWeight.Bold,
                     fontSize = 18.sp,
@@ -202,7 +249,6 @@ fun RegistroAsistenciaScreen(
                     Text(
                         text = "Revisa el resumen antes de guardar:",
                         fontFamily = Roboto,
-                        fontWeight = FontWeight.Normal,
                         fontSize = 14.sp,
                         color = TextSecondary,
                         textAlign = TextAlign.Center
@@ -211,83 +257,13 @@ fun RegistroAsistenciaScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        // Presentes
-                        Column(
-                            modifier = Modifier
-                                .weight(1f)
-                                .background(Color(0xFFE8F8F2), RoundedCornerShape(10.dp))
-                                .border(1.5.dp, AsistenciaVerde, RoundedCornerShape(10.dp))
-                                .padding(vertical = 12.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Text(
-                                text = "$presentes",
-                                fontFamily = Roboto,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 24.sp,
-                                color = AsistenciaVerde
-                            )
-                            Text(
-                                text = "Presentes",
-                                fontFamily = Roboto,
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 12.sp,
-                                color = AsistenciaVerde
-                            )
-                        }
-                        // Tardanzas
-                        Column(
-                            modifier = Modifier
-                                .weight(1f)
-                                .background(Color(0xFFFFF8E1), RoundedCornerShape(10.dp))
-                                .border(1.5.dp, TardanzaAmarillo, RoundedCornerShape(10.dp))
-                                .padding(vertical = 12.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Text(
-                                text = "$tardanzas",
-                                fontFamily = Roboto,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 24.sp,
-                                color = TardanzaAmarillo
-                            )
-                            Text(
-                                text = "Tardanzas",
-                                fontFamily = Roboto,
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 12.sp,
-                                color = TardanzaAmarillo
-                            )
-                        }
-                        // Ausentes
-                        Column(
-                            modifier = Modifier
-                                .weight(1f)
-                                .background(Color(0xFFFDECEC), RoundedCornerShape(10.dp))
-                                .border(1.5.dp, FaltaRojo, RoundedCornerShape(10.dp))
-                                .padding(vertical = 12.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Text(
-                                text = "$ausentes",
-                                fontFamily = Roboto,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 24.sp,
-                                color = FaltaRojo
-                            )
-                            Text(
-                                text = "Ausentes",
-                                fontFamily = Roboto,
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 12.sp,
-                                color = FaltaRojo
-                            )
-                        }
+                        ConteoResumen(presentes, "Presentes", AsistenciaVerde, Modifier.weight(1f))
+                        ConteoResumen(tardanzas, "Tardanzas", TardanzaAmarillo, Modifier.weight(1f))
+                        ConteoResumen(ausentes, "Ausentes", FaltaRojo, Modifier.weight(1f))
                     }
                     Text(
                         text = "Total: $totalAlumnos alumnos",
                         fontFamily = Roboto,
-                        fontWeight = FontWeight.Normal,
                         fontSize = 13.sp,
                         color = TextSecondary
                     )
@@ -379,7 +355,7 @@ fun RegistroAsistenciaScreen(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 IconButton(
-                    onClick = onBack,
+                    onClick = { if (editando) cancelarEdicion() else onBack() },
                     modifier = Modifier.size(32.dp).offset(x = (-5).dp)
                 ) {
                     Image(
@@ -390,7 +366,8 @@ fun RegistroAsistenciaScreen(
                 }
                 Column {
                     Text(
-                        text = "Registro de Asistencia", fontFamily = Roboto,
+                        text = if (editando) "Editar Asistencia" else "Registro de Asistencia",
+                        fontFamily = Roboto,
                         fontWeight = FontWeight.Bold, fontSize = 20.sp, color = TextWhite
                     )
                     Text(
@@ -448,245 +425,155 @@ fun RegistroAsistenciaScreen(
                 }
             }
 
-            // AVISO si hay asistencia previa
+            // AVISO si ya se registró: fecha y hora del registro y hasta cuándo se puede editar
             if (hayAsistenciaPrevia) {
+                val bloqueada = !dentroDelPlazo
+                val titulo = when {
+                    editando -> "Editando asistencia"
+                    bloqueada -> "Asistencia registrada · edición cerrada"
+                    else -> "¡Asistencia registrada!"
+                }
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(BackgroundStatusOrangeLight, RoundedCornerShape(8.dp))
-                        .border(1.dp, BorderOrange, RoundedCornerShape(8.dp))
+                        .background(
+                            if (bloqueada) BackgroundWhite else BackgroundStatusOrangeLight,
+                            RoundedCornerShape(8.dp)
+                        )
+                        .border(1.dp, if (bloqueada) BorderLight else BorderOrange, RoundedCornerShape(8.dp))
                         .padding(horizontal = 12.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Image(
-                        painter = painterResource(id = R.drawable.checklist_orange),
+                        painter = painterResource(id = if (bloqueada) R.drawable.clock_darkgray else R.drawable.checklist_orange),
                         contentDescription = null,
                         modifier = Modifier.size(30.dp)
                     )
-                    Text(
-                        text = "¡Asistencia Registrada!. Puedes modificar el estado de algún alumno.",
-                        fontFamily = Roboto, fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold, color = TextOrange
-                    )
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(
+                            text = titulo,
+                            fontFamily = Roboto, fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (bloqueada) TextBlue else TextOrange
+                        )
+                        registro?.let { FilaAviso("Registrada:", fechaHoraTexto(it), TextBlue) }
+                        limite?.let {
+                            FilaAviso(
+                                "Editable hasta:",
+                                fechaHoraTexto(it),
+                                if (bloqueada) TextSecondary else TextOrange
+                            )
+                        }
+                        if (bloqueada) {
+                            Text(
+                                text = "Para corregirla usa el Historial de asistencias.",
+                                fontFamily = Roboto, fontSize = 13.sp,
+                                color = TextSecondary
+                            )
+                        }
+                    }
                 }
             }
 
-            // ACCIONES RÁPIDAS: checkboxes Marcar todos / Limpiar todo
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Checkbox: Marcar todos presentes
+            // ACCIONES RÁPIDAS (solo si se puede editar)
+            if (editable) {
                 Row(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clickable {
-                            if (todosPresentes) {
-                                estadoAsistencia.clear()
-                            } else {
-                                listaAlumnos.forEach { estadoAsistencia[it.id] = "A" }
-                            }
-                        },
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(1.dp)
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Checkbox(
-                        checked = todosPresentes,
-                        onCheckedChange = {
-                            if (todosPresentes) estadoAsistencia.clear()
-                            else listaAlumnos.forEach { estadoAsistencia[it.id] = "A" }
-                        },
-                        colors = CheckboxDefaults.colors(
-                            checkedColor = AsistenciaVerde,
-                            uncheckedColor = BorderBlue
+                    // Marcar todos presentes
+                    Row(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable {
+                                if (todosPresentes) {
+                                    if (hayAsistenciaPrevia) restaurarPrevia() else estadoAsistencia.clear()
+                                } else {
+                                    listaAlumnos.forEach { estadoAsistencia[it.id] = "A" }
+                                }
+                            },
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(1.dp)
+                    ) {
+                        Checkbox(
+                            checked = todosPresentes,
+                            onCheckedChange = {
+                                if (todosPresentes) {
+                                    if (hayAsistenciaPrevia) restaurarPrevia() else estadoAsistencia.clear()
+                                } else listaAlumnos.forEach { estadoAsistencia[it.id] = "A" }
+                            },
+                            colors = CheckboxDefaults.colors(
+                                checkedColor = AsistenciaVerde,
+                                uncheckedColor = BorderBlue
+                            )
                         )
-                    )
-                    Text(
-                        text = "Presentes",
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 15.sp,
-                        color = if (todosPresentes) AsistenciaVerde else TextBlue
-                    )
-                }
+                        Text(
+                            text = "Presentes",
+                            fontFamily = Roboto,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 15.sp,
+                            color = if (todosPresentes) AsistenciaVerde else TextBlue
+                        )
+                    }
 
-                // Checkbox: Limpiar todo
-                Row(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clickable(enabled = hayAlgunMarcado) {
-                            estadoAsistencia.clear()
-                        },
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(1.dp)
-                ) {
-                    Checkbox(
-                        checked = false,
-                        onCheckedChange = {
-                            estadoAsistencia.clear()
-                        },
-                        enabled = hayAlgunMarcado,
-                        colors = CheckboxDefaults.colors(
-                            uncheckedColor = if (hayAlgunMarcado) FaltaRojo else BorderLight
-                        )
-                    )
-                    Text(
-                        text = "Limpiar",
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 15.sp,
-                        color = if (hayAlgunMarcado) FaltaRojo else TextSecondary
-                    )
+                    // Limpiar (solo en un registro nuevo; al editar no se puede dejar alumnos sin estado)
+                    if (!hayAsistenciaPrevia) {
+                        Row(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable(enabled = hayAlgunMarcado) { estadoAsistencia.clear() },
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(1.dp)
+                        ) {
+                            Checkbox(
+                                checked = false,
+                                onCheckedChange = { estadoAsistencia.clear() },
+                                enabled = hayAlgunMarcado,
+                                colors = CheckboxDefaults.colors(
+                                    uncheckedColor = if (hayAlgunMarcado) FaltaRojo else BorderLight
+                                )
+                            )
+                            Text(
+                                text = "Limpiar",
+                                fontFamily = Roboto,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 15.sp,
+                                color = if (hayAlgunMarcado) FaltaRojo else TextSecondary
+                            )
+                        }
+                    } else {
+                        Spacer(modifier = Modifier.weight(1f))
+                    }
                 }
             }
 
             // LISTA SCROLLEABLE
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                listaAlumnos.forEachIndexed { index, alumno ->
-                    val estado = estadoAsistencia[alumno.id] ?: ""
-
-                    val filaBorder = when (estado) {
-                        "A" -> BorderVerdePresente
-                        "F" -> BorderRojoFalta
-                        "T" -> BorderAmarilloTard
-                        else -> BorderBlue
-                    }
-
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(BackgroundWhite, RoundedCornerShape(10.dp))
-                            .border(1.5.dp, filaBorder, RoundedCornerShape(10.dp))
-                            .padding(horizontal = 14.dp, vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Image(
-                            painter = painterResource(
-                                id = when (estado) {
-                                    "A"  -> R.drawable.user_blue_check
-                                    "F"  -> R.drawable.user_blue_cross
-                                    "T"  -> R.drawable.user_alert
-                                    else -> R.drawable.user_grey
-                                }
-                            ),
-                            contentDescription = when (estado) {
-                                "A"  -> "Presente"
-                                "F"  -> "Falta"
-                                "T"  -> "Tardanza"
-                                else -> "Sin marcar"
-                            },
-                            modifier = Modifier.size(25.dp)
+            if (cargando && listaAlumnos.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxWidth().weight(1f),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(color = EduconnectBlue)
+                }
+            } else {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    listaAlumnos.forEachIndexed { index, alumno ->
+                        val estado = estadoAsistencia[alumno.id] ?: ""
+                        FilaAsistencia(
+                            numero = index + 1,
+                            alumno = alumno,
+                            estado = estado,
+                            editable = editable,
+                            onCambiar = { estadoAsistencia[alumno.id] = siguienteEstadoAsistencia(estado) }
                         )
-
-                        Spacer(modifier = Modifier.width(10.dp))
-
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "${index + 1}. ${nombreAlumno(alumno.apellidos, alumno.nombres)}".uppercase(),
-                                fontFamily = Roboto,
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 13.sp,
-                                color = TextBlue,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.width(8.dp))
-
-                        // ── BOTÓN A ──
-                        Box(
-                            modifier = Modifier
-                                .size(width = 48.dp, height = 36.dp)
-                                .background(
-                                    if (estado == "A") AsistenciaVerde else BackgroundWhite,
-                                    RoundedCornerShape(8.dp)
-                                )
-                                .border(
-                                    1.5.dp,
-                                    if (estado == "A") AsistenciaVerde else BorderLight,
-                                    RoundedCornerShape(8.dp)
-                                )
-                                .clickable {
-                                    estadoAsistencia[alumno.id] = if (estado == "A") "" else "A"
-                                },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "A",
-                                fontFamily = Roboto,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 16.sp,
-                                color = if (estado == "A") TextWhite else TextSecondary
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.width(6.dp))
-
-                        // ── BOTÓN T ──
-                        Box(
-                            modifier = Modifier
-                                .size(width = 44.dp, height = 36.dp)
-                                .background(
-                                    if (estado == "T") TardanzaAmarillo else BackgroundWhite,
-                                    RoundedCornerShape(8.dp)
-                                )
-                                .border(
-                                    1.5.dp,
-                                    if (estado == "T") TardanzaAmarillo else BorderLight,
-                                    RoundedCornerShape(8.dp)
-                                )
-                                .clickable {
-                                    estadoAsistencia[alumno.id] = if (estado == "T") "" else "T"
-                                },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "T",
-                                fontFamily = Roboto,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 16.sp,
-                                color = if (estado == "T") TextWhite else TextSecondary
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.width(6.dp))
-
-                        // ── BOTÓN F ──
-                        Box(
-                            modifier = Modifier
-                                .size(width = 44.dp, height = 36.dp)
-                                .background(
-                                    if (estado == "F") FaltaRojo else BackgroundWhite,
-                                    RoundedCornerShape(8.dp)
-                                )
-                                .border(
-                                    1.5.dp,
-                                    if (estado == "F") FaltaRojo else BorderLight,
-                                    RoundedCornerShape(8.dp)
-                                )
-                                .clickable {
-                                    estadoAsistencia[alumno.id] = if (estado == "F") "" else "F"
-                                },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "F",
-                                fontFamily = Roboto,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 16.sp,
-                                color = if (estado == "F") TextWhite else TextSecondary
-                            )
-                        }
                     }
                 }
             }
@@ -724,44 +611,101 @@ fun RegistroAsistenciaScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // BOTÓN GUARDAR — ahora abre el dialog de confirmación
-            Button(
-                onClick = {
-                    if (!hayAsistenciaPrevia) {
-                        val sinMarcar = listaAlumnos.count { alumno ->
-                            (estadoAsistencia[alumno.id] ?: "").isEmpty()
-                        }
+            // BOTONES
+            when {
+                // 1) Registro nuevo
+                !hayAsistenciaPrevia -> Button(
+                    onClick = {
+                        val sinMarcar = listaAlumnos.count { (estadoAsistencia[it.id] ?: "").isEmpty() }
                         if (sinMarcar > 0) {
-                            Toast.makeText(
-                                context,
-                                "Faltan $sinMarcar alumno(s) por marcar",
-                                Toast.LENGTH_SHORT
-                            ).show()
-                            return@Button
+                            Toast.makeText(context, "Faltan $sinMarcar alumno(s) por marcar", Toast.LENGTH_SHORT).show()
+                        } else {
+                            mostrarDialogConfirmacion = true
                         }
+                    },
+                    modifier = Modifier.fillMaxWidth().height(54.dp),
+                    shape = RoundedCornerShape(28.dp),
+                    enabled = botonHabilitado && !cargando,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (botonHabilitado) AccentOrange else BorderLight
+                    )
+                ) {
+                    Image(
+                        painter = painterResource(id = R.drawable.save_white),
+                        contentDescription = null,
+                        modifier = Modifier.size(30.dp)
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        text = "Guardar y notificar",
+                        fontFamily = Roboto,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 20.sp,
+                        color = if (botonHabilitado) TextWhite else TextSecondary
+                    )
+                }
+
+                // 2) Editando: Cancelar + Actualizar
+                editando -> Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = { cancelarEdicion() },
+                        modifier = Modifier.weight(1f).height(54.dp),
+                        shape = RoundedCornerShape(28.dp)
+                    ) {
+                        Text(
+                            text = "Cancelar",
+                            fontFamily = Roboto,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 17.sp,
+                            color = EduconnectBlue
+                        )
                     }
-                    mostrarDialogConfirmacion = true
-                },
-                modifier = Modifier.fillMaxWidth().height(54.dp),
-                shape = RoundedCornerShape(28.dp),
-                enabled = botonHabilitado,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (botonHabilitado) AccentOrange else BorderLight
-                )
-            ) {
-                Image(
-                    painter = painterResource(id = R.drawable.save_white),
-                    contentDescription = null,
-                    modifier = Modifier.size(30.dp)
-                )
-                Spacer(modifier = Modifier.width(10.dp))
-                Text(
-                    text = if (hayAsistenciaPrevia) "Actualizar asistencia" else "Guardar y notificar",
-                    fontFamily = Roboto,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 20.sp,
-                    color = if (botonHabilitado) TextWhite else TextSecondary
-                )
+                    Button(
+                        onClick = {
+                            if (!dentroDelPlazo) {
+                                Toast.makeText(context, "Terminó el plazo de edición ($HORAS_EDICION h)", Toast.LENGTH_SHORT).show()
+                            } else {
+                                mostrarDialogConfirmacion = true
+                            }
+                        },
+                        enabled = botonHabilitado,
+                        modifier = Modifier.weight(1.5f).height(54.dp),
+                        shape = RoundedCornerShape(28.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (botonHabilitado) AccentOrange else BorderLight
+                        )
+                    ) {
+                        Text(
+                            text = "Actualizar",
+                            fontFamily = Roboto,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 18.sp,
+                            color = if (botonHabilitado) TextWhite else TextSecondary
+                        )
+                    }
+                }
+
+                // 3) Registrada y dentro del plazo: botón Editar asistencia
+                dentroDelPlazo -> Button(
+                    onClick = { editando = true },
+                    modifier = Modifier.fillMaxWidth().height(54.dp),
+                    shape = RoundedCornerShape(28.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = EduconnectBlue)
+                ) {
+                    Text(
+                        text = "Editar asistencia",
+                        fontFamily = Roboto,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 20.sp,
+                        color = TextWhite
+                    )
+                }
+
+                // 4) Registrada y fuera del plazo: sin botón (solo lectura)
+                else -> {}
             }
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -773,6 +717,145 @@ fun RegistroAsistenciaScreen(
             onAvisos = onAvisos,
             onPerfil = onPerfilDocente,
             itemActivo = "Alumnos"
+        )
+    }
+}
+
+// Conteo del popup de confirmación: solo número y texto, sin cuadro
+@Composable
+private fun ConteoResumen(valor: Int, texto: String, color: Color, modifier: Modifier) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = "$valor",
+            fontFamily = Roboto,
+            fontWeight = FontWeight.Bold,
+            fontSize = 28.sp,
+            color = color
+        )
+        Text(
+            text = texto,
+            fontFamily = Roboto,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 13.sp,
+            color = color
+        )
+    }
+}
+
+// Fila "Etiqueta:  valor" del aviso; la etiqueta tiene ancho fijo para que ambas filas queden alineadas
+@Composable
+private fun FilaAviso(etiqueta: String, valor: String, colorValor: Color) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            text = etiqueta,
+            fontFamily = Roboto,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 14.sp,
+            color = TextSecondary,
+            modifier = Modifier.width(112.dp)
+        )
+        Text(
+            text = valor,
+            fontFamily = Roboto,
+            fontWeight = FontWeight.Bold,
+            fontSize = 14.sp,
+            color = colorValor
+        )
+    }
+}
+
+// Fila de un alumno: ícono + nombre completo + un solo botón de estado (A / T / F)
+@Composable
+private fun FilaAsistencia(
+    numero: Int,
+    alumno: AlumnoItem,
+    estado: String,
+    editable: Boolean,
+    onCambiar: () -> Unit
+) {
+    val filaBorder = when (estado) {
+        "A" -> BorderVerdePresente
+        "F" -> BorderRojoFalta
+        "T" -> BorderAmarilloTard
+        else -> BorderBlue
+    }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(BackgroundWhite, RoundedCornerShape(10.dp))
+            .border(1.5.dp, filaBorder.copy(alpha = if (editable) 1f else 0.6f), RoundedCornerShape(10.dp))
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Image(
+            painter = painterResource(
+                id = when (estado) {
+                    "A"  -> R.drawable.user_blue_check
+                    "F"  -> R.drawable.user_blue_cross
+                    "T"  -> R.drawable.user_alert
+                    else -> R.drawable.user_grey
+                }
+            ),
+            contentDescription = when (estado) {
+                "A"  -> "Presente"
+                "F"  -> "Falta"
+                "T"  -> "Tardanza"
+                else -> "Sin marcar"
+            },
+            modifier = Modifier.size(25.dp)
+        )
+
+        Spacer(modifier = Modifier.width(10.dp))
+
+        Text(
+            text = "$numero. ${nombreAlumno(alumno.apellidos, alumno.nombres)}".uppercase(),
+            fontFamily = Roboto,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 13.sp,
+            color = TextBlue,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f)
+        )
+
+        Spacer(modifier = Modifier.width(8.dp))
+
+        BotonEstadoAsistencia(estado = estado, editable = editable, onClick = onCambiar)
+    }
+}
+
+// Un solo botón que cambia de estado con cada toque. Muestra solo la letra con el color del estado.
+// Bloqueado: mismo color, pero más suave y sin respuesta al toque.
+@Composable
+private fun BotonEstadoAsistencia(estado: String, editable: Boolean, onClick: () -> Unit) {
+    val color = colorEstadoAsistencia(estado)
+    val fondo = when {
+        color == null -> BackgroundWhite
+        editable -> color
+        else -> color.copy(alpha = 0.15f)
+    }
+    Box(
+        modifier = Modifier
+            .size(width = 52.dp, height = 38.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(fondo)
+            .border(1.5.dp, color ?: BorderLight, RoundedCornerShape(8.dp))
+            .clickable(enabled = editable) { onClick() },
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = if (estado.isEmpty()) "–" else estado,
+            fontFamily = Roboto,
+            fontWeight = FontWeight.Bold,
+            fontSize = 17.sp,
+            color = when {
+                color == null -> TextSecondary
+                editable -> TextWhite
+                else -> color
+            }
         )
     }
 }
@@ -794,11 +877,9 @@ fun RegistroAsistenciaPreview() {
                 AlumnoItem(2L, "Pedro", "Sanchez Vega"),
                 AlumnoItem(3L, "Maria", "Sanchez Vela")
             ),
-            asistenciaPrevia = mapOf(
-                1L to "A",
-                2L to "F",
-                3L to "A"
-            )
+            asistenciaPrevia = mapOf(1L to "A", 2L to "F", 3L to "T"),
+            horaRegistro = "08:05:00",
+            fechaHoja = "2026-10-03"
         )
     }
 }

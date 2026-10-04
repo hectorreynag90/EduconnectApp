@@ -53,9 +53,24 @@ import com.educonnectapp.ui.theme.TextWhite
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.TimeZone
 
 private val ConfirmRed       = Color(0xFFE53935)
 private val TardanzaAmarillo = Color(0xFFFF4625)
+
+// Alumno cuya asistencia se cambió al actualizar (estados "A", "T" o "F")
+data class CambioAsistenciaItem(
+    val alumno: String,
+    val estadoAnterior: String,
+    val estadoNuevo: String
+)
+
+private fun colorLetraAsistencia(estado: String): Color = when (estado) {
+    "A" -> Color(0xFF26C281)
+    "T" -> Color(0xFFF59E0B)
+    "F" -> ConfirmRed
+    else -> TextSecondary
+}
 
 @Composable
 fun ConfirmacionAsistenciaScreen(
@@ -66,20 +81,29 @@ fun ConfirmacionAsistenciaScreen(
     totalPresentes: Int,
     totalAusentes: Int,
     totalTardanzas: Int = 0,
+    fecha: String = "",                                   // "yyyy-MM-dd" de la hoja (servidor)
+    esActualizacion: Boolean = false,                     // true si se editó una asistencia ya registrada
+    cambios: List<CambioAsistenciaItem> = emptyList(),    // solo en actualización
     onNuevaAsistencia: () -> Unit = {},
     onVerHistorial: () -> Unit = {},
     onClose: () -> Unit = {}
 ) {
-    val totalNotificados = totalPresentes + totalAusentes + totalTardanzas
+    // Al actualizar solo se notifica a los padres de los alumnos que cambiaron
+    val totalNotificados = if (esActualizacion) cambios.size
+    else totalPresentes + totalAusentes + totalTardanzas
 
-    val fechaDisplay = remember {
-        SimpleDateFormat("EEEE, dd 'de' MMMM yyyy", Locale("es", "PE"))
-            .format(Date())
-            .replaceFirstChar { it.uppercase() }
+    // Fecha y hora de Perú (aunque el celular tenga otra zona horaria)
+    val zonaPeru = remember { TimeZone.getTimeZone("America/Lima") }
+    val fechaDisplay = remember(fecha) {
+        val formato = SimpleDateFormat("EEEE, dd 'de' MMMM yyyy", Locale("es", "PE")).apply { timeZone = zonaPeru }
+        val dia = try {
+            SimpleDateFormat("yyyy-MM-dd", Locale.US).apply { timeZone = zonaPeru }.parse(fecha)
+        } catch (e: Exception) { null } ?: Date()
+        formato.format(dia).replaceFirstChar { it.uppercase() }
     }
 
     val horaDisplay = remember {
-        SimpleDateFormat("hh:mma", Locale.getDefault()).format(Date())
+        SimpleDateFormat("hh:mma", Locale.getDefault()).apply { timeZone = zonaPeru }.format(Date())
     }
 
     Column(
@@ -153,22 +177,22 @@ fun ConfirmacionAsistenciaScreen(
             // ÍCONO CHECK VERDE
             Box(
                 modifier = Modifier
-                    .size(100.dp),
+                    .size(80.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Image(
                     painter = painterResource(id = R.drawable.checkcircle_green),
                     contentDescription = null,
-                    modifier = Modifier.size(95.dp)
+                    modifier = Modifier.size(85.dp)
                 )
             }
 
             // TÍTULO
             Text(
-                text = "¡Asistencia Registrada!",
+                text = if (esActualizacion) "¡Asistencia Actualizada!" else "¡Asistencia Registrada!",
                 fontFamily = Roboto,
                 fontWeight = FontWeight.Bold,
-                fontSize = 24.sp,
+                fontSize = 21.sp,
                 color = ConfirmGreen,
                 textAlign = TextAlign.Center
             )
@@ -181,25 +205,25 @@ fun ConfirmacionAsistenciaScreen(
                 Image(
                     painter = painterResource(id = R.drawable.users_darkgray),
                     contentDescription = null,
-                    modifier = Modifier.size(24.dp)
+                    modifier = Modifier.size(22.dp)
                 )
                 Text(
-                    text = "$totalNotificados padres notificados -",
+                    text = "$totalNotificados " + (if (totalNotificados == 1) "padre notificado" else "padres notificados") + " -",
                     fontFamily = Roboto,
                     fontWeight = FontWeight.Medium,
-                    fontSize = 16.sp,
+                    fontSize = 15.sp,
                     color = TextSecondary
                 )
                 Image(
                     painter = painterResource(id = R.drawable.clock_darkgray),
                     contentDescription = null,
-                    modifier = Modifier.size(24.dp)
+                    modifier = Modifier.size(22.dp)
                 )
                 Text(
                     text = horaDisplay,
                     fontFamily = Roboto,
                     fontWeight = FontWeight.Medium,
-                    fontSize = 16.sp,
+                    fontSize = 14.sp,
                     color = TextSecondary
                 )
             }
@@ -219,7 +243,6 @@ fun ConfirmacionAsistenciaScreen(
                     fontWeight = FontWeight.Bold,
                     fontSize = 14.sp,
                     color = TextBlue,
-                    letterSpacing = 1.sp
                 )
 
                 HorizontalDivider(
@@ -280,9 +303,61 @@ fun ConfirmacionAsistenciaScreen(
                 FilaRegistro(
                     iconRes = R.drawable.users_darkgray,
                     label = "Notificados",
-                    valor = "$totalNotificados padres",
+                    valor = "$totalNotificados " + if (totalNotificados == 1) "padre" else "padres",
                     colorValor = TextPrimary
                 )
+
+                // ALUMNOS ACTUALIZADOS (solo en actualización): estado anterior → nuevo
+                if (esActualizacion && cambios.isNotEmpty()) {
+                    HorizontalDivider(
+                        modifier = Modifier.padding(vertical = 4.dp),
+                        thickness = 2.dp,
+                        color = DividerColor
+                    )
+                    Text(
+                        text = "ALUMNOS ACTUALIZADOS",
+                        fontFamily = Roboto,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp,
+                        color = TextBlue,
+                        letterSpacing = 1.sp
+                    )
+                    cambios.forEach { c ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = c.alumno,
+                                fontFamily = Roboto,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 14.sp,
+                                color = TextPrimary,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Text(
+                                text = c.estadoAnterior,
+                                fontFamily = Roboto,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 15.sp,
+                                color = colorLetraAsistencia(c.estadoAnterior)
+                            )
+                            Text(
+                                text = "  →  ",
+                                fontFamily = Roboto,
+                                fontSize = 15.sp,
+                                color = TextSecondary
+                            )
+                            Text(
+                                text = c.estadoNuevo,
+                                fontFamily = Roboto,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 15.sp,
+                                color = colorLetraAsistencia(c.estadoNuevo)
+                            )
+                        }
+                    }
+                }
             }
 
             //BOTÓN NUEVA ASISTENCIA
@@ -290,21 +365,21 @@ fun ConfirmacionAsistenciaScreen(
                 onClick = onNuevaAsistencia,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(54.dp),
+                    .height(45.dp),
                 shape = RoundedCornerShape(28.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = AccentOrange)
             ) {
                 Image(
                     painter = painterResource(id = R.drawable.gotoassistance_white),
                     contentDescription = null,
-                    modifier = Modifier.size(32.dp)
+                    modifier = Modifier.size(30.dp)
                 )
                 Spacer(modifier = Modifier.width(5.dp))
                 Text(
                     text = "Nueva Asistencia",
                     fontFamily = Roboto,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 20.sp,
+                    fontSize = 18.sp,
                     color = TextWhite
                 )
             }
@@ -324,7 +399,7 @@ fun ConfirmacionAsistenciaScreen(
                     text = "Ver Historial Asistencias",
                     fontFamily = Roboto,
                     fontWeight = FontWeight.SemiBold,
-                    fontSize = 18.sp,
+                    fontSize = 16.sp,
                     color = TextBlue
                 )
             }
@@ -347,7 +422,7 @@ fun FilaRegistro(
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
             modifier = Modifier.weight(1f)
         ) {
             Image(

@@ -20,6 +20,7 @@ import android.app.NotificationManager
 import android.os.Build
 
 
+import com.educonnectapp.ui.screens.CambioAsistenciaItem
 import com.educonnectapp.ui.screens.AgregarAsignacionScreen
 import com.educonnectapp.ui.screens.AlumnoEncontrado
 import com.educonnectapp.ui.screens.AsistenciasScreen
@@ -340,6 +341,9 @@ fun EduConnectApp() {
     var cursoIdPorNombre by remember { mutableStateOf<Map<String, Long>>(emptyMap()) }
     // Asistencias
     var fechaHojaSel by remember { mutableStateOf("") }   // fecha de la hoja cargada (servidor)
+    // Confirmación de asistencia: ¿fue actualización? y qué alumnos cambiaron
+    var esActualizacionAsistenciaSel by remember { mutableStateOf(false) }
+    var cambiosAsistenciaSel by remember { mutableStateOf<List<CambioAsistenciaItem>>(emptyList()) }
     var asistenciasHijoSel by remember { mutableStateOf<List<AsistenciaHijoResponse>>(emptyList()) }
     // Comunicados
     var enviandoComunicado by remember { mutableStateOf(false) }
@@ -566,6 +570,9 @@ fun EduConnectApp() {
                 notificacionesNoLeidasSel = bandeja.noLeidas
                 // Curso, grado y sección de las tareas/exámenes: salen de la agenda (1 petición por hijo, solo si no está cargada)
                 val hayPublicaciones = notificacionesSel.any { it.tipo == "PUBLICACION" || it.tipo == "CALIFICACION" }
+                // Si hay tareas/evaluaciones o entregas sin leer, la agenda cambió: se vuelve a pedir
+                val hayNuevas = notificacionesSel.any { !it.leida && (it.tipo == "PUBLICACION" || it.tipo == "CALIFICACION") }
+                if (hayNuevas) agendaCargada = false
                 if (hayPublicaciones && !agendaCargada) {
                     try { cargarAgendaPadre() } catch (e: Exception) { /* el panel se muestra sin ese dato */ }
                 }
@@ -1004,7 +1011,11 @@ fun EduConnectApp() {
 
                 Screen.REGISTRO_ASISTENCIA -> {
                     var asistenciaExistente by remember { mutableStateOf<Map<Long, String>>(emptyMap()) }
+                    // Hora del registro de hoy ("HH:mm:ss"): define el plazo de edición de 12 h
+                    var horaRegistroHoy by remember { mutableStateOf<String?>(null) }
+                    var cargandoHoja by remember { mutableStateOf(true) }
                     androidx.compose.runtime.LaunchedEffect(seccionIdSel, cursoIdSel) {
+                        cargandoHoja = true
                         try {
                             // 1 petición: alumnos de la sección + asistencia de hoy (si ya se registró)
                             val hoja = obtenerHojaAsistencia(seccionIdSel, cursoIdSel)
@@ -1015,9 +1026,17 @@ fun EduConnectApp() {
                             asistenciaExistente = if (hoja.yaRegistrado)
                                 hoja.alumnos.mapNotNull { a -> a.estado?.let { a.alumnoId to it } }.toMap()
                             else emptyMap()
+                            // La hora más temprana = cuando se registró la asistencia del día
+                            horaRegistroHoy = if (hoja.yaRegistrado)
+                                hoja.alumnos.mapNotNull { it.hora }.minOrNull()
+                            else null
                         } catch (e: kotlinx.coroutines.CancellationException) {
                             throw e
-                        } catch (e: Exception) { aviso("Error cargando alumnos: ${e.message}") }
+                        } catch (e: Exception) {
+                            aviso("Error cargando alumnos: ${e.message}")
+                        } finally {
+                            cargandoHoja = false
+                        }
                     }
                     RegistroAsistenciaScreen(
                         docenteId = usuarioLogueado?.id?.toString() ?: "",
@@ -1027,7 +1046,11 @@ fun EduConnectApp() {
                         grado = gradoSel,
                         seccion = seccionSel,
                         curso = cursoSel,
-                        listaAlumnos = listaAlumnosSel, asistenciaPrevia = asistenciaExistente,
+                        listaAlumnos = if (cargandoHoja) emptyList() else listaAlumnosSel,
+                        asistenciaPrevia = asistenciaExistente,
+                        horaRegistro = horaRegistroHoy,
+                        fechaHoja = fechaHojaSel,
+                        cargando = cargandoHoja,
                         onBack = { currentScreen = Screen.SELECCIONAR_SECCION },
                         onHomeDocente = { currentScreen = Screen.HOME_DOCENTE },
                         onAlumnos = {},
@@ -1039,19 +1062,25 @@ fun EduConnectApp() {
                             CoroutineScope(Dispatchers.Main).launch {
                                 try {
                                     if (esActualizacion) {
-                                        // Solo los alumnos cuyo estado cambió (el backend audita y avisa al director)
+                                        // Solo los alumnos cuyo estado cambió (el backend audita, avisa al director
+                                        // y notifica solo a los padres de esos alumnos)
                                         val cambios = estados.filter { (id, estado) ->
                                             estado.isNotEmpty() && asistenciaExistente[id] != estado
                                         }
-                                        if (cambios.isNotEmpty()) {
+                                        val respuesta = if (cambios.isNotEmpty())
                                             actualizarAsistenciaDia(
                                                 seccionIdSel, cursoIdSel, fechaHojaSel,
                                                 "Corrección desde el registro del día", cambios
                                             )
-                                        }
+                                        else null
+                                        cambiosAsistenciaSel = respuesta?.cambios?.map {
+                                            CambioAsistenciaItem(it.alumno, it.estadoAnterior, it.estadoNuevo)
+                                        } ?: emptyList()
                                     } else {
                                         registrarAsistencia(seccionIdSel, cursoIdSel, estados.filterValues { it.isNotEmpty() })
+                                        cambiosAsistenciaSel = emptyList()
                                     }
+                                    esActualizacionAsistenciaSel = esActualizacion
                                     // El backend ya envió el push a los padres: solo mostrar la confirmación
                                     presentesSel = presentes
                                     ausentesSel = ausentes
@@ -1075,6 +1104,9 @@ fun EduConnectApp() {
                     totalPresentes = presentesSel,
                     totalAusentes = ausentesSel,
                     totalTardanzas = tardanzasSel,
+                    fecha = fechaHojaSel,
+                    esActualizacion = esActualizacionAsistenciaSel,
+                    cambios = cambiosAsistenciaSel,
                     onNuevaAsistencia = { currentScreen = Screen.HOME_DOCENTE },
                     onVerHistorial = { currentScreen = Screen.SELECCIONAR_SECCION_HISTORIAL },
                     onClose = { currentScreen = Screen.HOME_DOCENTE }
@@ -2355,6 +2387,8 @@ fun EduConnectApp() {
                     mostrarNotificaciones = false
                     val notificacion = notificacionesSel.find { it.id == item.id }
                     if (item.tipo == "PUBLICACION" || item.tipo == "CALIFICACION") {
+                        // Entrega registrada: se recarga la agenda para ver el estado actualizado
+                        if (item.tipo == "CALIFICACION") agendaCargada = false
                         abrirPublicacionDeNotificacion(notificacion?.referenciaId)   // directo al detalle
                     } else if (item.tipo == "COMUNICADO") {
                         abrirComunicadoDeNotificacion(notificacion?.referenciaId)    // directo al comunicado
