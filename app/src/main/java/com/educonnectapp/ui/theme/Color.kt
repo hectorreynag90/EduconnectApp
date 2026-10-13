@@ -62,3 +62,13 @@ val OrangeTarjet = Color(0xFFFF8F00)      // Color Fondo naranja tarjeta
 val AsistenciaPresente = Color(0xFFE8F5E9) // Fondo botón Presente activo
 val AsistenciaAusente = Color(0xFFFFEBEE)  // Fondo botón Ausente activo
 val AsistenciaPendiente = Color(0xFFFFF3F0)// Fondo alumno sin marcar
+
+//Recuperar contraseña (encabezados y botones en azul oscuro sólido, sin degradado)
+val AzulOscuro = Color(0xFF0D47A1)         // Encabezado y botones principales
+val FondoCampoAzul = Color(0xFFE3EEFD)     // Fondo de campos y casillas del código
+val VerdeOk = Color(0xFF1B9E4B)            // Check, contraseña válida, seguridad "Fuerte"
+val VerdeTexto = Color(0xFF1B7F3B)         // Texto del aviso "Código enviado"
+val FondoVerde = Color(0xFFEAF9EF)         // Fondo del aviso verde y de campos válidos
+val RojoError = Color(0xFFD32F2F)          // Código incorrecto, contador, alertas
+val FondoRojo = Color(0xFFFFF1F0)          // Fondo de casillas y avisos en rojo
+val NaranjaMedia = Color(0xFFF59E0B)       // Seguridad "Media" y avisos

@@ -37,6 +37,12 @@ import com.educonnectapp.ui.screens.NuevoComunicadoScreen
 import com.educonnectapp.ui.screens.PerfilDocenteScreen
 import com.educonnectapp.ui.screens.PerfilPadreScreen
 import com.educonnectapp.ui.screens.AlertaRegistro
+import com.educonnectapp.ui.screens.AlertaRecuperacion
+import com.educonnectapp.ui.screens.ContrasenaActualizadaScreen
+import com.educonnectapp.ui.screens.ErrorLogin
+import com.educonnectapp.ui.screens.NuevaContrasenaScreen
+import com.educonnectapp.ui.screens.RecuperarCorreoScreen
+import com.educonnectapp.ui.screens.VerificarCodigoScreen
 import com.educonnectapp.ui.screens.RegisterScreen
 import com.educonnectapp.ui.screens.RegistroAsistenciaScreen
 import com.educonnectapp.ui.screens.SeleccionarEstudianteScreen
@@ -87,6 +93,9 @@ import com.educonnectapp.ui.screens.DetalleAlumnoItem
 import com.educonnectapp.ui.screens.SeleccionarSeccionHistorialScreen
 
 // Backend propio (Spring Boot)
+import com.educonnectapp.data.api.restablecerContrasena
+import com.educonnectapp.data.api.solicitarCodigoRecuperacion
+import com.educonnectapp.data.api.verificarCodigoRecuperacion
 import com.educonnectapp.data.api.ApiException
 import com.educonnectapp.data.api.ingresar
 import com.educonnectapp.data.api.registrar
@@ -166,7 +175,8 @@ enum class Screen {
     PUBLICACIONES, SELECCIONAR_CURSO_PUBLICACION, NUEVA_TAREA, NUEVA_EVALUACION, CONFIRMACION_PUBLICACION,
     SELECCIONAR_HIJO_AGENDA, AGENDA_ESCOLAR, DETALLE_AGENDA,
     COMUNICADOS_PADRE, SELECCIONAR_ESTUDIANTE_COMUNICADO, COMUNICADOS_RECIBIDOS, DETALLE_COMUNICADO_PADRE,
-    HISTORIAL_PUBLICACIONES, CALIFICAR_PUBLICACION
+    HISTORIAL_PUBLICACIONES, CALIFICAR_PUBLICACION,
+    RECUPERAR_CORREO, RECUPERAR_CODIGO, RECUPERAR_NUEVA, RECUPERAR_LISTO
 }
 
 data class UsuarioLogueado(
@@ -346,6 +356,17 @@ fun EduConnectApp() {
     var registrandoCuenta by remember { mutableStateOf(false) }
     var alertaRegistroSel by remember { mutableStateOf<AlertaRegistro?>(null) }
     var registroExitosoSel by remember { mutableStateOf(false) }
+    // Login: error del último intento (popup + campo en rojo)
+    var errorLoginSel by remember { mutableStateOf<ErrorLogin?>(null) }
+    // Recuperar contraseña
+    var recEmailSel by remember { mutableStateOf("") }
+    var recExpiraEnSel by remember { mutableStateOf(0L) }        // millis en que vence el código
+    var recReenviarDesdeSel by remember { mutableStateOf(0L) }   // millis desde los que se puede reenviar
+    var recTokenSel by remember { mutableStateOf("") }           // token de un solo uso (tras verificar)
+    var recCargando by remember { mutableStateOf(false) }
+    var recReenviando by remember { mutableStateOf(false) }
+    var recErrorCodigoSel by remember { mutableStateOf<String?>(null) }
+    var recAlertaSel by remember { mutableStateOf<AlertaRecuperacion?>(null) }
     // Confirmación de asistencia: ¿fue actualización? y qué alumnos cambiaron
     var esActualizacionAsistenciaSel by remember { mutableStateOf(false) }
     var cambiosAsistenciaSel by remember { mutableStateOf<List<CambioAsistenciaItem>>(emptyList()) }
@@ -790,9 +811,16 @@ fun EduConnectApp() {
 
                 Screen.LOGIN -> LoginScreen(
                     isLoading = isLoginLoading,
+                    errorLogin = errorLoginSel,
+                    onOlvidePassword = {
+                        errorLoginSel = null
+                        recAlertaSel = null
+                        currentScreen = Screen.RECUPERAR_CORREO
+                    },
                     onLogin = { emailInput, passwordInput ->
                         when {
-                            emailInput.isBlank() || passwordInput.isBlank() -> aviso("Completa el correo y contraseña")
+                            // La pantalla ya valida los campos vacíos (popup "Faltan datos")
+                            emailInput.isBlank() || passwordInput.isBlank() -> errorLoginSel = ErrorLogin("VACIOS")
                             else -> {
                                 isLoginLoading = true
                                 CoroutineScope(Dispatchers.Main).launch {
@@ -812,6 +840,7 @@ fun EduConnectApp() {
                                             dni = usuario.dni,
                                             telefono = usuario.telefono
                                         )
+                                        errorLoginSel = null
                                         currentScreen = if (usuario.rol == "DOCENTE") Screen.HOME_DOCENTE else Screen.HOME_PADRE
 
                                         // Registrar token FCM del dispositivo en el backend
@@ -825,9 +854,16 @@ fun EduConnectApp() {
                                                 }
                                             }
                                     } catch (e: ApiException) {
-                                        aviso(if (e.codigo == 401) "Correo o contraseña incorrectos" else (e.message ?: "Error al ingresar"))
+                                        // 404 = correo no registrado | 400 = correo con formato inválido
+                                        // 401 = contraseña incorrecta | otros (403 cuenta desactivada, sin conexión)
+                                        errorLoginSel = when (e.codigo) {
+                                            404 -> ErrorLogin("CORREO")
+                                            400 -> ErrorLogin("CORREO", e.message ?: "")
+                                            401 -> ErrorLogin("CONTRASENA")
+                                            else -> ErrorLogin("OTRO", e.message ?: "Error al ingresar")
+                                        }
                                     } catch (e: Exception) {
-                                        aviso("Error al ingresar: ${e.message}")
+                                        errorLoginSel = ErrorLogin("OTRO", "Error al ingresar: ${e.message}")
                                     } finally {
                                         isLoginLoading = false
                                     }
@@ -835,7 +871,156 @@ fun EduConnectApp() {
                             }
                         }
                     },
-                    onGoToRegister = { currentScreen = Screen.REGISTER }
+                    onGoToRegister = {
+                        errorLoginSel = null
+                        currentScreen = Screen.REGISTER
+                    }
+                )
+
+                // ---------- RECUPERAR CONTRASEÑA ----------
+                Screen.RECUPERAR_CORREO -> RecuperarCorreoScreen(
+                    emailInicial = recEmailSel,
+                    enviando = recCargando,
+                    alerta = recAlertaSel,
+                    onEnviar = { email ->
+                        if (!recCargando) {
+                            recCargando = true
+                            CoroutineScope(Dispatchers.Main).launch {
+                                try {
+                                    val r = solicitarCodigoRecuperacion(email)
+                                    val ahora = System.currentTimeMillis()
+                                    recEmailSel = r.email.ifBlank { email }
+                                    recExpiraEnSel = ahora + r.expiraEnSegundos * 1000
+                                    recReenviarDesdeSel = ahora + r.reenviarEnSegundos * 1000
+                                    recErrorCodigoSel = null
+                                    currentScreen = Screen.RECUPERAR_CODIGO
+                                } catch (e: ApiException) {
+                                    recAlertaSel = if (e.codigo == 404) AlertaRecuperacion("CORREO_NO_REGISTRADO")
+                                    else AlertaRecuperacion("ERROR", e.message ?: "")
+                                } catch (e: Exception) {
+                                    recAlertaSel = AlertaRecuperacion("ERROR", e.message ?: "")
+                                } finally {
+                                    recCargando = false
+                                }
+                            }
+                        }
+                    },
+                    onCerrarAlerta = { recAlertaSel = null },
+                    onVolverLogin = {
+                        recAlertaSel = null
+                        currentScreen = Screen.LOGIN
+                    }
+                )
+
+                Screen.RECUPERAR_CODIGO -> VerificarCodigoScreen(
+                    email = recEmailSel,
+                    expiraEnMillis = recExpiraEnSel,
+                    reenviarDesdeMillis = recReenviarDesdeSel,
+                    verificando = recCargando,
+                    reenviando = recReenviando,
+                    errorCodigo = recErrorCodigoSel,
+                    alerta = recAlertaSel,
+                    onVerificar = { codigo ->
+                        if (!recCargando) {
+                            recCargando = true
+                            CoroutineScope(Dispatchers.Main).launch {
+                                try {
+                                    recTokenSel = verificarCodigoRecuperacion(recEmailSel, codigo)
+                                    recErrorCodigoSel = null
+                                    currentScreen = Screen.RECUPERAR_NUEVA
+                                } catch (e: ApiException) {
+                                    when (e.codigo) {
+                                        // Código incorrecto: casillas en rojo con los intentos restantes
+                                        400 -> recErrorCodigoSel = e.message ?: "Código incorrecto. Verifica e intenta nuevamente."
+                                        // Vencido o sin intentos: hay que reenviar
+                                        409 -> {
+                                            recErrorCodigoSel = null
+                                            recExpiraEnSel = System.currentTimeMillis()
+                                            recAlertaSel = AlertaRecuperacion("CODIGO_VENCIDO", e.message ?: "")
+                                        }
+                                        else -> recAlertaSel = AlertaRecuperacion("ERROR", e.message ?: "")
+                                    }
+                                } catch (e: Exception) {
+                                    recAlertaSel = AlertaRecuperacion("ERROR", e.message ?: "")
+                                } finally {
+                                    recCargando = false
+                                }
+                            }
+                        }
+                    },
+                    onReenviar = {
+                        if (!recReenviando) {
+                            recReenviando = true
+                            CoroutineScope(Dispatchers.Main).launch {
+                                try {
+                                    val r = solicitarCodigoRecuperacion(recEmailSel)
+                                    val ahora = System.currentTimeMillis()
+                                    recExpiraEnSel = ahora + r.expiraEnSegundos * 1000
+                                    recReenviarDesdeSel = ahora + r.reenviarEnSegundos * 1000
+                                    recErrorCodigoSel = null
+                                    aviso("Te enviamos un nuevo código")
+                                } catch (e: ApiException) {
+                                    recAlertaSel = AlertaRecuperacion("ERROR", e.message ?: "")
+                                } catch (e: Exception) {
+                                    recAlertaSel = AlertaRecuperacion("ERROR", e.message ?: "")
+                                } finally {
+                                    recReenviando = false
+                                }
+                            }
+                        }
+                    },
+                    onLimpiarError = { recErrorCodigoSel = null },
+                    onCerrarAlerta = { recAlertaSel = null },
+                    onBack = {
+                        recErrorCodigoSel = null
+                        recAlertaSel = null
+                        currentScreen = Screen.RECUPERAR_CORREO
+                    }
+                )
+
+                Screen.RECUPERAR_NUEVA -> NuevaContrasenaScreen(
+                    guardando = recCargando,
+                    alerta = recAlertaSel,
+                    onActualizar = { nueva ->
+                        if (!recCargando) {
+                            recCargando = true
+                            CoroutineScope(Dispatchers.Main).launch {
+                                try {
+                                    restablecerContrasena(recEmailSel, recTokenSel, nueva)
+                                    recTokenSel = ""
+                                    currentScreen = Screen.RECUPERAR_LISTO
+                                } catch (e: ApiException) {
+                                    recAlertaSel = when (e.codigo) {
+                                        409 -> AlertaRecuperacion("SOLICITUD_VENCIDA", e.message ?: "")
+                                        400 -> AlertaRecuperacion("CONTRASENA", e.message ?: "")
+                                        else -> AlertaRecuperacion("ERROR", e.message ?: "")
+                                    }
+                                } catch (e: Exception) {
+                                    recAlertaSel = AlertaRecuperacion("ERROR", e.message ?: "")
+                                } finally {
+                                    recCargando = false
+                                }
+                            }
+                        }
+                    },
+                    onCerrarAlerta = {
+                        // Si la solicitud venció, se vuelve a pedir el código
+                        val vencida = recAlertaSel?.tipo == "SOLICITUD_VENCIDA"
+                        recAlertaSel = null
+                        if (vencida) currentScreen = Screen.RECUPERAR_CORREO
+                    },
+                    onBack = {
+                        recTokenSel = ""
+                        recAlertaSel = null
+                        currentScreen = Screen.LOGIN
+                    }
+                )
+
+                Screen.RECUPERAR_LISTO -> ContrasenaActualizadaScreen(
+                    onIrLogin = {
+                        errorLoginSel = null
+                        currentScreen = Screen.LOGIN
+                    }
                 )
 
                 Screen.REGISTER -> RegisterScreen(
@@ -2427,4 +2612,3 @@ fun EduConnectApp() {
     // Al cambiar de pantalla, el panel se cierra
     androidx.compose.runtime.LaunchedEffect(currentScreen) { mostrarNotificaciones = false }
 }
-

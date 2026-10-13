@@ -137,6 +137,16 @@ interface EduConnectApi {
     @GET("api/auth/me")
     suspend fun me(): UsuarioResponse
 
+    // Recuperar contraseña (públicos)
+    @POST("api/auth/recuperar/solicitar")
+    suspend fun solicitarCodigoRecuperacion(@Body body: SolicitarCodigoRequest): SolicitudCodigoResponse
+
+    @POST("api/auth/recuperar/verificar")
+    suspend fun verificarCodigoRecuperacion(@Body body: VerificarCodigoRequest): VerificacionCodigoResponse
+
+    @POST("api/auth/recuperar/restablecer")
+    suspend fun restablecerContrasena(@Body body: RestablecerContrasenaRequest)
+
     // Dispositivos (tokens FCM)
     @POST("api/dispositivos")
     suspend fun registrarDispositivo(@Body body: RegistrarDispositivoRequest)
@@ -355,6 +365,43 @@ suspend fun registrar(
 }
 
 suspend fun obtenerUsuarioActual(): UsuarioResponse = llamar { api.me() }
+
+// =====================================================================
+// RECUPERAR CONTRASEÑA
+// solicitar: 404 = correo no registrado | 400 = esperar para reenviar
+// verificar: 400 = código incorrecto (mensaje con intentos restantes) | 409 = vencido o sin intentos
+// restablecer: 409 = solicitud vencida | 400 = contraseña no válida o igual a la anterior
+// =====================================================================
+
+@Serializable
+data class SolicitarCodigoRequest(val email: String)
+
+@Serializable
+data class SolicitudCodigoResponse(
+    val email: String = "",
+    val expiraEnSegundos: Long = 600,
+    val reenviarEnSegundos: Long = 60
+)
+
+@Serializable
+data class VerificarCodigoRequest(val email: String, val codigo: String)
+
+@Serializable
+data class VerificacionCodigoResponse(val token: String)
+
+@Serializable
+data class RestablecerContrasenaRequest(val email: String, val token: String, val nuevaPassword: String)
+
+suspend fun solicitarCodigoRecuperacion(email: String): SolicitudCodigoResponse =
+    llamar { api.solicitarCodigoRecuperacion(SolicitarCodigoRequest(email.trim().lowercase())) }
+
+// Devuelve el token de un solo uso para restablecer la contraseña
+suspend fun verificarCodigoRecuperacion(email: String, codigo: String): String =
+    llamar { api.verificarCodigoRecuperacion(VerificarCodigoRequest(email.trim().lowercase(), codigo)).token }
+
+suspend fun restablecerContrasena(email: String, token: String, nuevaPassword: String) = llamar {
+    api.restablecerContrasena(RestablecerContrasenaRequest(email.trim().lowercase(), token, nuevaPassword))
+}
 
 // Quita el token FCM del backend (para no recibir push de otra cuenta) y borra la sesión
 suspend fun cerrarSesion() {

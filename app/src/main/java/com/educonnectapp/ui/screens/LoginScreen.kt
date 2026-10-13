@@ -1,6 +1,5 @@
 package com.educonnectapp.ui.screens
 
-import android.R.attr.singleLine
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -59,12 +58,28 @@ import com.educonnectapp.ui.theme.TextPrimary
 import com.educonnectapp.ui.theme.TextSecondary
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Key
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.graphics.Color
+
+// Error del login. tipo: "CORREO" (no registrado) | "CONTRASENA" (incorrecta) | "VACIOS" | "OTRO".
+// Clase normal (no data class): cada intento fallido es un error nuevo y vuelve a mostrar el popup.
+class ErrorLogin(val tipo: String, val mensaje: String = "")
+
+private val RojoCampo = Color(0xFFD32F2F)
+private val FondoCampoRojo = Color(0xFFFFF1F0)
+private val NaranjaAviso = Color(0xFFF59E0B)
 
 @Composable
 fun LoginScreen(
     onLogin: (email: String, password: String) -> Unit,
     onGoToRegister: () -> Unit,
-    isLoading: Boolean = false
+    isLoading: Boolean = false,
+    errorLogin: ErrorLogin? = null,          // error del último intento (lo arma MainActivity)
+    onOlvidePassword: () -> Unit = {}        // "¿Olvidaste tu contraseña?"
 )
 {
     var email by remember { mutableStateOf(value = "") }
@@ -72,6 +87,45 @@ fun LoginScreen(
     var passwordVisible by remember { mutableStateOf(false) }
     var emailFocused by remember { mutableStateOf(false) }
     var passwordFocused by remember { mutableStateOf(false) }
+
+    // Campos en rojo y popup del error. Se quita el rojo al escribir en el campo.
+    var correoEnRojo by remember { mutableStateOf(false) }
+    var passwordEnRojo by remember { mutableStateOf(false) }
+    var errorPopup by remember { mutableStateOf<ErrorLogin?>(null) }
+
+    fun mostrarError(error: ErrorLogin) {
+        correoEnRojo = error.tipo == "CORREO" || (error.tipo == "VACIOS" && email.isBlank())
+        passwordEnRojo = error.tipo == "CONTRASENA" || (error.tipo == "VACIOS" && password.isBlank())
+        errorPopup = error
+    }
+    LaunchedEffect(errorLogin) { errorLogin?.let { mostrarError(it) } }
+
+    // POPUP DE ERROR
+    errorPopup?.let { error ->
+        val cerrar = { errorPopup = null }
+        when (error.tipo) {
+            "CORREO" -> PopupAlertaEdu(
+                Icons.Filled.Email, RojoCampo, "Correo incorrecto",
+                error.mensaje.ifBlank { "El correo ingresado no está registrado en EduConnect. Verifica que esté bien escrito." },
+                onCerrar = cerrar
+            )
+            "CONTRASENA" -> PopupAlertaEdu(
+                Icons.Filled.Key, RojoCampo, "Contraseña incorrecta",
+                "La contraseña no es correcta. Inténtalo nuevamente o usa \"¿Olvidaste tu contraseña?\".",
+                onCerrar = cerrar
+            )
+            "VACIOS" -> PopupAlertaEdu(
+                Icons.Filled.Warning, NaranjaAviso, "Faltan datos",
+                "Ingresa tu correo y contraseña para iniciar sesión.",
+                onCerrar = cerrar
+            )
+            else -> PopupAlertaEdu(
+                Icons.Filled.Warning, NaranjaAviso, "No se pudo iniciar sesión",
+                error.mensaje.ifBlank { "Inténtalo nuevamente en unos minutos." },
+                onCerrar = cerrar
+            )
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -179,7 +233,7 @@ fun LoginScreen(
             // INPUTBOX CORREO
             OutlinedTextField(
                 value = email,
-                onValueChange = { nuevo -> email = nuevo },
+                onValueChange = { nuevo -> email = nuevo.trim(); correoEnRojo = false },
                 placeholder = {
                     Text(
                         text = "Ingrese su correo",
@@ -195,19 +249,20 @@ fun LoginScreen(
                         contentDescription = null,
                         modifier = Modifier.size(25.dp),
                         colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(
-                            if (emailFocused) EduconnectBlue else TextSecondary
+                            when {
+                                correoEnRojo -> RojoCampo
+                                emailFocused -> EduconnectBlue
+                                else -> TextSecondary
+                            }
                         )
                     )
                 },
 
-                shape = RoundedCornerShape(10.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = EduconnectBlue,
-                    unfocusedBorderColor = BorderLight,
-                    focusedTextColor = TextPrimary,
-                    unfocusedTextColor = TextPrimary,
-                    cursorColor = EduconnectBlue
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                    keyboardType = androidx.compose.ui.text.input.KeyboardType.Email
                 ),
+                shape = RoundedCornerShape(10.dp),
+                colors = coloresCampo(correoEnRojo),
                 modifier = Modifier
                     .fillMaxWidth()
                     .onFocusChanged { emailFocused = it.isFocused },
@@ -225,7 +280,7 @@ fun LoginScreen(
 
             OutlinedTextField(
                 value = password,
-                onValueChange = { nuevo -> password = nuevo },
+                onValueChange = { nuevo -> password = nuevo; passwordEnRojo = false },
                 visualTransformation = if (passwordVisible)
                     androidx.compose.ui.text.input.VisualTransformation.None
                 else
@@ -238,7 +293,7 @@ fun LoginScreen(
                         fontFamily = Roboto,
                         modifier = Modifier.fillMaxWidth(),
 
-                    )
+                        )
                 },
                 //
                 leadingIcon = {
@@ -247,7 +302,11 @@ fun LoginScreen(
                         contentDescription = null,
                         modifier = Modifier.size(25.dp),
                         colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(
-                            if (passwordFocused) EduconnectBlue else TextSecondary
+                            when {
+                                passwordEnRojo -> RojoCampo
+                                passwordFocused -> EduconnectBlue
+                                else -> TextSecondary
+                            }
                         )
                     )
                 },
@@ -268,13 +327,7 @@ fun LoginScreen(
                 },
 
                 shape = RoundedCornerShape(10.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = EduconnectBlue,
-                    unfocusedBorderColor = BorderLight,
-                    focusedTextColor = TextPrimary,
-                    unfocusedTextColor = TextPrimary,
-                    cursorColor = EduconnectBlue
-                ),
+                colors = coloresCampo(passwordEnRojo),
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp)
@@ -283,7 +336,7 @@ fun LoginScreen(
             )
             //OLVIDASTE CONTRASEÑA
             TextButton(
-                onClick = onGoToRegister,
+                onClick = onOlvidePassword,
                 modifier = Modifier.align(Alignment.End)
             )
             {
@@ -300,7 +353,12 @@ fun LoginScreen(
 
             // BOTÓN INICIAR SESIÓN
             Button(
-                onClick = { if (!isLoading) onLogin(email, password) },
+                onClick = {
+                    if (!isLoading) {
+                        if (email.isBlank() || password.isBlank()) mostrarError(ErrorLogin("VACIOS"))
+                        else onLogin(email, password)
+                    }
+                },
                 modifier = Modifier.fillMaxWidth().height(52.dp),
                 shape = RoundedCornerShape(25.dp),
                 enabled = !isLoading,
@@ -360,6 +418,18 @@ fun LoginScreen(
         }
     }
 }
+
+// Colores del campo: normales, o en rojo cuando tiene error
+@Composable
+private fun coloresCampo(enRojo: Boolean) = OutlinedTextFieldDefaults.colors(
+    focusedBorderColor = if (enRojo) RojoCampo else EduconnectBlue,
+    unfocusedBorderColor = if (enRojo) RojoCampo else BorderLight,
+    focusedContainerColor = if (enRojo) FondoCampoRojo else Color.Transparent,
+    unfocusedContainerColor = if (enRojo) FondoCampoRojo else Color.Transparent,
+    focusedTextColor = if (enRojo) RojoCampo else TextPrimary,
+    unfocusedTextColor = if (enRojo) RojoCampo else TextPrimary,
+    cursorColor = if (enRojo) RojoCampo else EduconnectBlue
+)
 
 @Preview(showBackground = true)
 @Composable
