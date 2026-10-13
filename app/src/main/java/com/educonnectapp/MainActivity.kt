@@ -36,6 +36,7 @@ import com.educonnectapp.ui.screens.LoginScreen
 import com.educonnectapp.ui.screens.NuevoComunicadoScreen
 import com.educonnectapp.ui.screens.PerfilDocenteScreen
 import com.educonnectapp.ui.screens.PerfilPadreScreen
+import com.educonnectapp.ui.screens.AlertaRegistro
 import com.educonnectapp.ui.screens.RegisterScreen
 import com.educonnectapp.ui.screens.RegistroAsistenciaScreen
 import com.educonnectapp.ui.screens.SeleccionarEstudianteScreen
@@ -341,6 +342,10 @@ fun EduConnectApp() {
     var cursoIdPorNombre by remember { mutableStateOf<Map<String, Long>>(emptyMap()) }
     // Asistencias
     var fechaHojaSel by remember { mutableStateOf("") }   // fecha de la hoja cargada (servidor)
+    // Registro de cuenta: estado de la petición y resultado que muestran los popups
+    var registrandoCuenta by remember { mutableStateOf(false) }
+    var alertaRegistroSel by remember { mutableStateOf<AlertaRegistro?>(null) }
+    var registroExitosoSel by remember { mutableStateOf(false) }
     // Confirmación de asistencia: ¿fue actualización? y qué alumnos cambiaron
     var esActualizacionAsistenciaSel by remember { mutableStateOf(false) }
     var cambiosAsistenciaSel by remember { mutableStateOf<List<CambioAsistenciaItem>>(emptyList()) }
@@ -834,29 +839,46 @@ fun EduConnectApp() {
                 )
 
                 Screen.REGISTER -> RegisterScreen(
+                    // La pantalla ya validó los campos (popups de DNI, teléfono, correo y contraseña)
                     onRegister = { nombre, dni, telefono, email, password, rol ->
-                        when {
-                            nombre.isBlank() || dni.isBlank() || telefono.isBlank() || email.isBlank() || password.isBlank() -> aviso("Completa todos los campos")
-                            dni.length != 8 -> aviso("El DNI debe tener 8 dígitos")
-                            telefono.length != 9 -> aviso("El teléfono debe tener 9 dígitos")
-                            password.length < 8 -> aviso("La contraseña debe tener al menos 8 caracteres")
-                            !password.any { it.isLetter() } || !password.any { it.isDigit() } -> aviso("La contraseña debe tener letras y números")
-                            else -> {
-                                CoroutineScope(Dispatchers.Main).launch {
-                                    try {
-                                        registrar(nombre, dni, telefono, email, password, rol)
-                                        aviso("Cuenta creada exitosamente")
-                                        currentScreen = Screen.LOGIN
-                                    } catch (e: ApiException) {
-                                        aviso(if (e.codigo == 409) "Ya existe una cuenta con ese correo o DNI" else (e.message ?: "Error al crear la cuenta"))
-                                    } catch (e: Exception) {
-                                        aviso("Error: ${e.message ?: e.toString()}")
+                        if (!registrandoCuenta) {
+                            registrandoCuenta = true
+                            CoroutineScope(Dispatchers.Main).launch {
+                                try {
+                                    registrar(nombre, dni, telefono, email, password, rol)
+                                    registroExitosoSel = true      // popup "¡Cuenta registrada!" (5 s) -> LOGIN
+                                } catch (e: ApiException) {
+                                    val mensaje = e.message ?: ""
+                                    alertaRegistroSel = when {
+                                        // 409: correo o DNI ya registrado (el mensaje del backend dice cuál)
+                                        e.codigo == 409 && mensaje.contains("dni", ignoreCase = true) ->
+                                            AlertaRegistro("DNI", mensaje)
+                                        e.codigo == 409 -> AlertaRegistro("CORREO", mensaje)
+                                        else -> AlertaRegistro("ERROR", mensaje.ifBlank { "Error al crear la cuenta" })
                                     }
+                                } catch (e: Exception) {
+                                    alertaRegistroSel = AlertaRegistro("ERROR", e.message ?: "Error al crear la cuenta")
+                                } finally {
+                                    registrandoCuenta = false
                                 }
                             }
                         }
                     },
-                    onBack = { currentScreen = Screen.LOGIN }
+                    onBack = {
+                        alertaRegistroSel = null
+                        currentScreen = Screen.LOGIN
+                    },
+                    registrando = registrandoCuenta,
+                    alertaServidor = alertaRegistroSel,
+                    registroExitoso = registroExitosoSel,
+                    onCerrarAlerta = { alertaRegistroSel = null },
+                    onIrALogin = {
+                        if (registroExitosoSel) {
+                            registroExitosoSel = false
+                            alertaRegistroSel = null
+                            currentScreen = Screen.LOGIN
+                        }
+                    }
                 )
 
                 Screen.HOME_DOCENTE -> {
@@ -2405,3 +2427,4 @@ fun EduConnectApp() {
     // Al cambiar de pantalla, el panel se cierra
     androidx.compose.runtime.LaunchedEffect(currentScreen) { mostrarNotificaciones = false }
 }
+
