@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
@@ -56,11 +57,15 @@ import com.educonnectapp.ui.theme.TextBlue
 import com.educonnectapp.ui.theme.TextPrimary
 import com.educonnectapp.ui.theme.TextSecondary
 import com.educonnectapp.ui.theme.TextWhite
+import com.educonnectapp.ui.theme.NaranjaMedia
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
 private val BackgroundBlueLight3 = Color(0xFFE6F1FB)
+
+// Error del servidor al registrar la asignación (lo arma MainActivity y se muestra como popup)
+data class AlertaAsignacion(val titulo: String, val mensaje: String)
 
 @Composable
 fun AgregarAsignacionScreen(
@@ -74,13 +79,20 @@ fun AgregarAsignacionScreen(
     seccionesDisp: Map<String, List<String>> = emptyMap(),
     cursosDisp: List<String> = emptyList(),
     onGuardar: (grado: String, seccion: String, curso: String) -> Unit = { _, _, _ -> },
-    onCancelar: () -> Unit = {}
+    onCancelar: () -> Unit = {},
+    // Estado del registro (lo controla MainActivity)
+    procesando: Boolean = false,
+    exito: Boolean = false,
+    alerta: AlertaAsignacion? = null,
+    onCerrarExito: () -> Unit = {},
+    onCerrarAlerta: () -> Unit = {}
 ){
     var gradoSeleccionado by remember { mutableStateOf("Seleccione...") }
     var seccionSeleccionada by remember { mutableStateOf("") }
     var cursoSeleccionado by remember { mutableStateOf("Seleccione...") }
     var dropdownGradoExpanded by remember { mutableStateOf(false) }
     var dropdownCursoExpanded by remember { mutableStateOf(false) }
+    var mostrarConfirmacion by remember { mutableStateOf(false) }
 
     val listaSecciones = if (gradoSeleccionado != "Seleccione...")
         seccionesDisp[gradoSeleccionado] ?: emptyList()
@@ -373,11 +385,7 @@ fun AgregarAsignacionScreen(
 
             // BOTÓN GUARDAR
             Button(
-                onClick = {
-                    if (seleccionCompleta) {
-                        onGuardar(gradoSeleccionado, seccionSeleccionada, cursoSeleccionado)
-                    }
-                },
+                onClick = { if (seleccionCompleta) mostrarConfirmacion = true },
                 modifier = Modifier.fillMaxWidth().height(50.dp),
                 shape = RoundedCornerShape(25.dp),
                 colors = ButtonDefaults.buttonColors(
@@ -414,6 +422,46 @@ fun AgregarAsignacionScreen(
             onAvisos = onAvisos,
             onPerfil = onPerfil,
             itemActivo = "Perfil",
+        )
+    }
+
+    // ===================== POPUPS (PopupsEdu.kt) =====================
+    // 1. Confirmación antes de registrar
+    if (mostrarConfirmacion) {
+        PopupConfirmacionEdu(
+            titulo = "¿Confirmar asignación?",
+            mensaje = "Se agregará a tu perfil la siguiente asignación:",
+            onCancelar = { mostrarConfirmacion = false },
+            onConfirmar = {
+                mostrarConfirmacion = false
+                onGuardar(gradoSeleccionado, seccionSeleccionada, cursoSeleccionado)
+            }
+        ) {
+            ResumenAsignacionEdu(gradoSeleccionado, seccionSeleccionada, cursoSeleccionado)
+        }
+    }
+
+    // 2. Procesando (mientras el servidor guarda)
+    if (procesando) PopupProcesandoEdu(titulo = "Registrando asignación…")
+
+    // 3. Éxito: se cierra solo a los 5 segundos o con la X
+    if (exito) {
+        PopupExitoEdu(
+            titulo = "¡Asignación registrada con éxito!",
+            detalle = "$gradoSeleccionado · Sec. $seccionSeleccionada\n$cursoSeleccionado",
+            mensaje = "Ya aparece en tu perfil.",
+            onCerrar = onCerrarExito
+        )
+    }
+
+    // Error (por ejemplo, asignación ya registrada): el docente se queda en la pantalla
+    alerta?.let {
+        PopupAlertaEdu(
+            icono = Icons.Filled.Warning,
+            color = NaranjaMedia,
+            titulo = it.titulo,
+            mensaje = it.mensaje,
+            onCerrar = onCerrarAlerta
         )
     }
 }

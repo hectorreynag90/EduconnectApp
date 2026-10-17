@@ -22,6 +22,12 @@ import android.os.Build
 
 import com.educonnectapp.ui.screens.CambioAsistenciaItem
 import com.educonnectapp.ui.screens.AgregarAsignacionScreen
+import com.educonnectapp.ui.screens.AlertaAsignacion
+import com.educonnectapp.ui.screens.AlertaDatos
+import com.educonnectapp.ui.screens.AsignacionGestion
+import com.educonnectapp.ui.screens.BottomNavBarDocente
+import com.educonnectapp.ui.screens.EditarDatosScreen
+import com.educonnectapp.ui.screens.MisAsignacionesScreen
 import com.educonnectapp.ui.screens.AlumnoEncontrado
 import com.educonnectapp.ui.screens.AsistenciasScreen
 import com.educonnectapp.ui.screens.AsociarHijoScreen
@@ -53,6 +59,7 @@ import com.educonnectapp.ui.screens.HijoAsociado
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import com.educonnectapp.ui.screens.AsignacionItem
 import com.educonnectapp.ui.screens.AlumnoItem
 import com.educonnectapp.ui.screens.GradoItem
@@ -105,6 +112,13 @@ import com.educonnectapp.data.api.AsignacionResponse
 import com.educonnectapp.data.api.HijoResponse
 import com.educonnectapp.data.api.obtenerAsignaciones
 import com.educonnectapp.data.api.agregarAsignacion
+import com.educonnectapp.data.api.eliminarAsignacion
+import com.educonnectapp.data.api.actualizarPerfil
+import com.educonnectapp.data.api.cambiarFotoPerfil
+import com.educonnectapp.data.api.crearCargadorImagenes
+import com.educonnectapp.data.api.prepararFotoPerfil
+import com.educonnectapp.data.api.precargarImagen
+import com.educonnectapp.data.api.urlArchivo
 import com.educonnectapp.data.api.obtenerGrados
 import com.educonnectapp.data.api.obtenerSeccionesDeGrado
 import com.educonnectapp.data.api.obtenerCursos
@@ -171,6 +185,7 @@ enum class Screen {
     DETALLE_ASISTENCIA_DOCENTE,
     COMUNICADOS, NUEVO_COMUNICADO, CONFIRMACION_COMUNICADO,
     PERFIL_DOCENTE, PERFIL_PADRE, AGREGAR_ASIGNACION, ASOCIAR_HIJO,
+    MIS_ASIGNACIONES, EDITAR_DATOS_DOCENTE,
     SELECCIONAR_COMUNICADO, BUSQUEDA_COMUNICADO, DETALLE_COMUNICADO,
     PUBLICACIONES, SELECCIONAR_CURSO_PUBLICACION, NUEVA_TAREA, NUEVA_EVALUACION, CONFIRMACION_PUBLICACION,
     SELECCIONAR_HIJO_AGENDA, AGENDA_ESCOLAR, DETALLE_AGENDA,
@@ -181,7 +196,8 @@ enum class Screen {
 
 data class UsuarioLogueado(
     val id: Long, val nombrecompleto: String, val email: String,
-    val rol: String, val dni: String = "", val telefono: String = "", val codigo: String = ""
+    val rol: String, val dni: String = "", val telefono: String = "", val codigo: String = "",
+    val fotoId: Long? = null   // foto de perfil (id del archivo en el backend)
 )
 
 // CONVERSION BACKEND -> UI
@@ -254,6 +270,8 @@ private fun PublicacionPadreResponse.aPublicacionAgendaItem(hoy: String): Public
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Coil (fotos de perfil) usa el cliente HTTP de ApiClient, que agrega el token de la sesión
+        coil.Coil.setImageLoader(crearCargadorImagenes(this))
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
@@ -350,6 +368,24 @@ fun EduConnectApp() {
     // Catálogo para AGREGAR_ASIGNACION: nombre -> id ("1er Grado|A" -> seccionId)
     var seccionIdPorNombre by remember { mutableStateOf<Map<String, Long>>(emptyMap()) }
     var cursoIdPorNombre by remember { mutableStateOf<Map<String, Long>>(emptyMap()) }
+    // Agregar asignación: estado de la petición y resultado que muestran los popups
+    var guardandoAsignacion by remember { mutableStateOf(false) }
+    var asignacionExitosa by remember { mutableStateOf(false) }
+    var alertaAsignacionSel by remember { mutableStateOf<AlertaAsignacion?>(null) }
+    // Pantalla a la que vuelve "Agregar asignación" (perfil o Mis asignaciones)
+    var origenAgregarAsignacion by remember { mutableStateOf(Screen.PERFIL_DOCENTE) }
+    // Mis asignaciones: eliminación
+    var eliminandoAsignacion by remember { mutableStateOf(false) }
+    var asignacionEliminadaSel by remember { mutableStateOf<AsignacionGestion?>(null) }
+    var alertaEliminarSel by remember { mutableStateOf<AlertaAsignacion?>(null) }
+    // Editar datos personales
+    var guardandoDatos by remember { mutableStateOf(false) }
+    var datosActualizados by remember { mutableStateOf(false) }
+    var alertaDatosSel by remember { mutableStateOf<AlertaDatos?>(null) }
+    // Foto de perfil
+    var guardandoFoto by remember { mutableStateOf(false) }
+    var fotoActualizada by remember { mutableStateOf(false) }
+    var alertaFotoSel by remember { mutableStateOf<AlertaDatos?>(null) }
     // Asistencias
     var fechaHojaSel by remember { mutableStateOf("") }   // fecha de la hoja cargada (servidor)
     // Registro de cuenta: estado de la petición y resultado que muestran los popups
@@ -838,8 +874,11 @@ fun EduConnectApp() {
                                             email = usuario.email,
                                             rol = usuario.rol,
                                             dni = usuario.dni,
-                                            telefono = usuario.telefono
+                                            telefono = usuario.telefono,
+                                            fotoId = usuario.fotoArchivoId
                                         )
+                                        // La foto empieza a descargarse ya (o sale de la caché) mientras se arma el inicio
+                                        usuario.fotoArchivoId?.let { precargarImagen(context, urlArchivo(it)) }
                                         errorLoginSel = null
                                         currentScreen = if (usuario.rol == "DOCENTE") Screen.HOME_DOCENTE else Screen.HOME_PADRE
 
@@ -1083,6 +1122,7 @@ fun EduConnectApp() {
                     }
                     HomeDocenteScreen(
                         usuarioNombre = usuarioLogueado?.nombrecompleto ?: "",
+                        fotoUrl = usuarioLogueado?.fotoId?.let { urlArchivo(it) },
                         onAsistencias = {
                             currentScreen = Screen.ASISTENCIAS
                         },
@@ -1595,7 +1635,40 @@ fun EduConnectApp() {
                         onEditarDni = {},
                         onEditarTelefono = {},
                         onEditarEmail = {},
-                        onAgregarAsignacion = { currentScreen = Screen.AGREGAR_ASIGNACION },
+                        onAgregarAsignacion = {
+                            origenAgregarAsignacion = Screen.PERFIL_DOCENTE
+                            currentScreen = Screen.AGREGAR_ASIGNACION
+                        },
+                        onGestionarAsignaciones = { currentScreen = Screen.MIS_ASIGNACIONES },
+                        onEditarDatos = { currentScreen = Screen.EDITAR_DATOS_DOCENTE },
+                        // Foto de perfil
+                        fotoUrl = usuarioLogueado?.fotoId?.let { urlArchivo(it) },
+                        onFotoElegida = { uri ->
+                            CoroutineScope(Dispatchers.Main).launch {
+                                guardandoFoto = true
+                                val inicio = System.currentTimeMillis()
+                                try {
+                                    val jpeg = prepararFotoPerfil(context.contentResolver, uri)
+                                    val actualizado = cambiarFotoPerfil(jpeg)
+                                    usuarioLogueado = usuarioLogueado?.copy(fotoId = actualizado.fotoArchivoId)
+                                    // El popup de carga se ve al menos 1 s aunque el servidor responda antes
+                                    val resto = 1000L - (System.currentTimeMillis() - inicio)
+                                    if (resto > 0) delay(resto)
+                                    fotoActualizada = true
+                                } catch (e: ApiException) {
+                                    alertaFotoSel = AlertaDatos("No se pudo guardar la foto", e.message ?: "Error al subir la foto.")
+                                } catch (e: Exception) {
+                                    alertaFotoSel = AlertaDatos("No se pudo guardar la foto", "No se pudo leer la imagen seleccionada. Prueba con otra foto.")
+                                } finally {
+                                    guardandoFoto = false
+                                }
+                            }
+                        },
+                        guardandoFoto = guardandoFoto,
+                        fotoActualizada = fotoActualizada,
+                        alertaFoto = alertaFotoSel,
+                        onCerrarExitoFoto = { fotoActualizada = false },
+                        onCerrarAlertaFoto = { alertaFotoSel = null },
                         onEliminarAsignacion = {},
                         onCambiarPassword = {},
                         onNotificacionesConfig = {},
@@ -1682,29 +1755,151 @@ fun EduConnectApp() {
                         } catch (e: Exception) { aviso("Error cargando datos: ${e.message}") }
                     }
                     AgregarAsignacionScreen(
-                        onBack = { currentScreen = Screen.PERFIL_DOCENTE }, onNotificaciones = {},
+                        onBack = { currentScreen = origenAgregarAsignacion }, onNotificaciones = {},
                         gradosDisp = gradosDisp, seccionesDisp = seccionesDisp, cursosDisp = cursosDisp,
+                        // Se llama después de que el docente confirma en el popup
                         onGuardar = { grado, seccion, curso ->
                             CoroutineScope(Dispatchers.Main).launch {
                                 val seccionId = seccionIdPorNombre["$grado|$seccion"]
                                 val cursoId = cursoIdPorNombre[curso]
                                 if (seccionId == null || cursoId == null) {
-                                    aviso("Selección no válida, vuelve a intentarlo")
+                                    alertaAsignacionSel = AlertaAsignacion(
+                                        "Selección no válida",
+                                        "No se encontró el grado, la sección o el curso elegido. Vuelve a seleccionarlos."
+                                    )
                                     return@launch
                                 }
+                                guardandoAsignacion = true
+                                val inicio = System.currentTimeMillis()
                                 try {
                                     val nueva = agregarAsignacion(seccionId, cursoId)
                                     aplicarAsignaciones(asignacionesApiSel + nueva)
                                     datosDocenteCargados = false   // el resumen del día debe incluirla
-                                    aviso("Asignación agregada"); currentScreen = Screen.PERFIL_DOCENTE
+                                    // El popup de carga se ve al menos 1 s aunque el servidor responda antes
+                                    val resto = 1000L - (System.currentTimeMillis() - inicio)
+                                    if (resto > 0) delay(resto)
+                                    asignacionExitosa = true
                                 } catch (e: ApiException) {
-                                    aviso(if (e.codigo == 409) "Ya tienes asignado ese curso en esa sección" else (e.message ?: "Error al guardar"))
-                                } catch (e: Exception) { aviso("Error al guardar: ${e.message}") }
+                                    alertaAsignacionSel = if (e.codigo == 409) AlertaAsignacion(
+                                        "Asignación ya registrada",
+                                        "Ya tienes asignado $curso en $grado sección $seccion."
+                                    ) else AlertaAsignacion("No se pudo registrar", e.message ?: "Error al guardar la asignación.")
+                                } catch (e: Exception) {
+                                    alertaAsignacionSel = AlertaAsignacion("No se pudo registrar", "Error al guardar: ${e.message}")
+                                } finally {
+                                    guardandoAsignacion = false
+                                }
                             }
                         },
-                        onCancelar = { currentScreen = Screen.PERFIL_DOCENTE }
+                        onCancelar = { currentScreen = origenAgregarAsignacion },
+                        procesando = guardandoAsignacion,
+                        exito = asignacionExitosa,
+                        alerta = alertaAsignacionSel,
+                        // Al cerrar el popup de éxito (X o 5 s) vuelve a la pantalla de origen con la nueva asignación
+                        onCerrarExito = {
+                            asignacionExitosa = false
+                            currentScreen = origenAgregarAsignacion
+                        },
+                        onCerrarAlerta = { alertaAsignacionSel = null }
                     )
                 }
+
+                Screen.MIS_ASIGNACIONES -> MisAsignacionesScreen(
+                    asignaciones = asignacionesApiSel
+                        .sortedWith(compareBy({ it.grado }, { it.seccion }, { it.curso }))
+                        .map { AsignacionGestion(it.id, it.grado, it.seccion, it.curso, it.cantidadAlumnos) },
+                    onBack = { currentScreen = Screen.PERFIL_DOCENTE },
+                    onNotificaciones = {},
+                    onHomeDocente = { currentScreen = Screen.HOME_DOCENTE },
+                    onAvisos = { currentScreen = Screen.COMUNICADOS },
+                    onPerfil = { currentScreen = Screen.PERFIL_DOCENTE },
+                    onAgregar = {
+                        origenAgregarAsignacion = Screen.MIS_ASIGNACIONES
+                        currentScreen = Screen.AGREGAR_ASIGNACION
+                    },
+                    // Se llama después de que el docente confirma en el popup
+                    onEliminar = { asignacion ->
+                        CoroutineScope(Dispatchers.Main).launch {
+                            eliminandoAsignacion = true
+                            val inicio = System.currentTimeMillis()
+                            try {
+                                eliminarAsignacion(asignacion.id)
+                                aplicarAsignaciones(asignacionesApiSel.filter { it.id != asignacion.id })
+                                datosDocenteCargados = false   // el resumen del día ya no debe incluirla
+                                // El popup de carga se ve al menos 1 s aunque el servidor responda antes
+                                val resto = 1000L - (System.currentTimeMillis() - inicio)
+                                if (resto > 0) delay(resto)
+                                asignacionEliminadaSel = asignacion
+                            } catch (e: ApiException) {
+                                alertaEliminarSel = if (e.codigo == 404) {
+                                    // Ya no existe en el servidor: se recarga la lista
+                                    try { aplicarAsignaciones(obtenerAsignaciones()) } catch (_: Exception) { }
+                                    AlertaAsignacion("Asignación no encontrada", "Esta asignación ya no existe. La lista se actualizó.")
+                                } else AlertaAsignacion("No se pudo eliminar", e.message ?: "Error al eliminar la asignación.")
+                            } catch (e: Exception) {
+                                alertaEliminarSel = AlertaAsignacion("No se pudo eliminar", "Error al eliminar: ${e.message}")
+                            } finally {
+                                eliminandoAsignacion = false
+                            }
+                        }
+                    },
+                    procesando = eliminandoAsignacion,
+                    eliminada = asignacionEliminadaSel,
+                    alerta = alertaEliminarSel,
+                    // Se queda en la lista (si quedó vacía, muestra "Sin asignaciones")
+                    onCerrarExito = { asignacionEliminadaSel = null },
+                    onCerrarAlerta = { alertaEliminarSel = null }
+                )
+
+                Screen.EDITAR_DATOS_DOCENTE -> EditarDatosScreen(
+                    nombreActual = usuarioLogueado?.nombrecompleto ?: "",
+                    telefonoActual = usuarioLogueado?.telefono ?: "",
+                    dni = usuarioLogueado?.dni ?: "",
+                    email = usuarioLogueado?.email ?: "",
+                    onBack = { currentScreen = Screen.PERFIL_DOCENTE },
+                    onNotificaciones = {},
+                    // Se llama después de que el usuario confirma en el popup
+                    onGuardar = { nombre, telefono ->
+                        CoroutineScope(Dispatchers.Main).launch {
+                            guardandoDatos = true
+                            val inicio = System.currentTimeMillis()
+                            try {
+                                val actualizado = actualizarPerfil(nombre, telefono)
+                                usuarioLogueado = usuarioLogueado?.copy(
+                                    nombrecompleto = actualizado.nombreCompleto,
+                                    telefono = actualizado.telefono
+                                )
+                                val resto = 1000L - (System.currentTimeMillis() - inicio)
+                                if (resto > 0) delay(resto)
+                                datosActualizados = true
+                            } catch (e: ApiException) {
+                                alertaDatosSel = AlertaDatos("No se pudo actualizar", e.message ?: "Error al guardar los datos.")
+                            } catch (e: Exception) {
+                                alertaDatosSel = AlertaDatos("No se pudo actualizar", "Error al guardar: ${e.message}")
+                            } finally {
+                                guardandoDatos = false
+                            }
+                        }
+                    },
+                    procesando = guardandoDatos,
+                    exito = datosActualizados,
+                    alerta = alertaDatosSel,
+                    // Al cerrar el popup de éxito (X o 5 s) vuelve al perfil con los datos nuevos
+                    onCerrarExito = {
+                        datosActualizados = false
+                        currentScreen = Screen.PERFIL_DOCENTE
+                    },
+                    onCerrarAlerta = { alertaDatosSel = null },
+                    barraInferior = {
+                        BottomNavBarDocente(
+                            onInicio = { currentScreen = Screen.HOME_DOCENTE },
+                            onAlumnos = {},
+                            onAvisos = { currentScreen = Screen.COMUNICADOS },
+                            onPerfil = { currentScreen = Screen.PERFIL_DOCENTE },
+                            itemActivo = "Perfil"
+                        )
+                    }
+                )
 
                 Screen.ASOCIAR_HIJO -> AsociarHijoScreen(
                     onBack = { currentScreen = Screen.PERFIL_PADRE },

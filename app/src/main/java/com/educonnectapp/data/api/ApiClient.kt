@@ -137,6 +137,15 @@ interface EduConnectApi {
     @GET("api/auth/me")
     suspend fun me(): UsuarioResponse
 
+    // Perfil: solo nombre y teléfono (DNI y correo no se editan)
+    @PUT("api/perfil")
+    suspend fun actualizarPerfil(@Body body: ActualizarPerfilRequest): UsuarioResponse
+
+    // Foto de perfil (multipart, campo "foto")
+    @Multipart
+    @POST("api/perfil/foto")
+    suspend fun cambiarFotoPerfil(@Part foto: MultipartBody.Part): UsuarioResponse
+
     // Recuperar contraseña (públicos)
     @POST("api/auth/recuperar/solicitar")
     suspend fun solicitarCodigoRecuperacion(@Body body: SolicitarCodigoRequest): SolicitudCodigoResponse
@@ -315,7 +324,8 @@ data class UsuarioResponse(
     val dni: String = "",
     val telefono: String = "",
     val email: String,
-    val rol: String            // "DOCENTE", "PADRE" o "ADMIN"
+    val rol: String,           // "DOCENTE", "PADRE" o "ADMIN"
+    val fotoArchivoId: Long? = null   // foto de perfil (null = sin foto)
 )
 
 @Serializable
@@ -365,6 +375,108 @@ suspend fun registrar(
 }
 
 suspend fun obtenerUsuarioActual(): UsuarioResponse = llamar { api.me() }
+
+// =====================================================================
+// PERFIL (docente y padre)
+// 400 = datos no válidos (nombre vacío o teléfono sin 9 dígitos)
+// =====================================================================
+
+@Serializable
+data class ActualizarPerfilRequest(val nombreCompleto: String, val telefono: String)
+
+// Devuelve el usuario con los datos ya guardados
+suspend fun actualizarPerfil(nombre: String, telefono: String): UsuarioResponse =
+    llamar { api.actualizarPerfil(ActualizarPerfilRequest(nombre.trim(), telefono.trim())) }
+
+// =====================================================================
+// FOTO DE PERFIL
+// La app recorta la imagen en cuadrado, la reduce a 512 px y la comprime en JPEG
+// (unos 50-150 KB) antes de subirla. La imagen se muestra con Coil usando el
+// mismo cliente HTTP, que ya agrega el token de la sesión.
+// =====================================================================
+
+private const val LADO_FOTO_PERFIL = 512
+
+// Lee la imagen elegida en la galería y la deja lista para subir (JPEG cuadrado de 512 px)
+suspend fun prepararFotoPerfil(resolver: android.content.ContentResolver, uri: android.net.Uri): ByteArray =
+    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        val original: android.graphics.Bitmap =
+            if (android.os.Build.VERSION.SDK_INT >= 28) {
+                // ImageDecoder respeta la orientación de la foto (EXIF)
+                android.graphics.ImageDecoder.decodeBitmap(
+                    android.graphics.ImageDecoder.createSource(resolver, uri)
+                ) { decoder, info, _ ->
+                    decoder.allocator = android.graphics.ImageDecoder.ALLOCATOR_SOFTWARE
+                    val menor = minOf(info.size.width, info.size.height)
+                    if (menor > LADO_FOTO_PERFIL * 2) {
+                        val factor = menor / (LADO_FOTO_PERFIL * 2f)
+                        decoder.setTargetSize(
+                            (info.size.width / factor).toInt(),
+                            (info.size.height / factor).toInt()
+                        )
+                    }
+                }
+            } else {
+                val limites = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                resolver.openInputStream(uri)?.use { android.graphics.BitmapFactory.decodeStream(it, null, limites) }
+                var muestra = 1
+                while (minOf(limites.outWidth, limites.outHeight) / (muestra * 2) >= LADO_FOTO_PERFIL) muestra *= 2
+                resolver.openInputStream(uri)?.use {
+                    android.graphics.BitmapFactory.decodeStream(
+                        it, null, android.graphics.BitmapFactory.Options().apply { inSampleSize = muestra }
+                    )
+                } ?: throw ApiException(0, "No se pudo leer la imagen seleccionada")
+            }
+        // Recorte cuadrado centrado y tamaño final
+        val lado = minOf(original.width, original.height)
+        val cuadrado = android.graphics.Bitmap.createBitmap(
+            original, (original.width - lado) / 2, (original.height - lado) / 2, lado, lado
+        )
+        val final = if (lado > LADO_FOTO_PERFIL)
+            android.graphics.Bitmap.createScaledBitmap(cuadrado, LADO_FOTO_PERFIL, LADO_FOTO_PERFIL, true)
+        else cuadrado
+        java.io.ByteArrayOutputStream().use { salida ->
+            final.compress(android.graphics.Bitmap.CompressFormat.JPEG, 85, salida)
+            salida.toByteArray()
+        }
+    }
+
+// Sube la foto ya preparada. Devuelve el usuario con el nuevo fotoArchivoId.
+suspend fun cambiarFotoPerfil(jpeg: ByteArray): UsuarioResponse {
+    val parte = MultipartBody.Part.createFormData(
+        "foto", "foto_perfil.jpg", jpeg.toRequestBody("image/jpeg".toMediaType())
+    )
+    return llamar { api.cambiarFotoPerfil(parte) }
+}
+
+// URL de un archivo del backend (la foto se pide con el token de la sesión)
+fun urlArchivo(archivoId: Long): String = "${BuildConfig.API_URL}api/archivos/$archivoId"
+
+// Cargador de imágenes de Coil que usa el mismo cliente HTTP (con el token de la sesión).
+// Se configura una sola vez en MainActivity.onCreate.
+// - Caché en disco: la foto se descarga una sola vez y en los siguientes logins sale al instante.
+// - respectCacheHeaders(false): el backend responde "no-cache" (Spring Security), pero cada foto
+//   nueva tiene otro id y otra URL, así que guardarla en caché nunca muestra una foto vieja.
+fun crearCargadorImagenes(context: android.content.Context): coil.ImageLoader =
+    coil.ImageLoader.Builder(context)
+        .okHttpClient(okHttp)
+        .respectCacheHeaders(false)
+        .diskCache {
+            coil.disk.DiskCache.Builder()
+                .directory(context.cacheDir.resolve("fotos_perfil"))
+                .maxSizeBytes(20L * 1024 * 1024)   // 20 MB
+                .build()
+        }
+        .crossfade(150)
+        .build()
+
+// Empieza a descargar una imagen en segundo plano (por ejemplo, la foto apenas se inicia sesión)
+// para que la pantalla la muestre sin esperar.
+fun precargarImagen(context: android.content.Context, url: String) {
+    coil.Coil.imageLoader(context).enqueue(
+        coil.request.ImageRequest.Builder(context).data(url).build()
+    )
+}
 
 // =====================================================================
 // RECUPERAR CONTRASEÑA

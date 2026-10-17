@@ -25,6 +25,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
+import coil.compose.AsyncImage
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
@@ -52,6 +56,7 @@ import java.util.Locale
 @Composable
 fun HomeDocenteScreen(
     usuarioNombre: String,
+    fotoUrl: String? = null,      // foto de perfil (null = iniciales)
     onAsistencias: () -> Unit = {},
     onComunicados: () -> Unit = {},
     onPublicaciones: () -> Unit = {},
@@ -65,9 +70,6 @@ fun HomeDocenteScreen(
         val sdf = SimpleDateFormat("EEEE, dd 'de' MMMM yyyy", Locale("es", "PE"))
         sdf.format(Date()).replaceFirstChar { it.uppercase() }
     }
-
-    val iniciales = usuarioNombre.split(" ").take(2)
-        .mapNotNull { it.firstOrNull()?.uppercaseChar() }.joinToString("")
 
     Column(
         modifier = Modifier
@@ -90,21 +92,14 @@ fun HomeDocenteScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(70.dp)
-                        .clip(CircleShape)
-                        .background(AccentOrange),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = iniciales,
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 35.sp,
-                        color = TextWhite
-                    )
-                }
+                // Foto de perfil (o iniciales); al tocarla abre el perfil
+                AvatarUsuario(
+                    nombre = usuarioNombre,
+                    fotoUrl = fotoUrl,
+                    tamano = 70.dp,
+                    tamanoTexto = 35.sp,
+                    modifier = Modifier.clickable { onPerfilDocente() }
+                )
 
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
@@ -319,6 +314,43 @@ fun HomeDocenteScreen(
     }
 }
 
+
+// Avatar circular: muestra la foto de perfil si existe; si no (o si no carga), las iniciales.
+// Se puede reutilizar en cualquier encabezado (docente o padre).
+@Composable
+fun AvatarUsuario(
+    nombre: String,
+    fotoUrl: String?,
+    tamano: Dp,
+    tamanoTexto: TextUnit,
+    modifier: Modifier = Modifier
+) {
+    val iniciales = nombre.split(" ").filter { it.isNotBlank() }.take(2)
+        .mapNotNull { it.firstOrNull()?.uppercaseChar() }.joinToString("")
+    Box(
+        modifier = modifier
+            .size(tamano)
+            .clip(CircleShape)
+            .background(AccentOrange),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = iniciales,
+            fontFamily = Roboto,
+            fontWeight = FontWeight.Bold,
+            fontSize = tamanoTexto,
+            color = TextWhite
+        )
+        if (fotoUrl != null) {
+            AsyncImage(
+                model = fotoUrl,
+                contentDescription = "Foto de perfil",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize().clip(CircleShape)
+            )
+        }
+    }
+}
 
 //NAVBAR INFERIOR
 @Composable
