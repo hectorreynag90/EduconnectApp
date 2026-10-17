@@ -20,6 +20,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.IconButton
@@ -52,6 +54,7 @@ import com.educonnectapp.ui.theme.BorderLight
 import com.educonnectapp.ui.theme.BorderRed
 import com.educonnectapp.ui.theme.EduConnectAppTheme
 import com.educonnectapp.ui.theme.EduconnectBlue
+import com.educonnectapp.ui.theme.NaranjaMedia
 import com.educonnectapp.ui.theme.Roboto
 import com.educonnectapp.ui.theme.StatusGreen
 import com.educonnectapp.ui.theme.TextBlue
@@ -89,10 +92,19 @@ fun AsociarHijoScreen(
     onBuscar: (codigo: String) -> Unit = {},
     alumnoEncontrado: AlumnoEncontrado? = null,
     mensajeError: String = "",
-    onConfirmar: (AlumnoEncontrado) -> Unit = {},
+    onConfirmar: (AlumnoEncontrado) -> Unit = {},   // se llama después de confirmar en el popup
     onCancelar: () -> Unit = {},
+    // Estado de la asociación (lo controla MainActivity)
+    procesando: Boolean = false,
+    exito: Boolean = false,
+    alerta: AlertaHijo? = null,
+    onCerrarExito: () -> Unit = {},
+    onCerrarAlerta: () -> Unit = {},
 ) {
     var codigo by remember { mutableStateOf("") }
+    var mostrarConfirmacion by remember { mutableStateOf(false) }
+    // El alumno se guarda al confirmar para mostrarlo en el popup de éxito
+    var alumnoAsociado by remember { mutableStateOf<AlumnoEncontrado?>(null) }
 
     val iniciales = alumnoEncontrado?.let {
         "${it.nombres.firstOrNull() ?: ""}${it.apellidos.firstOrNull() ?: ""}".uppercase()
@@ -362,33 +374,9 @@ fun AsociarHijoScreen(
 
                 Spacer(modifier = Modifier.height(15.dp))
 
-                // Confirmación
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(BackgroundGreenLight3, RoundedCornerShape(10.dp))
-                        .border(1.dp, StatusGreen, RoundedCornerShape(10.dp))
-                        .padding(12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.check_green),
-                        contentDescription = null, modifier = Modifier.size(30.dp)
-                    )
-                    Text(
-                        text = "¿Confirmas asociar a ${alumnoEncontrado.nombres} ${alumnoEncontrado.apellidos} a tu cargo?",
-                        fontFamily = Roboto, fontSize = 16.sp,
-                        color = GreenText3, lineHeight = 20.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(2.dp))
-
-                // BOTÓN CONFIRMAR
+                // BOTÓN ASOCIAR: abre el popup de confirmación
                 Button(
-                    onClick = { onConfirmar(alumnoEncontrado) },
+                    onClick = { mostrarConfirmacion = true },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(50.dp),
@@ -401,7 +389,7 @@ fun AsociarHijoScreen(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "Confirmar y asociar", fontFamily = Roboto,
+                        text = "Asociar hijo", fontFamily = Roboto,
                         fontWeight = FontWeight.Bold, fontSize = 20.sp, color = TextWhite
                     )
                 }
@@ -436,7 +424,55 @@ fun AsociarHijoScreen(
             itemActivo = "Perfil",
         )
     }
+
+    // ===================== POPUPS (PopupsEdu.kt) =====================
+    // 1. Confirmación con los datos del alumno
+    if (mostrarConfirmacion && alumnoEncontrado != null) {
+        PopupConfirmacionEdu(
+            titulo = "¿Asociar a tu hijo?",
+            mensaje = "Recibirás sus asistencias, comunicados y tareas:",
+            textoConfirmar = "Asociar",
+            onCancelar = { mostrarConfirmacion = false },
+            onConfirmar = {
+                mostrarConfirmacion = false
+                alumnoAsociado = alumnoEncontrado
+                onConfirmar(alumnoEncontrado)
+            }
+        ) {
+            ResumenHijoEdu(alumnoEncontrado.aHijo())
+        }
+    }
+
+    // 2. Procesando
+    if (procesando) PopupProcesandoEdu(titulo = "Asociando hijo…")
+
+    // 3. Éxito: se cierra solo a los 5 segundos o con la X
+    if (exito) {
+        val a = alumnoAsociado
+        PopupExitoEdu(
+            titulo = "¡Hijo asociado con éxito!",
+            detalle = a?.let { "${it.nombres} ${it.apellidos}\n${it.gradoNombre} · Sec. ${it.seccionNombre}" },
+            mensaje = "Ya aparece en tu perfil.",
+            onCerrar = onCerrarExito
+        )
+    }
+
+    // Error (por ejemplo, ya estaba asociado)
+    alerta?.let {
+        PopupAlertaEdu(
+            icono = Icons.Filled.Warning,
+            color = NaranjaMedia,
+            titulo = it.titulo,
+            mensaje = it.mensaje,
+            onCerrar = onCerrarAlerta
+        )
+    }
 }
+
+private fun AlumnoEncontrado.aHijo() = HijoAsociado(
+    id = id, nombres = nombres, apellidos = apellidos,
+    gradoNombre = gradoNombre, seccionNombre = seccionNombre, codigoEstudiante = codigoEstudiante
+)
 
 @Preview(showBackground = true)
 @Composable

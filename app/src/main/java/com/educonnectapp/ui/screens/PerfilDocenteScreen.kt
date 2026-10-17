@@ -1,9 +1,6 @@
 package com.educonnectapp.ui.screens
 
 import android.net.Uri
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.PickVisualMediaRequest
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -28,9 +25,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material3.HorizontalDivider
@@ -46,9 +41,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.window.Dialog
-import coil.compose.AsyncImage
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
@@ -63,7 +55,6 @@ import com.educonnectapp.ui.theme.BorderBlue
 import com.educonnectapp.ui.theme.BorderLight
 import com.educonnectapp.ui.theme.EduConnectAppTheme
 import com.educonnectapp.ui.theme.EduconnectBlue
-import com.educonnectapp.ui.theme.NaranjaMedia
 import com.educonnectapp.ui.theme.Roboto
 import com.educonnectapp.ui.theme.TextBlue
 import com.educonnectapp.ui.theme.TextPrimary
@@ -119,20 +110,6 @@ fun PerfilDocenteScreen(
     onNotificacionesConfig: () -> Unit = {},
     onCerrarSesion: () -> Unit = {}
 ) {
-    val iniciales = usuarioNombre.split(" ").take(2)
-        .mapNotNull { it.firstOrNull()?.uppercaseChar() }.joinToString("")
-
-    // Foto: ampliada (si ya tiene) y foto elegida pendiente de confirmar
-    var verFotoAmpliada by remember { mutableStateOf(false) }
-    var fotoPendiente by remember { mutableStateOf<Uri?>(null) }
-    // Selector de fotos de Android: abre la galería sin pedir permisos
-    val selectorFoto = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-        if (uri != null) fotoPendiente = uri
-    }
-    val abrirGaleria = {
-        verFotoAmpliada = false
-        selectorFoto.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-    }
 
     Column(
         modifier = Modifier
@@ -177,49 +154,17 @@ fun PerfilDocenteScreen(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Avatar: foto (si tiene) o iniciales.
-            // Con foto: tocar = verla ampliada. Sin foto: tocar = abrir la galería.
-            Box(contentAlignment = Alignment.BottomEnd) {
-                Box(
-                    modifier = Modifier
-                        .size(80.dp)
-                        .clip(CircleShape)
-                        .background(AccentOrange)
-                        .clickable { if (fotoUrl != null) verFotoAmpliada = true else abrirGaleria() },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = iniciales,
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 35.sp,
-                        color = TextWhite
-                    )
-                    // La foto se dibuja encima de las iniciales (si no carga, se ven las iniciales)
-                    if (fotoUrl != null) {
-                        AsyncImage(
-                            model = fotoUrl,
-                            contentDescription = "Foto de perfil",
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize().clip(CircleShape)
-                        )
-                    }
-                }
-                Box(
-                    modifier = Modifier
-                        .size(28.dp)
-                        .clip(CircleShape)
-                        .background(BackgroundWhite)
-                        .clickable { abrirGaleria() },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.camera_blue),
-                        contentDescription = "Cambiar foto",
-                        modifier = Modifier.size(23.dp)
-                    )
-                }
-            }
+            // Avatar con foto de perfil editable (FotoPerfilEdu.kt)
+            AvatarPerfilEditable(
+                nombre = usuarioNombre,
+                fotoUrl = fotoUrl,
+                onFotoElegida = onFotoElegida,
+                guardando = guardandoFoto,
+                actualizada = fotoActualizada,
+                alerta = alertaFoto,
+                onCerrarExito = onCerrarExitoFoto,
+                onCerrarAlerta = onCerrarAlertaFoto
+            )
 
             Spacer(modifier = Modifier.height(8.dp))
 
@@ -332,10 +277,9 @@ fun PerfilDocenteScreen(
                     color = EduconnectBlue,
                     modifier = Modifier.weight(1f)
                 )
-
+                // "Gestionar" abre Mis asignaciones (ver y eliminar); "+ Asignar" abre Agregar asignación
                 BotonTitulo(icono = Icons.Filled.Add, texto = "", onClick = onAgregarAsignacion)
 
-                // "Gestionar" abre Mis asignaciones (ver y eliminar); "+ Asignar" abre Agregar asignación
                 if (asignaciones.isNotEmpty()) {
                     BotonTitulo(icono = Icons.Filled.Settings, texto = "", onClick = onGestionarAsignaciones)
                 }
@@ -522,122 +466,6 @@ fun PerfilDocenteScreen(
             itemActivo = "Perfil"
         )
     }
-
-    // ===================== FOTO DE PERFIL =====================
-    // Foto ampliada en círculo con el lápiz para cambiarla
-    if (verFotoAmpliada && fotoUrl != null) {
-        PopupFotoAmpliada(
-            fotoUrl = fotoUrl,
-            onEditar = { abrirGaleria() },
-            onCerrar = { verFotoAmpliada = false }
-        )
-    }
-
-    // 1. Confirmación con la vista previa de la foto elegida
-    fotoPendiente?.let { uri ->
-        PopupConfirmacionEdu(
-            titulo = "¿Usar esta foto?",
-            mensaje = "Así se verá tu foto de perfil:",
-            textoConfirmar = "Guardar",
-            onCancelar = { fotoPendiente = null },
-            onConfirmar = {
-                fotoPendiente = null
-                onFotoElegida(uri)
-            }
-        ) {
-            AsyncImage(
-                model = uri,
-                contentDescription = "Vista previa",
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .size(150.dp)
-                    .clip(CircleShape)
-                    .border(3.dp, EduconnectBlue, CircleShape)
-            )
-        }
-    }
-
-    // 2. Procesando
-    if (guardandoFoto) PopupProcesandoEdu(titulo = "Guardando foto…")
-
-    // 3. Éxito: se cierra solo a los 5 segundos o con la X
-    if (fotoActualizada) {
-        PopupExitoEdu(
-            titulo = "¡Foto actualizada con éxito!",
-            mensaje = "Tu nueva foto ya aparece en tu perfil.",
-            onCerrar = onCerrarExitoFoto
-        )
-    }
-
-    // Error al guardar la foto
-    alertaFoto?.let {
-        PopupAlertaEdu(
-            icono = Icons.Filled.Warning,
-            color = NaranjaMedia,
-            titulo = it.titulo,
-            mensaje = it.mensaje,
-            onCerrar = onCerrarAlertaFoto
-        )
-    }
-}
-
-// Foto de perfil ampliada: círculo grande, lápiz naranja para cambiarla y X para cerrar
-@Composable
-private fun PopupFotoAmpliada(fotoUrl: String, onEditar: () -> Unit, onCerrar: () -> Unit) {
-    Dialog(onDismissRequest = onCerrar) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(BackgroundWhite, RoundedCornerShape(20.dp))
-                .padding(bottom = 24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            // X para cerrar
-            Box(modifier = Modifier.fillMaxWidth().padding(6.dp), contentAlignment = Alignment.TopEnd) {
-                IconButton(onClick = onCerrar, modifier = Modifier.size(36.dp)) {
-                    Box(
-                        modifier = Modifier.size(28.dp).background(BackgroundLight, CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(Icons.Filled.Close, contentDescription = "Cerrar",
-                            tint = TextSecondary, modifier = Modifier.size(18.dp))
-                    }
-                }
-            }
-            Text(text = "Foto de perfil", fontFamily = Roboto, fontWeight = FontWeight.Bold,
-                fontSize = 20.sp, color = TextBlue)
-            Spacer(modifier = Modifier.height(16.dp))
-            // Foto en círculo grande con el lápiz abajo a la derecha
-            Box(contentAlignment = Alignment.BottomEnd) {
-                AsyncImage(
-                    model = fotoUrl,
-                    contentDescription = "Foto de perfil ampliada",
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .size(250.dp)
-                        .clip(CircleShape)
-                        .background(BackgroundLight)
-                        .border(4.dp, EduconnectBlue, CircleShape)
-                )
-                Box(
-                    modifier = Modifier
-                        .padding(end = 14.dp, bottom = 14.dp)
-                        .size(52.dp)
-                        .clip(CircleShape)
-                        .background(AccentOrange)
-                        .border(3.dp, BackgroundWhite, CircleShape)
-                        .clickable { onEditar() },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Icons.Filled.Edit, contentDescription = "Cambiar foto",
-                        tint = TextWhite, modifier = Modifier.size(26.dp))
-                }
-            }
-            Spacer(modifier = Modifier.height(14.dp))
-            Text(text = "Toca el lápiz para cambiar tu foto", fontFamily = Roboto,
-                fontSize = 15.sp, color = TextSecondary)
-        }
-    }
 }
 
 // COMPONENTES REUTILIZABLES
@@ -713,9 +541,9 @@ fun FilaPerfil(
     }
 }
 
-// Botón de texto naranja con ícono, a la derecha de un título de sección
+// Botón de texto naranja con ícono, a la derecha de un título de sección (también lo usa el perfil del padre)
 @Composable
-private fun BotonTitulo(icono: ImageVector, texto: String, onClick: () -> Unit) {
+fun BotonTitulo(icono: ImageVector, texto: String, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .clip(RoundedCornerShape(20.dp))

@@ -53,6 +53,7 @@ import java.util.Locale
 @Composable
 fun HomePadreScreen(
     usuarioNombre: String,
+    fotoUrl: String? = null,      // foto de perfil (null = iniciales)
     tieneNotificaciones: Boolean = false,
     onAsistencias: () -> Unit = {},
     onComunicados: () -> Unit = {},
@@ -66,9 +67,6 @@ fun HomePadreScreen(
         val sdf = SimpleDateFormat("EEEE, dd 'de' MMMM yyyy", Locale("es", "PE"))
         sdf.format(Date()).replaceFirstChar { it.uppercase() }
     }
-
-    val iniciales = usuarioNombre.split(" ").take(2)
-        .mapNotNull { it.firstOrNull()?.uppercaseChar() }.joinToString("")
 
     Column(
         modifier = Modifier
@@ -92,21 +90,14 @@ fun HomePadreScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(70.dp)
-                        .clip(CircleShape)
-                        .background(AccentOrange),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = iniciales,
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 35.sp,
-                        color = TextWhite
-                    )
-                }
+                // Foto de perfil (o iniciales); al tocarla abre el perfil (AvatarUsuario en HomeDocenteScreen.kt)
+                AvatarUsuario(
+                    nombre = usuarioNombre,
+                    fotoUrl = fotoUrl,
+                    tamano = 70.dp,
+                    tamanoTexto = 35.sp,
+                    modifier = Modifier.clickable { onPerfil() }
+                )
 
                 Column(modifier = Modifier.weight(1f)) {
                     Text(

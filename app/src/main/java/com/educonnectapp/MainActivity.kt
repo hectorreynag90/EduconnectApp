@@ -28,6 +28,9 @@ import com.educonnectapp.ui.screens.AsignacionGestion
 import com.educonnectapp.ui.screens.BottomNavBarDocente
 import com.educonnectapp.ui.screens.EditarDatosScreen
 import com.educonnectapp.ui.screens.MisAsignacionesScreen
+import com.educonnectapp.ui.screens.AlertaHijo
+import com.educonnectapp.ui.screens.BottomNavBarPadre
+import com.educonnectapp.ui.screens.MisHijosScreen
 import com.educonnectapp.ui.screens.AlumnoEncontrado
 import com.educonnectapp.ui.screens.AsistenciasScreen
 import com.educonnectapp.ui.screens.AsociarHijoScreen
@@ -125,6 +128,7 @@ import com.educonnectapp.data.api.obtenerCursos
 import com.educonnectapp.data.api.obtenerHijos
 import com.educonnectapp.data.api.buscarAlumno
 import com.educonnectapp.data.api.asociarHijo
+import com.educonnectapp.data.api.desasociarHijo
 import com.educonnectapp.data.api.AsistenciaHijoResponse
 import com.educonnectapp.data.api.obtenerHojaAsistencia
 import com.educonnectapp.data.api.registrarAsistencia
@@ -185,7 +189,7 @@ enum class Screen {
     DETALLE_ASISTENCIA_DOCENTE,
     COMUNICADOS, NUEVO_COMUNICADO, CONFIRMACION_COMUNICADO,
     PERFIL_DOCENTE, PERFIL_PADRE, AGREGAR_ASIGNACION, ASOCIAR_HIJO,
-    MIS_ASIGNACIONES, EDITAR_DATOS_DOCENTE,
+    MIS_ASIGNACIONES, EDITAR_DATOS_DOCENTE, MIS_HIJOS, EDITAR_DATOS_PADRE,
     SELECCIONAR_COMUNICADO, BUSQUEDA_COMUNICADO, DETALLE_COMUNICADO,
     PUBLICACIONES, SELECCIONAR_CURSO_PUBLICACION, NUEVA_TAREA, NUEVA_EVALUACION, CONFIRMACION_PUBLICACION,
     SELECCIONAR_HIJO_AGENDA, AGENDA_ESCOLAR, DETALLE_AGENDA,
@@ -386,6 +390,61 @@ fun EduConnectApp() {
     var guardandoFoto by remember { mutableStateOf(false) }
     var fotoActualizada by remember { mutableStateOf(false) }
     var alertaFotoSel by remember { mutableStateOf<AlertaDatos?>(null) }
+    // Padre: asociar y quitar hijos
+    var origenAsociarHijo by remember { mutableStateOf(Screen.PERFIL_PADRE) }
+    var asociandoHijo by remember { mutableStateOf(false) }
+    var hijoAsociadoOk by remember { mutableStateOf(false) }
+    var alertaAsociarSel by remember { mutableStateOf<AlertaHijo?>(null) }
+    var quitandoHijo by remember { mutableStateOf(false) }
+    var hijoQuitadoSel by remember { mutableStateOf<HijoAsociado?>(null) }
+    var alertaQuitarSel by remember { mutableStateOf<AlertaHijo?>(null) }
+
+    // EDITAR DATOS (docente y padre): guarda nombre y teléfono y actualiza la sesión
+    fun guardarDatosPersonales(nombre: String, telefono: String) {
+        CoroutineScope(Dispatchers.Main).launch {
+            guardandoDatos = true
+            val inicio = System.currentTimeMillis()
+            try {
+                val actualizado = actualizarPerfil(nombre, telefono)
+                usuarioLogueado = usuarioLogueado?.copy(
+                    nombrecompleto = actualizado.nombreCompleto,
+                    telefono = actualizado.telefono
+                )
+                val resto = 1000L - (System.currentTimeMillis() - inicio)
+                if (resto > 0) delay(resto)
+                datosActualizados = true
+            } catch (e: ApiException) {
+                alertaDatosSel = AlertaDatos("No se pudo actualizar", e.message ?: "Error al guardar los datos.")
+            } catch (e: Exception) {
+                alertaDatosSel = AlertaDatos("No se pudo actualizar", "Error al guardar: ${e.message}")
+            } finally {
+                guardandoDatos = false
+            }
+        }
+    }
+
+    // FOTO DE PERFIL (docente y padre): prepara la imagen, la sube y actualiza la sesión
+    fun guardarFotoPerfil(uri: android.net.Uri) {
+        CoroutineScope(Dispatchers.Main).launch {
+            guardandoFoto = true
+            val inicio = System.currentTimeMillis()
+            try {
+                val jpeg = prepararFotoPerfil(context.contentResolver, uri)
+                val actualizado = cambiarFotoPerfil(jpeg)
+                usuarioLogueado = usuarioLogueado?.copy(fotoId = actualizado.fotoArchivoId)
+                // El popup de carga se ve al menos 1 s aunque el servidor responda antes
+                val resto = 1000L - (System.currentTimeMillis() - inicio)
+                if (resto > 0) delay(resto)
+                fotoActualizada = true
+            } catch (e: ApiException) {
+                alertaFotoSel = AlertaDatos("No se pudo guardar la foto", e.message ?: "Error al subir la foto.")
+            } catch (e: Exception) {
+                alertaFotoSel = AlertaDatos("No se pudo guardar la foto", "No se pudo leer la imagen seleccionada. Prueba con otra foto.")
+            } finally {
+                guardandoFoto = false
+            }
+        }
+    }
     // Asistencias
     var fechaHojaSel by remember { mutableStateOf("") }   // fecha de la hoja cargada (servidor)
     // Registro de cuenta: estado de la petición y resultado que muestran los popups
@@ -1158,6 +1217,7 @@ fun EduConnectApp() {
                     }
                     HomePadreScreen(
                         usuarioNombre = usuarioLogueado?.nombrecompleto ?: "",
+                        fotoUrl = usuarioLogueado?.fotoId?.let { urlArchivo(it) },
                         tieneNotificaciones = notificacionesNoLeidasSel > 0,
                         onAsistencias = {
                             hijosAsistenciaCargados = false
@@ -1643,27 +1703,7 @@ fun EduConnectApp() {
                         onEditarDatos = { currentScreen = Screen.EDITAR_DATOS_DOCENTE },
                         // Foto de perfil
                         fotoUrl = usuarioLogueado?.fotoId?.let { urlArchivo(it) },
-                        onFotoElegida = { uri ->
-                            CoroutineScope(Dispatchers.Main).launch {
-                                guardandoFoto = true
-                                val inicio = System.currentTimeMillis()
-                                try {
-                                    val jpeg = prepararFotoPerfil(context.contentResolver, uri)
-                                    val actualizado = cambiarFotoPerfil(jpeg)
-                                    usuarioLogueado = usuarioLogueado?.copy(fotoId = actualizado.fotoArchivoId)
-                                    // El popup de carga se ve al menos 1 s aunque el servidor responda antes
-                                    val resto = 1000L - (System.currentTimeMillis() - inicio)
-                                    if (resto > 0) delay(resto)
-                                    fotoActualizada = true
-                                } catch (e: ApiException) {
-                                    alertaFotoSel = AlertaDatos("No se pudo guardar la foto", e.message ?: "Error al subir la foto.")
-                                } catch (e: Exception) {
-                                    alertaFotoSel = AlertaDatos("No se pudo guardar la foto", "No se pudo leer la imagen seleccionada. Prueba con otra foto.")
-                                } finally {
-                                    guardandoFoto = false
-                                }
-                            }
-                        },
+                        onFotoElegida = { uri -> guardarFotoPerfil(uri) },
                         guardandoFoto = guardandoFoto,
                         fotoActualizada = fotoActualizada,
                         alertaFoto = alertaFotoSel,
@@ -1711,8 +1751,21 @@ fun EduConnectApp() {
                         onEditarDni = {},
                         onEditarTelefono = {},
                         onEditarEmail = {},
-                        onAsociarHijo = { currentScreen = Screen.ASOCIAR_HIJO },
+                        onAsociarHijo = {
+                            origenAsociarHijo = Screen.PERFIL_PADRE
+                            currentScreen = Screen.ASOCIAR_HIJO
+                        },
                         onEliminarHijo = {},
+                        onGestionarHijos = { currentScreen = Screen.MIS_HIJOS },
+                        onEditarDatos = { currentScreen = Screen.EDITAR_DATOS_PADRE },
+                        // Foto de perfil
+                        fotoUrl = usuarioLogueado?.fotoId?.let { urlArchivo(it) },
+                        onFotoElegida = { uri -> guardarFotoPerfil(uri) },
+                        guardandoFoto = guardandoFoto,
+                        fotoActualizada = fotoActualizada,
+                        alertaFoto = alertaFotoSel,
+                        onCerrarExitoFoto = { fotoActualizada = false },
+                        onCerrarAlertaFoto = { alertaFotoSel = null },
                         onCambiarPassword = {},
                         onNotificacionesConfig = {},
                         onCerrarSesion = {
@@ -1859,28 +1912,7 @@ fun EduConnectApp() {
                     onBack = { currentScreen = Screen.PERFIL_DOCENTE },
                     onNotificaciones = {},
                     // Se llama después de que el usuario confirma en el popup
-                    onGuardar = { nombre, telefono ->
-                        CoroutineScope(Dispatchers.Main).launch {
-                            guardandoDatos = true
-                            val inicio = System.currentTimeMillis()
-                            try {
-                                val actualizado = actualizarPerfil(nombre, telefono)
-                                usuarioLogueado = usuarioLogueado?.copy(
-                                    nombrecompleto = actualizado.nombreCompleto,
-                                    telefono = actualizado.telefono
-                                )
-                                val resto = 1000L - (System.currentTimeMillis() - inicio)
-                                if (resto > 0) delay(resto)
-                                datosActualizados = true
-                            } catch (e: ApiException) {
-                                alertaDatosSel = AlertaDatos("No se pudo actualizar", e.message ?: "Error al guardar los datos.")
-                            } catch (e: Exception) {
-                                alertaDatosSel = AlertaDatos("No se pudo actualizar", "Error al guardar: ${e.message}")
-                            } finally {
-                                guardandoDatos = false
-                            }
-                        }
-                    },
+                    onGuardar = { nombre, telefono -> guardarDatosPersonales(nombre, telefono) },
                     procesando = guardandoDatos,
                     exito = datosActualizados,
                     alerta = alertaDatosSel,
@@ -1925,25 +1957,118 @@ fun EduConnectApp() {
                         }
                     },
                     alumnoEncontrado = alumnoEncontradoSel, mensajeError = errorBusquedaSel,
+                    // Se llama después de que el padre confirma en el popup
                     onConfirmar = { alumno ->
                         CoroutineScope(Dispatchers.Main).launch {
+                            asociandoHijo = true
+                            val inicio = System.currentTimeMillis()
                             try {
                                 val hijo = asociarHijo(alumno.codigoEstudiante)
-                                aviso("Hijo asociado correctamente")
-                                alumnoEncontradoSel = null; errorBusquedaSel = ""
                                 hijosAsociadosSel = hijosAsociadosSel.filter { it.id != hijo.alumnoId } + hijo.aHijoAsociado()
                                 hijosApiSel = hijosApiSel.orEmpty().filter { it.alumnoId != hijo.alumnoId } + hijo
                                 // Los módulos del padre deben incluir al nuevo hijo
                                 hijosAsistenciaCargados = false
                                 comunicadosPadreCargados = false
                                 agendaCargada = false
-                                currentScreen = Screen.PERFIL_PADRE
+                                val resto = 1000L - (System.currentTimeMillis() - inicio)
+                                if (resto > 0) delay(resto)
+                                hijoAsociadoOk = true
                             } catch (e: ApiException) {
-                                aviso(if (e.codigo == 409) "Este estudiante ya está asociado a tu cuenta" else (e.message ?: "Error al asociar"))
-                            } catch (e: Exception) { aviso("Error al asociar: ${e.message}") }
+                                alertaAsociarSel = if (e.codigo == 409) AlertaHijo(
+                                    "Hijo ya asociado",
+                                    "${alumno.nombres} ${alumno.apellidos} ya está asociado a tu cuenta."
+                                ) else AlertaHijo("No se pudo asociar", e.message ?: "Error al asociar al estudiante.")
+                            } catch (e: Exception) {
+                                alertaAsociarSel = AlertaHijo("No se pudo asociar", "Error al asociar: ${e.message}")
+                            } finally {
+                                asociandoHijo = false
+                            }
                         }
                     },
-                    onCancelar = { alumnoEncontradoSel = null; errorBusquedaSel = ""; currentScreen = Screen.PERFIL_PADRE }
+                    onCancelar = { alumnoEncontradoSel = null; errorBusquedaSel = ""; currentScreen = origenAsociarHijo },
+                    procesando = asociandoHijo,
+                    exito = hijoAsociadoOk,
+                    alerta = alertaAsociarSel,
+                    // Al cerrar el popup de éxito (X o 5 s) vuelve a la pantalla de origen con el nuevo hijo
+                    onCerrarExito = {
+                        hijoAsociadoOk = false
+                        alumnoEncontradoSel = null; errorBusquedaSel = ""
+                        currentScreen = origenAsociarHijo
+                    },
+                    onCerrarAlerta = { alertaAsociarSel = null }
+                )
+
+                Screen.MIS_HIJOS -> MisHijosScreen(
+                    hijos = hijosAsociadosSel,
+                    onBack = { currentScreen = Screen.PERFIL_PADRE },
+                    onNotificaciones = { abrirNotificaciones() },
+                    onHomePadre = { currentScreen = Screen.HOME_PADRE },
+                    onAvisos = { irAvisosPadre() },
+                    onAgenda = { irAgenda() },
+                    onPerfil = { currentScreen = Screen.PERFIL_PADRE },
+                    onAsociar = {
+                        origenAsociarHijo = Screen.MIS_HIJOS
+                        alumnoEncontradoSel = null; errorBusquedaSel = ""
+                        currentScreen = Screen.ASOCIAR_HIJO
+                    },
+                    // Se llama después de que el padre confirma en el popup
+                    onQuitar = { hijo ->
+                        CoroutineScope(Dispatchers.Main).launch {
+                            quitandoHijo = true
+                            val inicio = System.currentTimeMillis()
+                            try {
+                                desasociarHijo(hijo.id)
+                                hijosAsociadosSel = hijosAsociadosSel.filter { it.id != hijo.id }
+                                hijosApiSel = hijosApiSel?.filter { it.alumnoId != hijo.id }
+                                // Los módulos del padre ya no deben mostrar a este hijo
+                                hijosAsistenciaCargados = false
+                                comunicadosPadreCargados = false
+                                agendaCargada = false
+                                val resto = 1000L - (System.currentTimeMillis() - inicio)
+                                if (resto > 0) delay(resto)
+                                hijoQuitadoSel = hijo
+                            } catch (e: ApiException) {
+                                alertaQuitarSel = AlertaHijo("No se pudo quitar", e.message ?: "Error al quitar al estudiante.")
+                            } catch (e: Exception) {
+                                alertaQuitarSel = AlertaHijo("No se pudo quitar", "Error al quitar: ${e.message}")
+                            } finally {
+                                quitandoHijo = false
+                            }
+                        }
+                    },
+                    procesando = quitandoHijo,
+                    quitado = hijoQuitadoSel,
+                    alerta = alertaQuitarSel,
+                    // Se queda en la lista (si quedó vacía, muestra "Sin hijos asociados")
+                    onCerrarExito = { hijoQuitadoSel = null },
+                    onCerrarAlerta = { alertaQuitarSel = null }
+                )
+
+                Screen.EDITAR_DATOS_PADRE -> EditarDatosScreen(
+                    nombreActual = usuarioLogueado?.nombrecompleto ?: "",
+                    telefonoActual = usuarioLogueado?.telefono ?: "",
+                    dni = usuarioLogueado?.dni ?: "",
+                    email = usuarioLogueado?.email ?: "",
+                    onBack = { currentScreen = Screen.PERFIL_PADRE },
+                    onNotificaciones = { abrirNotificaciones() },
+                    onGuardar = { nombre, telefono -> guardarDatosPersonales(nombre, telefono) },
+                    procesando = guardandoDatos,
+                    exito = datosActualizados,
+                    alerta = alertaDatosSel,
+                    onCerrarExito = {
+                        datosActualizados = false
+                        currentScreen = Screen.PERFIL_PADRE
+                    },
+                    onCerrarAlerta = { alertaDatosSel = null },
+                    barraInferior = {
+                        BottomNavBarPadre(
+                            onInicio = { currentScreen = Screen.HOME_PADRE },
+                            onAvisos = { irAvisosPadre() },
+                            onAgenda = { irAgenda() },
+                            onPerfil = { currentScreen = Screen.PERFIL_PADRE },
+                            itemActivo = "Perfil"
+                        )
+                    }
                 )
 
                 Screen.SELECCIONAR_COMUNICADO -> {

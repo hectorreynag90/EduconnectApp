@@ -1,5 +1,6 @@
 package com.educonnectapp.ui.screens
 
+import android.net.Uri
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -20,6 +21,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.PersonAdd
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -82,14 +87,21 @@ fun PerfilPadreScreen(
     onEditarTelefono: () -> Unit = {},
     onEditarEmail: () -> Unit = {},
     onAsociarHijo: () -> Unit = {},
-    onEliminarHijo: (HijoAsociado) -> Unit = {},
+    onEliminarHijo: (HijoAsociado) -> Unit = {},   // ya no se usa aquí: se quita desde "Gestionar"
+    onGestionarHijos: () -> Unit = {},
+    onEditarDatos: () -> Unit = {},
+    // Foto de perfil
+    fotoUrl: String? = null,
+    onFotoElegida: (Uri) -> Unit = {},
+    guardandoFoto: Boolean = false,
+    fotoActualizada: Boolean = false,
+    alertaFoto: AlertaDatos? = null,
+    onCerrarExitoFoto: () -> Unit = {},
+    onCerrarAlertaFoto: () -> Unit = {},
     onCambiarPassword: () -> Unit = {},
     onNotificacionesConfig: () -> Unit = {},
     onCerrarSesion: () -> Unit = {},
 ) {
-    val iniciales = usuarioNombre.split(" ").take(2)
-        .mapNotNull { it.firstOrNull()?.uppercaseChar() }.joinToString("")
-
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -134,38 +146,17 @@ fun PerfilPadreScreen(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Avatar
-            Box(contentAlignment = Alignment.BottomEnd) {
-                Box(
-                    modifier = Modifier
-                        .size(80.dp)
-                        .clip(CircleShape)
-                        .background(AccentOrange),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = iniciales,
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 35.sp,
-                        color = TextWhite
-                    )
-                }
-                Box(
-                    modifier = Modifier
-                        .size(28.dp)
-                        .clip(CircleShape)
-                        .background(BackgroundWhite)
-                        .clickable { },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.camera_blue),
-                        contentDescription = "Cambiar foto",
-                        modifier = Modifier.size(23.dp)
-                    )
-                }
-            }
+            // Avatar con foto de perfil editable (FotoPerfilEdu.kt)
+            AvatarPerfilEditable(
+                nombre = usuarioNombre,
+                fotoUrl = fotoUrl,
+                onFotoElegida = onFotoElegida,
+                guardando = guardandoFoto,
+                actualizada = fotoActualizada,
+                alerta = alertaFoto,
+                onCerrarExito = onCerrarExitoFoto,
+                onCerrarAlerta = onCerrarAlertaFoto
+            )
 
             Spacer(modifier = Modifier.height(8.dp))
 
@@ -195,15 +186,21 @@ fun PerfilPadreScreen(
                 .padding(horizontal = 20.dp, vertical = 20.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // DATOS PERSONALES
-            Text(
-                text = "DATOS PERSONALES",
-                fontFamily = Roboto,
-                fontWeight = FontWeight.Bold,
-                fontSize = 16.sp,
-                color = EduconnectBlue,
-                modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
-            )
+            // DATOS PERSONALES: título + botón "Editar" (abre EditarDatosScreen)
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(start = 4.dp, bottom = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "DATOS PERSONALES",
+                    fontFamily = Roboto,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp,
+                    color = EduconnectBlue,
+                    modifier = Modifier.weight(1f)
+                )
+                BotonTitulo(icono = Icons.Filled.Edit, texto = "", onClick = onEditarDatos)
+            }
 
             Column(
                 modifier = Modifier
@@ -216,7 +213,7 @@ fun PerfilPadreScreen(
                     bgColor = BackgroundBlueLight2,
                     label = "Nombre completo",
                     valor = usuarioNombre,
-                    onClick = onEditarNombre
+                    onClick = null
                 )
                 HorizontalDivider(color = BorderLight, thickness = 1.dp)
                 FilaPerfil(
@@ -224,7 +221,7 @@ fun PerfilPadreScreen(
                     bgColor = BackgroundBlueLight2,
                     label = "DNI",
                     valor = if (dni.isNotEmpty()) dni else "No registrado",
-                    onClick = onEditarDni
+                    onClick = null
                 )
                 HorizontalDivider(color = BorderLight, thickness = 1.dp)
                 FilaPerfil(
@@ -232,7 +229,7 @@ fun PerfilPadreScreen(
                     bgColor = BackgroundBlueLight2,
                     label = "Teléfono",
                     valor = if (telefono.isNotEmpty()) telefono else "No registrado",
-                    onClick = onEditarTelefono
+                    onClick = null
                 )
                 HorizontalDivider(color = BorderLight, thickness = 1.dp)
                 FilaPerfil(
@@ -240,21 +237,33 @@ fun PerfilPadreScreen(
                     bgColor = BackgroundBlueLight2,
                     label = "Correo",
                     valor = if (email.isNotEmpty()) email else "No registrado",
-                    onClick = onEditarEmail
+                    onClick = null
                 )
             }
 
             Spacer(modifier = Modifier.height(4.dp))
 
-            // MIS HIJOS
-            Text(
-                text = "MIS HIJOS",
-                fontFamily = Roboto,
-                fontWeight = FontWeight.Bold,
-                fontSize = 16.sp,
-                color = EduconnectBlue,
-                modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
-            )
+            // MIS HIJOS: título + "Gestionar" (ver y quitar) + "Asociar" (ícono de usuario con +)
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(start = 4.dp, bottom = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "HIJOS ASIGNADOS",
+                    fontFamily = Roboto,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp,
+                    color = EduconnectBlue,
+                    modifier = Modifier.weight(1f)
+                )
+
+
+                BotonTitulo(icono = Icons.Filled.PersonAdd, texto = "", onClick = onAsociarHijo)
+
+                if (hijosAsociados.isNotEmpty()) {
+                    BotonTitulo(icono = Icons.Filled.Settings, texto = "", onClick = onGestionarHijos)
+                }
+            }
 
             Column(
                 modifier = Modifier
@@ -283,15 +292,14 @@ fun PerfilPadreScreen(
                             )
                         }
                         Text(
-                            text = "Sin hijos asociados aún",
+                            text = "Sin hijos asociados · usa \"Asociar\"",
                             fontFamily = Roboto,
                             fontSize = 14.sp,
                             color = TextSecondary
                         )
                     }
-                    HorizontalDivider(color = BorderLight, thickness = 0.5.dp)
                 } else {
-                    hijosAsociados.forEach { hijo ->
+                    hijosAsociados.forEachIndexed { indice, hijo ->
                         val inicialesHijo = "${hijo.nombres.firstOrNull() ?: ""}${hijo.apellidos.firstOrNull() ?: ""}".uppercase()
                         Row(
                             modifier = Modifier
@@ -335,58 +343,11 @@ fun PerfilPadreScreen(
                                     color = TextPrimary
                                 )
                             }
-                            Box(
-                                modifier = Modifier
-                                    .size(28.dp)
-                                    .background(Color(0xFFFCEBEB), RoundedCornerShape(8.dp))
-                                    .clickable { onEliminarHijo(hijo) },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Image(
-                                    painter = painterResource(id = R.drawable.close_red),
-                                    contentDescription = "Eliminar",
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
                         }
-                        HorizontalDivider(color = BorderLight, thickness = 1.dp)
+                        if (indice < hijosAsociados.lastIndex) {
+                            HorizontalDivider(color = BorderLight, thickness = 1.dp)
+                        }
                     }
-                }
-
-                // Botón asociar hijo
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { onAsociarHijo() }
-                        .padding(horizontal = 16.dp, vertical = 14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(38.dp)
-                            .background(BackgroundOrangeLight2, RoundedCornerShape(10.dp)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Image(
-                            painter = painterResource(id = R.drawable.useradd_red),
-                            contentDescription = null,
-                            modifier = Modifier.size(28.dp)
-                        )
-                    }
-                    Text(
-                        text = "Asociar nuevo hijo",
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 16.sp,
-                        color = AccentOrange,
-                        modifier = Modifier.weight(1f)
-                    )
-                    Image(
-                        painter = painterResource(id = R.drawable.next_red),
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
-                    )
                 }
             }
 
