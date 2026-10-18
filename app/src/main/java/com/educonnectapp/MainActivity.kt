@@ -31,6 +31,8 @@ import com.educonnectapp.ui.screens.MisAsignacionesScreen
 import com.educonnectapp.ui.screens.AlertaHijo
 import com.educonnectapp.ui.screens.BottomNavBarPadre
 import com.educonnectapp.ui.screens.MisHijosScreen
+import com.educonnectapp.ui.screens.CambiarContrasenaScreen
+import com.educonnectapp.ui.screens.NotificacionesConfigScreen
 import com.educonnectapp.ui.screens.AlumnoEncontrado
 import com.educonnectapp.ui.screens.AsistenciasScreen
 import com.educonnectapp.ui.screens.AsociarHijoScreen
@@ -117,6 +119,9 @@ import com.educonnectapp.data.api.obtenerAsignaciones
 import com.educonnectapp.data.api.agregarAsignacion
 import com.educonnectapp.data.api.eliminarAsignacion
 import com.educonnectapp.data.api.actualizarPerfil
+import com.educonnectapp.data.api.cambiarContrasena
+import com.educonnectapp.data.api.guardarPreferenciasNotificacion
+import com.educonnectapp.data.api.obtenerPreferenciasNotificacion
 import com.educonnectapp.data.api.cambiarFotoPerfil
 import com.educonnectapp.data.api.crearCargadorImagenes
 import com.educonnectapp.data.api.prepararFotoPerfil
@@ -190,6 +195,7 @@ enum class Screen {
     COMUNICADOS, NUEVO_COMUNICADO, CONFIRMACION_COMUNICADO,
     PERFIL_DOCENTE, PERFIL_PADRE, AGREGAR_ASIGNACION, ASOCIAR_HIJO,
     MIS_ASIGNACIONES, EDITAR_DATOS_DOCENTE, MIS_HIJOS, EDITAR_DATOS_PADRE,
+    CAMBIAR_CONTRASENA, CONFIG_NOTIFICACIONES,
     SELECCIONAR_COMUNICADO, BUSQUEDA_COMUNICADO, DETALLE_COMUNICADO,
     PUBLICACIONES, SELECCIONAR_CURSO_PUBLICACION, NUEVA_TAREA, NUEVA_EVALUACION, CONFIRMACION_PUBLICACION,
     SELECCIONAR_HIJO_AGENDA, AGENDA_ESCOLAR, DETALLE_AGENDA,
@@ -398,6 +404,17 @@ fun EduConnectApp() {
     var quitandoHijo by remember { mutableStateOf(false) }
     var hijoQuitadoSel by remember { mutableStateOf<HijoAsociado?>(null) }
     var alertaQuitarSel by remember { mutableStateOf<AlertaHijo?>(null) }
+    // Configuración: cambiar contraseña
+    var cambiandoClave by remember { mutableStateOf(false) }
+    var claveActualizada by remember { mutableStateOf(false) }
+    var alertaClaveSel by remember { mutableStateOf<AlertaDatos?>(null) }
+    // Configuración: notificaciones (tipo -> activo, en el orden que envía el backend)
+    var preferenciasNotifSel by remember { mutableStateOf<Map<String, Boolean>>(emptyMap()) }
+    var cargandoPreferencias by remember { mutableStateOf(false) }
+    var guardandoPreferencias by remember { mutableStateOf(false) }
+    var preferenciasGuardadas by remember { mutableStateOf(false) }
+    var alertaPreferenciasSel by remember { mutableStateOf<AlertaDatos?>(null) }
+    var notifSistemaActivas by remember { mutableStateOf(true) }
 
     // EDITAR DATOS (docente y padre): guarda nombre y teléfono y actualiza la sesión
     fun guardarDatosPersonales(nombre: String, telefono: String) {
@@ -1710,8 +1727,8 @@ fun EduConnectApp() {
                         onCerrarExitoFoto = { fotoActualizada = false },
                         onCerrarAlertaFoto = { alertaFotoSel = null },
                         onEliminarAsignacion = {},
-                        onCambiarPassword = {},
-                        onNotificacionesConfig = {},
+                        onCambiarPassword = { currentScreen = Screen.CAMBIAR_CONTRASENA },
+                        onNotificacionesConfig = { currentScreen = Screen.CONFIG_NOTIFICACIONES },
                         onCerrarSesion = {
                             CoroutineScope(Dispatchers.Main).launch {
                                 try {
@@ -1766,8 +1783,8 @@ fun EduConnectApp() {
                         alertaFoto = alertaFotoSel,
                         onCerrarExitoFoto = { fotoActualizada = false },
                         onCerrarAlertaFoto = { alertaFotoSel = null },
-                        onCambiarPassword = {},
-                        onNotificacionesConfig = {},
+                        onCambiarPassword = { currentScreen = Screen.CAMBIAR_CONTRASENA },
+                        onNotificacionesConfig = { currentScreen = Screen.CONFIG_NOTIFICACIONES },
                         onCerrarSesion = {
                             CoroutineScope(Dispatchers.Main).launch {
                                 try {
@@ -1997,6 +2014,146 @@ fun EduConnectApp() {
                     },
                     onCerrarAlerta = { alertaAsociarSel = null }
                 )
+
+                Screen.CAMBIAR_CONTRASENA -> {
+                    val esDocente = usuarioLogueado?.rol == "DOCENTE"
+                    val perfil = if (esDocente) Screen.PERFIL_DOCENTE else Screen.PERFIL_PADRE
+                    CambiarContrasenaScreen(
+                        onBack = { currentScreen = perfil },
+                        onNotificaciones = { abrirNotificaciones() },
+                        // Se llama después de que el usuario confirma en el popup
+                        onGuardar = { actual, nueva ->
+                            CoroutineScope(Dispatchers.Main).launch {
+                                cambiandoClave = true
+                                val inicio = System.currentTimeMillis()
+                                try {
+                                    cambiarContrasena(actual, nueva)
+                                    val resto = 1000L - (System.currentTimeMillis() - inicio)
+                                    if (resto > 0) delay(resto)
+                                    claveActualizada = true
+                                } catch (e: ApiException) {
+                                    alertaClaveSel = when {
+                                        e.message?.contains("actual es incorrecta") == true ->
+                                            AlertaDatos("Contraseña actual incorrecta", "Revisa la contraseña que usas hoy para ingresar.")
+                                        e.message?.contains("distinta") == true ->
+                                            AlertaDatos("Contraseña repetida", "La nueva contraseña debe ser distinta a la actual.")
+                                        else -> AlertaDatos("No se pudo cambiar", e.message ?: "Error al cambiar la contraseña.")
+                                    }
+                                } catch (e: Exception) {
+                                    alertaClaveSel = AlertaDatos("No se pudo cambiar", "Error: ${e.message}")
+                                } finally {
+                                    cambiandoClave = false
+                                }
+                            }
+                        },
+                        procesando = cambiandoClave,
+                        exito = claveActualizada,
+                        alerta = alertaClaveSel,
+                        // Al cerrar el popup de éxito (X o 5 s) se cierra la sesión y va al Login
+                        onCerrarExito = {
+                            claveActualizada = false
+                            CoroutineScope(Dispatchers.Main).launch {
+                                try { cerrarSesion() } catch (e: Exception) { }
+                                limpiarDatosSesion()
+                                currentScreen = Screen.LOGIN
+                            }
+                        },
+                        onCerrarAlerta = { alertaClaveSel = null },
+                        barraInferior = {
+                            if (esDocente) BottomNavBarDocente(
+                                onInicio = { currentScreen = Screen.HOME_DOCENTE },
+                                onAlumnos = {},
+                                onAvisos = { currentScreen = Screen.COMUNICADOS },
+                                onPerfil = { currentScreen = Screen.PERFIL_DOCENTE },
+                                itemActivo = "Perfil"
+                            ) else BottomNavBarPadre(
+                                onInicio = { currentScreen = Screen.HOME_PADRE },
+                                onAvisos = { irAvisosPadre() },
+                                onAgenda = { irAgenda() },
+                                onPerfil = { currentScreen = Screen.PERFIL_PADRE },
+                                itemActivo = "Perfil"
+                            )
+                        }
+                    )
+                }
+
+                Screen.CONFIG_NOTIFICACIONES -> {
+                    val esDocente = usuarioLogueado?.rol == "DOCENTE"
+                    val perfil = if (esDocente) Screen.PERFIL_DOCENTE else Screen.PERFIL_PADRE
+                    androidx.compose.runtime.LaunchedEffect(Unit) {
+                        // Estado de las notificaciones de la app en Android (por si el usuario las bloqueó)
+                        notifSistemaActivas = androidx.core.app.NotificationManagerCompat.from(context).areNotificationsEnabled()
+                        cargandoPreferencias = true
+                        try {
+                            preferenciasNotifSel = obtenerPreferenciasNotificacion()
+                                .associate { it.tipo to it.activo }
+                        } catch (e: kotlinx.coroutines.CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            alertaPreferenciasSel = AlertaDatos("No se pudieron cargar", e.message ?: "Error al cargar tus preferencias.")
+                        } finally {
+                            cargandoPreferencias = false
+                        }
+                    }
+                    NotificacionesConfigScreen(
+                        preferencias = preferenciasNotifSel,
+                        cargando = cargandoPreferencias,
+                        notificacionesSistemaActivas = notifSistemaActivas,
+                        onBack = { currentScreen = perfil },
+                        onNotificaciones = { abrirNotificaciones() },
+                        // Se llama después de que el usuario confirma en el popup
+                        onGuardar = { cambios ->
+                            CoroutineScope(Dispatchers.Main).launch {
+                                guardandoPreferencias = true
+                                val inicio = System.currentTimeMillis()
+                                try {
+                                    preferenciasNotifSel = guardarPreferenciasNotificacion(cambios)
+                                        .associate { it.tipo to it.activo }
+                                    val resto = 1000L - (System.currentTimeMillis() - inicio)
+                                    if (resto > 0) delay(resto)
+                                    preferenciasGuardadas = true
+                                } catch (e: ApiException) {
+                                    alertaPreferenciasSel = AlertaDatos("No se pudo guardar", e.message ?: "Error al guardar tus preferencias.")
+                                } catch (e: Exception) {
+                                    alertaPreferenciasSel = AlertaDatos("No se pudo guardar", "Error: ${e.message}")
+                                } finally {
+                                    guardandoPreferencias = false
+                                }
+                            }
+                        },
+                        // Ajustes de notificaciones de Android para EduConnect (sonido, vibración, bloquear)
+                        onAbrirAjustesSistema = {
+                            val intent = android.content.Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                                .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, context.packageName)
+                                .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                            try { context.startActivity(intent) } catch (e: Exception) { aviso("No se pudo abrir los ajustes") }
+                        },
+                        procesando = guardandoPreferencias,
+                        exito = preferenciasGuardadas,
+                        alerta = alertaPreferenciasSel,
+                        // Al cerrar el éxito vuelve al perfil
+                        onCerrarExito = {
+                            preferenciasGuardadas = false
+                            currentScreen = perfil
+                        },
+                        onCerrarAlerta = { alertaPreferenciasSel = null },
+                        barraInferior = {
+                            if (esDocente) BottomNavBarDocente(
+                                onInicio = { currentScreen = Screen.HOME_DOCENTE },
+                                onAlumnos = {},
+                                onAvisos = { currentScreen = Screen.COMUNICADOS },
+                                onPerfil = { currentScreen = Screen.PERFIL_DOCENTE },
+                                itemActivo = "Perfil"
+                            ) else BottomNavBarPadre(
+                                onInicio = { currentScreen = Screen.HOME_PADRE },
+                                onAvisos = { irAvisosPadre() },
+                                onAgenda = { irAgenda() },
+                                onPerfil = { currentScreen = Screen.PERFIL_PADRE },
+                                itemActivo = "Perfil"
+                            )
+                        }
+                    )
+                }
 
                 Screen.MIS_HIJOS -> MisHijosScreen(
                     hijos = hijosAsociadosSel,
