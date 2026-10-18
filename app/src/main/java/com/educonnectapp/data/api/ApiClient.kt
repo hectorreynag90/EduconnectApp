@@ -141,6 +141,17 @@ interface EduConnectApi {
     @PUT("api/perfil")
     suspend fun actualizarPerfil(@Body body: ActualizarPerfilRequest): UsuarioResponse
 
+    // Cambiar contraseña (400 = contraseña actual incorrecta o igual a la nueva)
+    @PUT("api/perfil/password")
+    suspend fun cambiarContrasena(@Body body: CambiarContrasenaRequest)
+
+    // Preferencias de notificaciones push
+    @GET("api/perfil/notificaciones")
+    suspend fun preferenciasNotificacion(): List<PreferenciaNotificacionResponse>
+
+    @PUT("api/perfil/notificaciones")
+    suspend fun guardarPreferenciasNotificacion(@Body body: ActualizarPreferenciasRequest): List<PreferenciaNotificacionResponse>
+
     // Foto de perfil (multipart, campo "foto")
     @Multipart
     @POST("api/perfil/foto")
@@ -387,6 +398,43 @@ data class ActualizarPerfilRequest(val nombreCompleto: String, val telefono: Str
 // Devuelve el usuario con los datos ya guardados
 suspend fun actualizarPerfil(nombre: String, telefono: String): UsuarioResponse =
     llamar { api.actualizarPerfil(ActualizarPerfilRequest(nombre.trim(), telefono.trim())) }
+
+// =====================================================================
+// CAMBIAR CONTRASEÑA
+// 400 = la contraseña actual es incorrecta, la nueva es igual o no cumple la regla
+// =====================================================================
+
+@Serializable
+data class CambiarContrasenaRequest(val passwordActual: String, val passwordNueva: String)
+
+suspend fun cambiarContrasena(actual: String, nueva: String) =
+    llamar { api.cambiarContrasena(CambiarContrasenaRequest(actual, nueva)) }
+
+// =====================================================================
+// PREFERENCIAS DE NOTIFICACIONES (push por tipo; la campana siempre las registra)
+// tipo: "ASISTENCIA" | "COMUNICADO" | "PUBLICACION" | "CALIFICACION" | "AVISO"
+// El backend devuelve solo los tipos que aplican al rol del usuario.
+// =====================================================================
+
+@Serializable
+data class PreferenciaNotificacionResponse(val tipo: String, val activo: Boolean = true)
+
+@Serializable
+data class PreferenciaItemRequest(val tipo: String, val activo: Boolean)
+
+@Serializable
+data class ActualizarPreferenciasRequest(val preferencias: List<PreferenciaItemRequest>)
+
+suspend fun obtenerPreferenciasNotificacion(): List<PreferenciaNotificacionResponse> =
+    llamar { api.preferenciasNotificacion() }
+
+// Envía solo los tipos que cambiaron (tipo -> activo)
+suspend fun guardarPreferenciasNotificacion(cambios: Map<String, Boolean>): List<PreferenciaNotificacionResponse> =
+    llamar {
+        api.guardarPreferenciasNotificacion(
+            ActualizarPreferenciasRequest(cambios.map { (tipo, activo) -> PreferenciaItemRequest(tipo, activo) })
+        )
+    }
 
 // =====================================================================
 // FOTO DE PERFIL
