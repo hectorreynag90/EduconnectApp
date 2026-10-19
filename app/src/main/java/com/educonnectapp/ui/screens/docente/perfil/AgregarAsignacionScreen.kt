@@ -1,35 +1,29 @@
-package com.educonnectapp.ui.screens
+package com.educonnectapp.ui.screens.docente.perfil
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Notifications
+import androidx.compose.material.icons.rounded.School
+import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -38,41 +32,50 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.educonnectapp.R
+import com.educonnectapp.ui.components.BotonIconoCabeceraEdu
+import com.educonnectapp.ui.components.BotonPrincipalEdu
+import com.educonnectapp.ui.components.BotonSecundarioEdu
+import com.educonnectapp.ui.components.CabeceraEdu
+import com.educonnectapp.ui.components.ColorModulo
+import com.educonnectapp.ui.components.IconoCirculoEdu
 import com.educonnectapp.ui.components.PopupConfirmacionEdu
 import com.educonnectapp.ui.components.PopupExitoEdu
 import com.educonnectapp.ui.components.PopupProcesandoEdu
 import com.educonnectapp.ui.components.ResumenAsignacionEdu
+import com.educonnectapp.ui.components.TarjetaEdu
+import com.educonnectapp.ui.components.TipoBotonEdu
+import com.educonnectapp.ui.components.TituloSeccionEdu
+import com.educonnectapp.ui.components.TonoEdu
 import com.educonnectapp.ui.screens.acceso.PopupAlertaEdu
 import com.educonnectapp.ui.screens.docente.inicio.BottomNavBarDocente
-import com.educonnectapp.ui.theme.AccentOrange
-import com.educonnectapp.ui.theme.BackgroundLight
-import com.educonnectapp.ui.theme.BackgroundWhite
-import com.educonnectapp.ui.theme.BorderBlue
-import com.educonnectapp.ui.theme.BorderLight
+import com.educonnectapp.ui.theme.EduAmarillo
+import com.educonnectapp.ui.theme.EduBorde
 import com.educonnectapp.ui.theme.EduConnectAppTheme
-import com.educonnectapp.ui.theme.EduconnectBlue
-import com.educonnectapp.ui.theme.Roboto
-import com.educonnectapp.ui.theme.TextBlue
-import com.educonnectapp.ui.theme.TextPrimary
-import com.educonnectapp.ui.theme.TextSecondary
-import com.educonnectapp.ui.theme.TextWhite
-import com.educonnectapp.ui.theme.NaranjaMedia
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import com.educonnectapp.ui.theme.EduEtiqueta
+import com.educonnectapp.ui.theme.EduFondo
+import com.educonnectapp.ui.theme.EduTeal
+import com.educonnectapp.ui.theme.EduTealClaro
+import com.educonnectapp.ui.theme.EduTealOscuro
+import com.educonnectapp.ui.theme.EduTexto
+import com.educonnectapp.ui.theme.EduTextoSecundario
+import com.educonnectapp.ui.theme.Nunito
 
-private val BackgroundBlueLight3 = Color(0xFFE6F1FB)
-
-// Error del servidor al registrar la asignación (lo arma MainActivity y se muestra como popup)
+// Error del servidor al registrar o quitar la asignación (lo arma MainActivity y se muestra como popup)
 data class AlertaAsignacion(val titulo: String, val mensaje: String)
 
+// =====================================================================
+// AGREGAR ASIGNACIÓN (rediseño 2026)
+// Cabecera fija azul oscuro · grado y sección con pastillas · cursos en tarjetas ·
+// resumen + Cancelar / Agregar fijos abajo
+// =====================================================================
+
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun AgregarAsignacionScreen(
     onBack: () -> Unit = {},
@@ -92,370 +95,180 @@ fun AgregarAsignacionScreen(
     alerta: AlertaAsignacion? = null,
     onCerrarExito: () -> Unit = {},
     onCerrarAlerta: () -> Unit = {}
-){
-    var gradoSeleccionado by remember { mutableStateOf("Seleccione...") }
-    var seccionSeleccionada by remember { mutableStateOf("") }
-    var cursoSeleccionado by remember { mutableStateOf("Seleccione...") }
-    var dropdownGradoExpanded by remember { mutableStateOf(false) }
-    var dropdownCursoExpanded by remember { mutableStateOf(false) }
+) {
+    var grado by remember { mutableStateOf("") }
+    var seccion by remember { mutableStateOf("") }
+    var curso by remember { mutableStateOf("") }
     var mostrarConfirmacion by remember { mutableStateOf(false) }
 
-    val listaSecciones = if (gradoSeleccionado != "Seleccione...")
-        seccionesDisp[gradoSeleccionado] ?: emptyList()
-    else emptyList()
-
-    val seleccionCompleta = gradoSeleccionado != "Seleccione..." &&
-            seccionSeleccionada.isNotEmpty() &&
-            cursoSeleccionado != "Seleccione..."
-
-    // obtiene la fecha actual del dispositivo en español
-    val fechaActual = remember {
-        val sdf = SimpleDateFormat("EEEE, dd 'de' MMMM yyyy", Locale("es", "PE"))
-        sdf.format(Date())
-            .replaceFirstChar { it.uppercase() } // pone la primera letra en mayúscula
-    }
+    val secciones = if (grado.isNotEmpty()) seccionesDisp[grado] ?: emptyList() else emptyList()
+    val completa = grado.isNotEmpty() && seccion.isNotEmpty() && curso.isNotEmpty()
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(BackgroundLight)
+            .background(EduFondo)
     ) {
-        // HEADER
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(EduconnectBlue)
-                .padding(horizontal = 20.dp, vertical = 20.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Row(
-                modifier = Modifier.weight(1f),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                IconButton(
-                    onClick = onBack,
-                    modifier = Modifier.size(35.dp).offset(x = (-5).dp)
-                ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.arrowleft_white),
-                        contentDescription = "Volver",
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-                Column {
-                    Text(
-                        text = "Agregar asignación",
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 22.sp,
-                        color = TextWhite
-                    )
-                    Text(
-                        text = "Selecciona grado, sección y curso",
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.Normal,
-                        fontSize = 16.sp,
-                        color = TextWhite.copy(alpha = 0.85f)
-                    )
-                    Text(
-                        text = fechaActual, // fecha actual
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.Normal,
-                        fontSize = 15.sp,
-                        color = TextWhite
-                    )
-                }
-            }
-            IconButton(onClick = onNotificaciones) {
-                Image(
-                    painter = painterResource(id = R.drawable.notification_white),
-                    contentDescription = "Notificaciones",
-                    modifier = Modifier.size(35.dp)
+        // CABECERA FIJA
+        CabeceraEdu(
+            titulo = "Agregar asignación",
+            subtitulo = "Elige grado, sección y curso",
+            onVolver = onBack,
+            colorFondo = ColorModulo.Perfil,
+            acciones = {
+                BotonIconoCabeceraEdu(
+                    icono = Icons.Rounded.Notifications,
+                    descripcion = "Notificaciones",
+                    onClick = onNotificaciones,
+                    colorCabecera = ColorModulo.Perfil
                 )
             }
-        }
+        )
 
-        // CONTENIDO
+        // CONTENIDO DESPLAZABLE
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             // GRADO
-            Text(
-                text = "GRADO",
-                fontFamily = Roboto,
-                fontWeight = FontWeight.Bold,
-                fontSize = 16.sp,
-                color = EduconnectBlue,
-                modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
-            )
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(BackgroundWhite, RoundedCornerShape(14.dp))
-                    .border(0.5.dp, BorderBlue, RoundedCornerShape(14.dp))
-                    .padding(12.dp)
-            ) {
-                Text(text = "Seleccione el grado", fontFamily = Roboto,
-                    fontSize = 15.sp, color = TextPrimary)
-                Spacer(modifier = Modifier.height(6.dp))
-                Box(modifier = Modifier.fillMaxWidth()) {
-                    OutlinedTextField(
-                        value = gradoSeleccionado,
-                        onValueChange = {}, readOnly = true,
-                        trailingIcon = {
-                            IconButton(onClick = { dropdownGradoExpanded = true }) {
-                                Icon(Icons.Filled.KeyboardArrowDown,
-                                    contentDescription = null, tint = TextSecondary)
-                            }
-                        },
-                        shape = RoundedCornerShape(10.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = EduconnectBlue,
-                            unfocusedBorderColor = BorderLight,
-                            focusedTextColor = TextPrimary,
-                            unfocusedTextColor = TextPrimary,
-                            focusedContainerColor = BackgroundBlueLight3,
-                            unfocusedContainerColor = BackgroundBlueLight3
-                        ),
-                        modifier = Modifier.fillMaxWidth().height(50.dp)
-                    )
-                    Box(modifier = Modifier.matchParentSize().padding(end = 48.dp)
-                        .clickable { dropdownGradoExpanded = true })
-                    DropdownMenu(expanded = dropdownGradoExpanded,
-                        onDismissRequest = { dropdownGradoExpanded = false }) {
-                        gradosDisp.forEach { grado ->
-                            DropdownMenuItem(
-                                text = { Text(grado, fontFamily = Roboto,
-                                    fontSize = 16.sp, color = TextBlue) },
-                                onClick = {
-                                    gradoSeleccionado = grado
-                                    seccionSeleccionada = ""
-                                    dropdownGradoExpanded = false
-                                }
-                            )
-                        }
+            TituloSeccionEdu("Grado")
+            if (gradosDisp.isEmpty()) {
+                MensajeVacioAsignacion("Cargando grados...")
+            } else {
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    gradosDisp.forEach { g ->
+                        PastillaAsignacion(g, g == grado) { grado = g; seccion = "" }
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(2.dp))
-            // SECCIÓN
-            Text(
-                text = "SECCIÓN",
-                fontFamily = Roboto,
-                fontWeight = FontWeight.Bold,
-                fontSize = 15.sp,
-                color = EduconnectBlue,
-                modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
-            )
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(BackgroundWhite, RoundedCornerShape(14.dp))
-                    .border(0.5.dp, BorderBlue, RoundedCornerShape(14.dp))
-                    .padding(12.dp)
-            ) {
-                Text(text = "Seleccione la sección", fontFamily = Roboto,
-                    fontSize = 15.sp, color = TextPrimary)
-                Spacer(modifier = Modifier.height(8.dp))
-                if (listaSecciones.isEmpty()) {
-                    Text(text = "Primero selecciona un grado",
-                        fontFamily = Roboto, fontSize = 14.sp, color = TextSecondary)
+            // SECCIÓN (aparece al elegir el grado)
+            if (grado.isNotEmpty()) {
+                TituloSeccionEdu("Sección", modifier = Modifier.padding(top = 6.dp))
+                if (secciones.isEmpty()) {
+                    MensajeVacioAsignacion("Este grado aún no tiene secciones registradas.")
                 } else {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        listaSecciones.forEach { seccion ->
-                            val seleccionada = seccion == seccionSeleccionada
-                            Box(
-                                modifier = Modifier
-                                    .size(42.dp)
-                                    .background(
-                                        if (seleccionada) EduconnectBlue else BackgroundWhite,
-                                        RoundedCornerShape(10.dp)
-                                    )
-                                    .border(
-                                        1.5.dp,
-                                        if (seleccionada) EduconnectBlue else BorderLight,
-                                        RoundedCornerShape(10.dp)
-                                    )
-                                    .clickable { seccionSeleccionada = seccion },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(text = seccion, fontFamily = Roboto,
-                                    fontWeight = FontWeight.Bold, fontSize = 16.sp,
-                                    color = if (seleccionada) TextWhite else TextSecondary)
-                            }
-                        }
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        secciones.forEach { s -> PastillaAsignacion("Sección $s", s == seccion) { seccion = s } }
                     }
                 }
             }
-
-            Spacer(modifier = Modifier.height(2.dp))
 
             // CURSO
-            Text(
-                text = "CURSO",
-                fontFamily = Roboto,
-                fontWeight = FontWeight.Bold,
-                fontSize = 15.sp,
-                color = EduconnectBlue,
-                modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
-            )
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(BackgroundWhite, RoundedCornerShape(14.dp))
-                    .border(0.5.dp, BorderBlue, RoundedCornerShape(14.dp))
-                    .padding(12.dp)
-            ) {
-                Text(text = "Seleccione el curso", fontFamily = Roboto,
-                    fontSize = 15.sp, color = TextPrimary)
-                Spacer(modifier = Modifier.height(6.dp))
-                Box(modifier = Modifier.fillMaxWidth()) {
-                    OutlinedTextField(
-                        value = cursoSeleccionado,
-                        onValueChange = {}, readOnly = true,
-                        trailingIcon = {
-                            IconButton(onClick = { dropdownCursoExpanded = true }) {
-                                Icon(Icons.Filled.KeyboardArrowDown,
-                                    contentDescription = null, tint = TextSecondary)
-                            }
-                        },
-                        shape = RoundedCornerShape(10.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = EduconnectBlue,
-                            unfocusedBorderColor = BorderLight,
-                            focusedTextColor = TextPrimary,
-                            unfocusedTextColor = TextPrimary,
-                            focusedContainerColor = BackgroundBlueLight3,
-                            unfocusedContainerColor = BackgroundBlueLight3
-                        ),
-                        modifier = Modifier.fillMaxWidth().height(50.dp)
-                    )
-                    Box(modifier = Modifier.matchParentSize().padding(end = 48.dp)
-                        .clickable { dropdownCursoExpanded = true })
-                    DropdownMenu(expanded = dropdownCursoExpanded,
-                        onDismissRequest = { dropdownCursoExpanded = false }) {
-                        cursosDisp.forEach { curso ->
-                            DropdownMenuItem(
-                                text = { Text(curso, fontFamily = Roboto,
-                                    fontSize = 14.sp, color = TextBlue) },
-                                onClick = {
-                                    cursoSeleccionado = curso
-                                    dropdownCursoExpanded = false
-                                }
-                            )
-                        }
-                    }
-                }
-            }
-
-            // PREVIEW SELECCIÓN
-            if (seleccionCompleta) {
+            TituloSeccionEdu("Curso", modifier = Modifier.padding(top = 6.dp))
+            if (cursosDisp.isEmpty()) MensajeVacioAsignacion("Cargando cursos...")
+            cursosDisp.forEach { c ->
+                val elegido = c == curso
+                val forma = RoundedCornerShape(18.dp)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(BackgroundBlueLight3, RoundedCornerShape(12.dp))
-                        .border(1.dp, EduconnectBlue, RoundedCornerShape(12.dp))
-                        .padding(12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        .clip(forma)
+                        .background(if (elegido) EduTealClaro else Color.White)
+                        .border(if (elegido) 2.dp else 1.5.dp, if (elegido) EduTeal else EduBorde, forma)
+                        .clickable { curso = c }
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Box(
-                        modifier = Modifier.size(40.dp)
-                            .background(EduconnectBlue, RoundedCornerShape(10.dp)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Image(painter = painterResource(id = R.drawable.teacher_white),
-                            contentDescription = null, modifier = Modifier.size(22.dp))
+                    Text(
+                        c, modifier = Modifier.weight(1f), fontFamily = Nunito,
+                        fontWeight = if (elegido) FontWeight.Black else FontWeight.Bold, fontSize = 15.5.sp,
+                        color = if (elegido) EduTealOscuro else EduTexto
+                    )
+                    if (elegido) {
+                        Box(
+                            modifier = Modifier.size(26.dp).background(EduTeal, CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Rounded.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                        }
                     }
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(text = "$gradoSeleccionado · Sec. $seccionSeleccionada",
-                            fontFamily = Roboto, fontWeight = FontWeight.Bold,
-                            fontSize = 17.sp, color = EduconnectBlue)
-                        Text(text = cursoSeleccionado, fontFamily = Roboto,
-                            fontSize = 15.sp, color = TextBlue)
-                    }
-                    Image(painter = painterResource(id = R.drawable.check_blue),
-                        contentDescription = null, modifier = Modifier.size(22.dp))
                 }
             }
-
-            Spacer(modifier = Modifier.height(60.dp))
-
-            // BOTÓN GUARDAR
-            Button(
-                onClick = { if (seleccionCompleta) mostrarConfirmacion = true },
-                modifier = Modifier.fillMaxWidth().height(50.dp),
-                shape = RoundedCornerShape(25.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (seleccionCompleta) AccentOrange else BorderLight
-                ),
-                enabled = seleccionCompleta
-            ) {
-                Image(painter = painterResource(id = R.drawable.add_white),
-                    contentDescription = null, modifier = Modifier.size(25.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(text = "Agregar Asignación", fontFamily = Roboto,
-                    fontWeight = FontWeight.Bold, fontSize = 20.sp,
-                    color = if (seleccionCompleta) TextWhite else TextSecondary)
-            }
-
-            // BOTÓN CANCELAR
-            Button(
-                onClick = onCancelar,
-                modifier = Modifier.fillMaxWidth().height(46.dp),
-                shape = RoundedCornerShape(25.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = BackgroundWhite)
-            ) {
-                Text(text = "Cancelar", fontFamily = Roboto,
-                    fontWeight = FontWeight.Bold, fontSize = 20.sp, color = TextSecondary)
-            }
-
-            Spacer(modifier = Modifier.height(28.dp))
         }
 
-        //NAVBAR INFERIOR
+        // ZONA FIJA: resumen + botones
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(EduFondo)
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            if (completa) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color.White, RoundedCornerShape(18.dp))
+                        .border(1.5.dp, EduBorde, RoundedCornerShape(18.dp))
+                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    IconoCirculoEdu(Icons.Rounded.School, TonoEdu.VERDE, tamano = 40.dp)
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("$grado $seccion · $curso", fontFamily = Nunito, fontWeight = FontWeight.Black, fontSize = 15.5.sp, color = EduTexto)
+                        Text("Se agregará a tus clases", fontFamily = Nunito, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = EduEtiqueta)
+                    }
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                BotonSecundarioEdu(texto = "Cancelar", modifier = Modifier.weight(1f), onClick = onCancelar)
+                BotonPrincipalEdu(
+                    texto = "Agregar",
+                    tipo = TipoBotonEdu.GUARDAR,
+                    icono = Icons.Rounded.Add,
+                    modifier = Modifier.weight(1f),
+                    habilitado = completa && !procesando,
+                    onClick = { if (completa) mostrarConfirmacion = true }
+                )
+            }
+        }
+
         BottomNavBarDocente(
             onInicio = onHomeDocente,
             onAlumnos = onAlumnos,
             onAvisos = onAvisos,
             onPerfil = onPerfil,
-            itemActivo = "Perfil",
+            itemActivo = "Perfil"
         )
     }
 
-    // ===================== POPUPS (PopupsEdu.kt) =====================
-    // 1. Confirmación antes de registrar
+    // ===================== POPUPS =====================
     if (mostrarConfirmacion) {
         PopupConfirmacionEdu(
-            titulo = "¿Confirmar asignación?",
-            mensaje = "Se agregará a tu perfil la siguiente asignación:",
+            titulo = "¿Agregar asignación?",
+            mensaje = "Se agregará a tus clases la siguiente asignación:",
+            textoConfirmar = "Agregar",
+            colorConfirmar = TipoBotonEdu.GUARDAR.fondo,
+            icono = Icons.Rounded.School,
             onCancelar = { mostrarConfirmacion = false },
             onConfirmar = {
                 mostrarConfirmacion = false
-                onGuardar(gradoSeleccionado, seccionSeleccionada, cursoSeleccionado)
+                onGuardar(grado, seccion, curso)
             }
         ) {
-            ResumenAsignacionEdu(gradoSeleccionado, seccionSeleccionada, cursoSeleccionado)
+            ResumenAsignacionEdu(grado, seccion, curso)
         }
     }
 
-    // 2. Procesando (mientras el servidor guarda)
     if (procesando) PopupProcesandoEdu(titulo = "Registrando asignación…")
 
-    // 3. Éxito: se cierra solo a los 5 segundos o con la X
     if (exito) {
         PopupExitoEdu(
-            titulo = "¡Asignación registrada con éxito!",
-            detalle = "$gradoSeleccionado · Sec. $seccionSeleccionada\n$cursoSeleccionado",
-            mensaje = "Ya aparece en tu perfil.",
+            titulo = "¡Asignación agregada!",
+            detalle = "$grado $seccion\n$curso",
+            mensaje = "Ya aparece en tus clases.",
             onCerrar = onCerrarExito
         )
     }
@@ -463,8 +276,8 @@ fun AgregarAsignacionScreen(
     // Error (por ejemplo, asignación ya registrada): el docente se queda en la pantalla
     alerta?.let {
         PopupAlertaEdu(
-            icono = Icons.Filled.Warning,
-            color = NaranjaMedia,
+            icono = Icons.Rounded.Warning,
+            color = EduAmarillo,
             titulo = it.titulo,
             mensaje = it.mensaje,
             onCerrar = onCerrarAlerta
@@ -472,10 +285,38 @@ fun AgregarAsignacionScreen(
     }
 }
 
-@Preview(showBackground = true)
+// Pastilla seleccionable (grado o sección): turquesa sólido cuando está elegida
+@Composable
+private fun PastillaAsignacion(texto: String, elegida: Boolean, onClick: () -> Unit) {
+    val forma = RoundedCornerShape(50)
+    Text(
+        texto,
+        modifier = Modifier
+            .clip(forma)
+            .background(if (elegida) EduTeal else Color.White)
+            .border(1.5.dp, if (elegida) EduTeal else EduBorde, forma)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 9.dp),
+        fontFamily = Nunito, fontWeight = if (elegida) FontWeight.Black else FontWeight.Bold,
+        fontSize = 14.5.sp, color = if (elegida) Color.White else EduEtiqueta
+    )
+}
+
+@Composable
+private fun MensajeVacioAsignacion(texto: String) {
+    TarjetaEdu {
+        Text(texto, fontFamily = Nunito, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = EduTextoSecundario)
+    }
+}
+
+@Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
 fun AgregarAsignacionPreview() {
     EduConnectAppTheme {
-        AgregarAsignacionScreen()
+        AgregarAsignacionScreen(
+            gradosDisp = listOf("1er Grado", "2do Grado", "3er Grado"),
+            seccionesDisp = mapOf("3er Grado" to listOf("A", "B")),
+            cursosDisp = listOf("Matemáticas", "Comunicación", "Ciencia y Tecnología")
+        )
     }
 }

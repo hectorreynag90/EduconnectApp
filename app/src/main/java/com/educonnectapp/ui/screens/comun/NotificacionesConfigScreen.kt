@@ -1,41 +1,35 @@
 package com.educonnectapp.ui.screens.comun
 
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Assignment
-import androidx.compose.material.icons.filled.Campaign
-import androidx.compose.material.icons.filled.EventAvailable
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Mail
-import androidx.compose.material.icons.filled.NotificationsOff
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.TaskAlt
-import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material.icons.automirrored.rounded.Assignment
+import androidx.compose.material.icons.rounded.Campaign
+import androidx.compose.material.icons.rounded.EventAvailable
+import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Mail
+import androidx.compose.material.icons.rounded.Notifications
+import androidx.compose.material.icons.rounded.NotificationsActive
+import androidx.compose.material.icons.rounded.NotificationsOff
+import androidx.compose.material.icons.rounded.Save
+import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.TaskAlt
+import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -46,50 +40,61 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.educonnectapp.R
+import com.educonnectapp.ui.components.BotonIconoCabeceraEdu
+import com.educonnectapp.ui.components.BotonPrincipalEdu
+import com.educonnectapp.ui.components.CabeceraEdu
+import com.educonnectapp.ui.components.ChipEdu
+import com.educonnectapp.ui.components.ColorModulo
+import com.educonnectapp.ui.components.IconoCirculoEdu
 import com.educonnectapp.ui.components.PopupConfirmacionEdu
 import com.educonnectapp.ui.components.PopupExitoEdu
 import com.educonnectapp.ui.components.PopupProcesandoEdu
+import com.educonnectapp.ui.components.TarjetaEdu
+import com.educonnectapp.ui.components.TipoBotonEdu
+import com.educonnectapp.ui.components.TituloSeccionEdu
+import com.educonnectapp.ui.components.TonoEdu
 import com.educonnectapp.ui.screens.acceso.PopupAlertaEdu
-import com.educonnectapp.ui.theme.AccentOrange
-import com.educonnectapp.ui.theme.BackgroundLight
-import com.educonnectapp.ui.theme.BackgroundWhite
-import com.educonnectapp.ui.theme.BorderBlue
-import com.educonnectapp.ui.theme.BorderLight
+import com.educonnectapp.ui.theme.EduAmarillo
+import com.educonnectapp.ui.theme.EduAzulOscuro
+import com.educonnectapp.ui.theme.EduAzulOscuroClaro
+import com.educonnectapp.ui.theme.EduBorde
 import com.educonnectapp.ui.theme.EduConnectAppTheme
-import com.educonnectapp.ui.theme.EduconnectBlue
-import com.educonnectapp.ui.theme.FondoRojo
-import com.educonnectapp.ui.theme.NaranjaMedia
-import com.educonnectapp.ui.theme.Roboto
-import com.educonnectapp.ui.theme.RojoError
-import com.educonnectapp.ui.theme.TextBlue
-import com.educonnectapp.ui.theme.TextPrimary
-import com.educonnectapp.ui.theme.TextSecondary
-import com.educonnectapp.ui.theme.TextWhite
+import com.educonnectapp.ui.theme.EduCoralClaro
+import com.educonnectapp.ui.theme.EduCoralOscuro
+import com.educonnectapp.ui.theme.EduEtiqueta
+import com.educonnectapp.ui.theme.EduFondo
+import com.educonnectapp.ui.theme.EduTeal
+import com.educonnectapp.ui.theme.EduTealClaro
+import com.educonnectapp.ui.theme.EduTealOscuro
+import com.educonnectapp.ui.theme.EduTexto
+import com.educonnectapp.ui.theme.EduTextoSecundario
+import com.educonnectapp.ui.theme.Nunito
 
-private val FondoAzulNotif = Color(0xFFE6F1FB)
-
-// Texto e ícono de cada tipo de notificación (los tipos que llegan dependen del rol)
-private data class InfoTipo(val titulo: String, val descripcion: String, val icono: ImageVector)
+// Texto, ícono y tono de cada tipo de notificación (los tipos que llegan dependen del rol)
+private data class InfoTipo(val titulo: String, val descripcion: String, val icono: ImageVector, val tono: TonoEdu)
 
 private fun infoTipo(tipo: String): InfoTipo = when (tipo) {
-    "ASISTENCIA" -> InfoTipo("Asistencias", "Registro y corrección de la asistencia de tu hijo", Icons.Filled.EventAvailable)
-    "COMUNICADO" -> InfoTipo("Comunicados", "Mensajes del docente a los padres de la sección", Icons.Filled.Mail)
-    "PUBLICACION" -> InfoTipo("Tareas y evaluaciones", "Nuevas tareas y avisos de evaluación", Icons.Filled.Assignment)
-    "CALIFICACION" -> InfoTipo("Entregas de tareas", "Si tu hijo entregó o no una tarea", Icons.Filled.TaskAlt)
-    "AVISO" -> InfoTipo("Avisos de la institución", "Comunicados generales de la I.E.", Icons.Filled.Campaign)
-    else -> InfoTipo(tipo, "", Icons.Filled.Info)
+    "ASISTENCIA" -> InfoTipo("Asistencias", "Registro y corrección de asistencias", Icons.Rounded.EventAvailable, TonoEdu.AZUL)
+    "COMUNICADO" -> InfoTipo("Comunicados", "Mensajes del docente a los padres de la sección", Icons.Rounded.Mail, TonoEdu.CORAL)
+    "PUBLICACION" -> InfoTipo("Tareas y evaluaciones", "Nuevas tareas y avisos de evaluación", Icons.AutoMirrored.Rounded.Assignment, TonoEdu.AMARILLO)
+    "CALIFICACION" -> InfoTipo("Entregas de tareas", "Si el alumno entregó o no una tarea", Icons.Rounded.TaskAlt, TonoEdu.VERDE)
+    "AVISO" -> InfoTipo("Avisos de la institución", "Comunicados generales de la I.E.", Icons.Rounded.Campaign, TonoEdu.AZUL)
+    else -> InfoTipo(tipo, "", Icons.Rounded.Info, TonoEdu.GRIS)
 }
 
-// Configuración de notificaciones: interruptores por tipo (se guardan en el backend)
-// y acceso a los ajustes del sistema (sonido, vibración, bloquear).
+// =====================================================================
+// NOTIFICACIONES (rediseño 2026) · lo usan docente y padre
+// Cabecera fija azul oscuro · estado de las notificaciones del celular + Ajustes ·
+// interruptor por tipo (se guarda en el backend) · "Guardar cambios"
+// =====================================================================
+
 @Composable
 fun NotificacionesConfigScreen(
     preferencias: Map<String, Boolean>,       // tipo -> activo (como está guardado en el servidor)
@@ -115,83 +120,94 @@ fun NotificacionesConfigScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(BackgroundLight)
+            .background(EduFondo)
     ) {
-        // HEADER
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(EduconnectBlue)
-                .padding(horizontal = 20.dp, vertical = 20.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Row(
-                modifier = Modifier.weight(1f),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                IconButton(onClick = onBack, modifier = Modifier.size(35.dp).offset(x = (-5).dp)) {
-                    Image(painter = painterResource(id = R.drawable.arrowleft_white),
-                        contentDescription = "Volver", modifier = Modifier.size(18.dp))
-                }
-                Column {
-                    Text(text = "Notificaciones", fontFamily = Roboto,
-                        fontWeight = FontWeight.Bold, fontSize = 22.sp, color = TextWhite)
-                    Text(text = "Elige qué avisos recibir en tu celular", fontFamily = Roboto,
-                        fontSize = 16.sp, color = TextWhite.copy(alpha = 0.85f))
-                }
+        // CABECERA FIJA
+        CabeceraEdu(
+            titulo = "Notificaciones",
+            subtitulo = "Elige qué avisos recibir en tu celular",
+            onVolver = onBack,
+            colorFondo = ColorModulo.Perfil,
+            acciones = {
+                BotonIconoCabeceraEdu(
+                    icono = Icons.Rounded.Notifications,
+                    descripcion = "Notificaciones",
+                    onClick = onNotificaciones,
+                    colorCabecera = ColorModulo.Perfil
+                )
             }
-            IconButton(onClick = onNotificaciones) {
-                Image(painter = painterResource(id = R.drawable.notification_white),
-                    contentDescription = "Notificaciones", modifier = Modifier.size(35.dp))
-            }
-        }
+        )
 
-        // CONTENIDO
+        // CONTENIDO DESPLAZABLE
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            // Aviso si Android tiene bloqueadas las notificaciones de la app
-            if (!notificacionesSistemaActivas) {
+            // ESTADO EN EL CELULAR (Android) + acceso a los ajustes del sistema
+            TarjetaEdu(
+                relleno = PaddingValues(horizontal = 14.dp, vertical = 12.dp),
+                colorFondo = if (notificacionesSistemaActivas) Color.White else EduCoralClaro
+            ) {
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(FondoRojo, RoundedCornerShape(12.dp))
-                        .border(1.dp, RojoError, RoundedCornerShape(12.dp))
-                        .padding(12.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Icon(Icons.Filled.NotificationsOff, contentDescription = null,
-                        tint = RojoError, modifier = Modifier.size(24.dp))
-                    Text(
-                        text = "Las notificaciones de EduConnect están bloqueadas en tu celular. " +
-                                "Actívalas en \"Ajustes del sistema\".",
-                        fontFamily = Roboto, fontSize = 14.sp, color = RojoError, lineHeight = 19.sp
+                    IconoCirculoEdu(
+                        if (notificacionesSistemaActivas) Icons.Rounded.NotificationsActive else Icons.Rounded.NotificationsOff,
+                        if (notificacionesSistemaActivas) TonoEdu.VERDE else TonoEdu.CORAL,
+                        tamano = 40.dp,
+                        solido = !notificacionesSistemaActivas
                     )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            "Notificaciones del celular", fontFamily = Nunito, fontWeight = FontWeight.Black,
+                            fontSize = 15.sp, color = EduTexto
+                        )
+                        Text(
+                            if (notificacionesSistemaActivas) "Activadas · sonido y vibración en Ajustes"
+                            else "Bloqueadas: actívalas en Ajustes",
+                            fontFamily = Nunito, fontWeight = FontWeight.Bold, fontSize = 12.5.sp,
+                            color = if (notificacionesSistemaActivas) EduTealOscuro else EduCoralOscuro
+                        )
+                    }
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(EduAzulOscuroClaro)
+                            .clickable(onClick = onAbrirAjustesSistema)
+                            .padding(horizontal = 10.dp, vertical = 7.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                    ) {
+                        Icon(Icons.Rounded.Settings, contentDescription = null, tint = EduAzulOscuro, modifier = Modifier.size(15.dp))
+                        Text("Ajustes", fontFamily = Nunito, fontWeight = FontWeight.Black, fontSize = 13.sp, color = EduAzulOscuro)
+                    }
                 }
-                Spacer(modifier = Modifier.height(4.dp))
             }
 
-            Text(text = "NOTIFICACIONES PUSH", fontFamily = Roboto, fontWeight = FontWeight.Bold,
-                fontSize = 16.sp, color = EduconnectBlue, modifier = Modifier.padding(start = 4.dp, bottom = 4.dp))
-
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(BackgroundWhite, RoundedCornerShape(14.dp))
-                    .border(0.5.dp, BorderBlue, RoundedCornerShape(14.dp))
-            ) {
+            // AVISOS DE EDUCONNECT
+            Spacer(modifier = Modifier.size(2.dp))
+            TituloSeccionEdu("Avisos de EduConnect") {
+                if (cambios.isNotEmpty()) {
+                    ChipEdu(if (cambios.size == 1) "1 cambio" else "${cambios.size} cambios", TonoEdu.AMARILLO)
+                }
+            }
+            TarjetaEdu(relleno = PaddingValues(horizontal = 14.dp, vertical = 2.dp)) {
                 if (cargando) {
-                    Box(modifier = Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = EduconnectBlue, strokeWidth = 3.dp,
-                            modifier = Modifier.size(32.dp))
+                    Row(
+                        modifier = Modifier.padding(vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        CircularProgressIndicator(color = EduTeal, strokeWidth = 3.dp, modifier = Modifier.size(24.dp))
+                        Text(
+                            "Cargando tus preferencias...", fontFamily = Nunito, fontWeight = FontWeight.Bold,
+                            fontSize = 15.sp, color = EduTextoSecundario
+                        )
                     }
                 } else {
                     val tipos = editadas.keys.toList()
@@ -201,7 +217,7 @@ fun NotificacionesConfigScreen(
                             activo = editadas[tipo] ?: true,
                             onCambio = { editadas = editadas + (tipo to it) }
                         )
-                        if (i < tipos.lastIndex) HorizontalDivider(color = BorderLight, thickness = 1.dp)
+                        if (i < tipos.lastIndex) HorizontalDivider(color = EduFondo, thickness = 1.dp)
                     }
                 }
             }
@@ -210,61 +226,39 @@ fun NotificacionesConfigScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(FondoAzulNotif, RoundedCornerShape(12.dp))
-                    .padding(12.dp),
-                verticalAlignment = Alignment.Top,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    .background(EduTealClaro, RoundedCornerShape(16.dp))
+                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                Icon(Icons.Filled.Info, contentDescription = null,
-                    tint = EduconnectBlue, modifier = Modifier.size(20.dp))
+                Icon(Icons.Rounded.Info, contentDescription = null, tint = EduTealOscuro, modifier = Modifier.size(22.dp))
                 Text(
-                    text = "Si apagas un tipo, no te llegará al celular, pero seguirás viéndolo en la campana de la app.",
-                    fontFamily = Roboto, fontSize = 14.sp, color = TextBlue, lineHeight = 19.sp
+                    "Si apagas un tipo, no te llegará al celular, pero seguirás viéndolo en la campana de la app.",
+                    modifier = Modifier.weight(1f), fontFamily = Nunito, fontWeight = FontWeight.SemiBold,
+                    fontSize = 13.sp, lineHeight = 18.sp, color = EduEtiqueta
                 )
             }
+        }
 
-            Spacer(modifier = Modifier.height(4.dp))
-
-            // AJUSTES DEL SISTEMA
-            Text(text = "SONIDO Y VIBRACIÓN", fontFamily = Roboto, fontWeight = FontWeight.Bold,
-                fontSize = 16.sp, color = EduconnectBlue, modifier = Modifier.padding(start = 4.dp, bottom = 4.dp))
-            OutlinedButton(
-                onClick = onAbrirAjustesSistema,
-                modifier = Modifier.fillMaxWidth().height(50.dp),
-                shape = RoundedCornerShape(25.dp),
-                border = BorderStroke(1.dp, EduconnectBlue)
-            ) {
-                Icon(Icons.Filled.Settings, contentDescription = null,
-                    tint = EduconnectBlue, modifier = Modifier.size(22.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(text = "Ajustes del sistema", fontFamily = Roboto, fontWeight = FontWeight.Bold,
-                    fontSize = 18.sp, color = EduconnectBlue)
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // GUARDAR (solo si hay cambios)
-            Button(
-                onClick = { mostrarConfirmacion = true },
-                enabled = cambios.isNotEmpty() && !cargando,
-                modifier = Modifier.fillMaxWidth().height(50.dp),
-                shape = RoundedCornerShape(25.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = AccentOrange,
-                    disabledContainerColor = BorderLight
-                )
-            ) {
-                Text(text = "Guardar cambios", fontFamily = Roboto, fontWeight = FontWeight.Bold,
-                    fontSize = 20.sp, color = if (cambios.isNotEmpty()) TextWhite else TextSecondary)
-            }
-
-            Spacer(modifier = Modifier.height(20.dp))
+        // BOTÓN FIJO
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(EduFondo)
+                .padding(horizontal = 16.dp, vertical = 12.dp)
+        ) {
+            BotonPrincipalEdu(
+                texto = "Guardar cambios",
+                tipo = TipoBotonEdu.GUARDAR,
+                icono = Icons.Rounded.Save,
+                habilitado = cambios.isNotEmpty() && !cargando && !procesando,
+                onClick = { mostrarConfirmacion = true }
+            )
         }
 
         barraInferior()
     }
 
-    // ===================== POPUPS (PopupsEdu.kt) =====================
+    // ===================== POPUPS =====================
     if (mostrarConfirmacion) {
         val activar = cambios.filterValues { it }.keys.map { infoTipo(it).titulo }
         val desactivar = cambios.filterValues { !it }.keys.map { infoTipo(it).titulo }
@@ -272,6 +266,8 @@ fun NotificacionesConfigScreen(
             titulo = "¿Guardar tus preferencias?",
             mensaje = "Revisa los cambios:",
             textoConfirmar = "Guardar",
+            colorConfirmar = TipoBotonEdu.GUARDAR.fondo,
+            icono = Icons.Rounded.NotificationsActive,
             onCancelar = { mostrarConfirmacion = false },
             onConfirmar = {
                 mostrarConfirmacion = false
@@ -281,41 +277,17 @@ fun NotificacionesConfigScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(FondoAzulNotif, RoundedCornerShape(12.dp))
-                    .border(1.dp, EduconnectBlue, RoundedCornerShape(12.dp))
+                    .background(EduFondo, RoundedCornerShape(16.dp))
                     .padding(12.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 if (activar.isNotEmpty()) {
-                    Text(
-                        text = "Se activarán:", fontFamily = Roboto, fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp, color = EduconnectBlue
-                    )
-                    activar.forEach {
-                        Text(
-                            "• $it",
-                            fontFamily = Roboto,
-                            fontSize = 14.sp,
-                            color = TextPrimary
-                        )
-                    }
+                    Text("Se activarán", fontFamily = Nunito, fontWeight = FontWeight.Black, fontSize = 13.5.sp, color = EduTealOscuro)
+                    activar.forEach { ChipEdu(it, TonoEdu.VERDE) }
                 }
                 if (desactivar.isNotEmpty()) {
-                    Text(
-                        text = "Se desactivarán:",
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp,
-                        color = RojoError
-                    )
-                    desactivar.forEach {
-                        Text(
-                            "• $it",
-                            fontFamily = Roboto,
-                            fontSize = 14.sp,
-                            color = TextPrimary
-                        )
-                    }
+                    Text("Se desactivarán", fontFamily = Nunito, fontWeight = FontWeight.Black, fontSize = 13.5.sp, color = EduCoralOscuro)
+                    desactivar.forEach { ChipEdu(it, TonoEdu.CORAL) }
                 }
             }
         }
@@ -333,8 +305,8 @@ fun NotificacionesConfigScreen(
 
     alerta?.let {
         PopupAlertaEdu(
-            icono = Icons.Filled.Warning,
-            color = NaranjaMedia,
+            icono = Icons.Rounded.Warning,
+            color = EduAmarillo,
             titulo = it.titulo,
             mensaje = it.mensaje,
             onCerrar = onCerrarAlerta
@@ -342,42 +314,43 @@ fun NotificacionesConfigScreen(
     }
 }
 
+// Fila con ícono de color, título, descripción e interruptor turquesa
 @Composable
 private fun FilaInterruptor(info: InfoTipo, activo: Boolean, onCambio: (Boolean) -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .clickable { onCambio(!activo) }
+            .padding(vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Box(
-            modifier = Modifier.size(40.dp).background(FondoAzulNotif, RoundedCornerShape(10.dp)),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(info.icono, contentDescription = null, tint = EduconnectBlue, modifier = Modifier.size(24.dp))
-        }
+        IconoCirculoEdu(info.icono, info.tono, tamano = 40.dp)
         Column(modifier = Modifier.weight(1f)) {
-            Text(text = info.titulo, fontFamily = Roboto, fontWeight = FontWeight.Medium,
-                fontSize = 17.sp, color = TextPrimary)
-            Text(text = info.descripcion, fontFamily = Roboto, fontSize = 13.sp,
-                color = TextSecondary, lineHeight = 17.sp)
+            Text(info.titulo, fontFamily = Nunito, fontWeight = FontWeight.Black, fontSize = 15.sp, color = EduTexto)
+            if (info.descripcion.isNotBlank()) {
+                Text(
+                    info.descripcion, fontFamily = Nunito, fontWeight = FontWeight.SemiBold, fontSize = 12.5.sp,
+                    color = EduTextoSecundario, lineHeight = 17.sp
+                )
+            }
         }
         Switch(
             checked = activo,
             onCheckedChange = onCambio,
             colors = SwitchDefaults.colors(
-                checkedThumbColor = TextWhite,
-                checkedTrackColor = AccentOrange,
-                uncheckedThumbColor = TextWhite,
-                uncheckedTrackColor = BorderLight,
-                uncheckedBorderColor = BorderLight
+                checkedThumbColor = Color.White,
+                checkedTrackColor = EduTeal,
+                checkedBorderColor = EduTeal,
+                uncheckedThumbColor = Color.White,
+                uncheckedTrackColor = EduBorde,
+                uncheckedBorderColor = EduBorde
             )
         )
     }
 }
 
-@Preview(showBackground = true)
+@Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
 fun NotificacionesConfigPreview() {
     EduConnectAppTheme {

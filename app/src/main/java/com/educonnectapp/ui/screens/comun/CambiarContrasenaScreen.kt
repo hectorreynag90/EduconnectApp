@@ -1,36 +1,38 @@
-package com.educonnectapp.ui.screens
+package com.educonnectapp.ui.screens.comun
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.RadioButtonUnchecked
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
-import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Key
+import androidx.compose.material.icons.rounded.Notifications
+import androidx.compose.material.icons.rounded.Sync
+import androidx.compose.material.icons.rounded.Visibility
+import androidx.compose.material.icons.rounded.VisibilityOff
+import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -39,8 +41,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -48,28 +52,35 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.educonnectapp.R
+import com.educonnectapp.ui.components.BotonIconoCabeceraEdu
+import com.educonnectapp.ui.components.BotonPrincipalEdu
+import com.educonnectapp.ui.components.BotonSecundarioEdu
+import com.educonnectapp.ui.components.CabeceraEdu
+import com.educonnectapp.ui.components.ChipEdu
+import com.educonnectapp.ui.components.ColorModulo
 import com.educonnectapp.ui.components.PopupConfirmacionEdu
 import com.educonnectapp.ui.components.PopupExitoEdu
 import com.educonnectapp.ui.components.PopupProcesandoEdu
+import com.educonnectapp.ui.components.TipoBotonEdu
+import com.educonnectapp.ui.components.TonoEdu
 import com.educonnectapp.ui.screens.acceso.PopupAlertaEdu
-import com.educonnectapp.ui.theme.AccentOrange
-import com.educonnectapp.ui.theme.BackgroundLight
-import com.educonnectapp.ui.theme.BackgroundWhite
-import com.educonnectapp.ui.theme.BorderBlue
-import com.educonnectapp.ui.theme.BorderLight
+import com.educonnectapp.ui.theme.EduAmarillo
+import com.educonnectapp.ui.theme.EduAmarilloClaro
+import com.educonnectapp.ui.theme.EduAmarilloOscuro
+import com.educonnectapp.ui.theme.EduAzulOscuroClaro
+import com.educonnectapp.ui.theme.EduBorde
+import com.educonnectapp.ui.theme.EduCampo
 import com.educonnectapp.ui.theme.EduConnectAppTheme
-import com.educonnectapp.ui.theme.EduconnectBlue
-import com.educonnectapp.ui.theme.NaranjaMedia
-import com.educonnectapp.ui.theme.Roboto
-import com.educonnectapp.ui.theme.RojoError
-import com.educonnectapp.ui.theme.TextBlue
-import com.educonnectapp.ui.theme.TextPrimary
-import com.educonnectapp.ui.theme.TextSecondary
-import com.educonnectapp.ui.theme.TextWhite
-import com.educonnectapp.ui.theme.VerdeOk
-
-private val FondoCampoClave = Color(0xFFE6F1FB)
+import com.educonnectapp.ui.theme.EduCoral
+import com.educonnectapp.ui.theme.EduCoralClaro
+import com.educonnectapp.ui.theme.EduCoralOscuro
+import com.educonnectapp.ui.theme.EduEtiqueta
+import com.educonnectapp.ui.theme.EduFondo
+import com.educonnectapp.ui.theme.EduTeal
+import com.educonnectapp.ui.theme.EduTealOscuro
+import com.educonnectapp.ui.theme.EduTexto
+import com.educonnectapp.ui.theme.EduTextoSecundario
+import com.educonnectapp.ui.theme.Nunito
 
 // Misma regla que el registro y Recuperar contraseña: 8 a 72 caracteres, con letras y números
 private fun cumpleLongitud(p: String) = p.length in 8..72
@@ -93,6 +104,12 @@ private fun nivelSeguridad(p: String): Int {
     }
 }
 
+// =====================================================================
+// CAMBIAR CONTRASEÑA (rediseño 2026) · lo usan docente y padre
+// Cabecera fija azul oscuro · 3 campos con ojo · barra de seguridad · requisitos · Cancelar / Actualizar
+// =====================================================================
+
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun CambiarContrasenaScreen(
     onBack: () -> Unit = {},
@@ -118,130 +135,108 @@ fun CambiarContrasenaScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(BackgroundLight)
+            .background(EduFondo)
     ) {
-        // HEADER
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(EduconnectBlue)
-                .padding(horizontal = 20.dp, vertical = 20.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Row(
-                modifier = Modifier.weight(1f),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                IconButton(onClick = onBack, modifier = Modifier.size(35.dp).offset(x = (-5).dp)) {
-                    Image(painter = painterResource(id = R.drawable.arrowleft_white),
-                        contentDescription = "Volver", modifier = Modifier.size(18.dp))
-                }
-                Column {
-                    Text(text = "Cambiar contraseña", fontFamily = Roboto,
-                        fontWeight = FontWeight.Bold, fontSize = 22.sp, color = TextWhite)
-                    Text(text = "Protege el acceso a tu cuenta", fontFamily = Roboto,
-                        fontSize = 16.sp, color = TextWhite.copy(alpha = 0.85f))
-                }
+        // CABECERA FIJA
+        CabeceraEdu(
+            titulo = "Cambiar contraseña",
+            subtitulo = "Protege el acceso a tu cuenta",
+            onVolver = onBack,
+            colorFondo = ColorModulo.Perfil,
+            acciones = {
+                BotonIconoCabeceraEdu(
+                    icono = Icons.Rounded.Notifications,
+                    descripcion = "Notificaciones",
+                    onClick = onNotificaciones,
+                    colorCabecera = ColorModulo.Perfil
+                )
             }
-            IconButton(onClick = onNotificaciones) {
-                Image(painter = painterResource(id = R.drawable.notification_white),
-                    contentDescription = "Notificaciones", modifier = Modifier.size(35.dp))
-            }
-        }
+        )
 
-        // CONTENIDO
+        // CONTENIDO DESPLAZABLE
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text(text = "CONTRASEÑA", fontFamily = Roboto, fontWeight = FontWeight.Bold,
-                fontSize = 16.sp, color = EduconnectBlue, modifier = Modifier.padding(start = 4.dp, bottom = 4.dp))
+            CampoClaveEdu(etiqueta = "Contraseña actual", valor = actual, onCambio = { actual = it })
 
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(BackgroundWhite, RoundedCornerShape(14.dp))
-                    .border(0.5.dp, BorderBlue, RoundedCornerShape(14.dp))
-                    .padding(14.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+            CampoClaveEdu(
+                etiqueta = "Nueva contraseña",
+                valor = nueva,
+                onCambio = { nueva = it },
+                error = if (nueva.isNotEmpty() && actual.isNotEmpty() && !distintaDeActual)
+                    "Debe ser distinta a la contraseña actual" else null
+            )
+            IndicadorSeguridad(nivelSeguridad(nueva))
+
+            // Requisitos: se marcan en turquesa al cumplirse
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                CampoClave(etiqueta = "Contraseña actual", valor = actual, onCambio = { actual = it })
-
-                CampoClave(
-                    etiqueta = "Nueva contraseña",
-                    valor = nueva,
-                    onCambio = { nueva = it },
-                    error = if (nueva.isNotEmpty() && actual.isNotEmpty() && !distintaDeActual)
-                        "Debe ser distinta a la contraseña actual" else null
-                )
-                IndicadorSeguridad(nivelSeguridad(nueva))
-
-                // Requisitos con check verde al cumplirse
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Requisito("Mínimo 8 caracteres", cumpleLongitud(nueva))
-                    Requisito("Al menos una letra", tieneLetra(nueva))
-                    Requisito("Al menos un número", tieneNumero(nueva))
-                }
-
-                CampoClave(
-                    etiqueta = "Confirmar nueva contraseña",
-                    valor = confirmar,
-                    onCambio = { confirmar = it },
-                    error = if (confirmar.isNotEmpty() && !coinciden) "Las contraseñas no coinciden" else null,
-                    ok = coinciden
-                )
+                Requisito("8+ caracteres", cumpleLongitud(nueva))
+                Requisito("Una letra", tieneLetra(nueva))
+                Requisito("Un número", tieneNumero(nueva))
             }
 
-            Text(
-                text = "Al actualizarla se cerrará tu sesión y deberás ingresar con la nueva contraseña.",
-                fontFamily = Roboto, fontSize = 14.sp, color = TextSecondary,
-                lineHeight = 19.sp, modifier = Modifier.padding(horizontal = 4.dp)
+            CampoClaveEdu(
+                etiqueta = "Confirmar nueva contraseña",
+                valor = confirmar,
+                onCambio = { confirmar = it },
+                error = if (confirmar.isNotEmpty() && !coinciden) "Las contraseñas no coinciden" else null,
+                ok = coinciden
             )
 
-            Spacer(modifier = Modifier.height(20.dp))
-
-            Button(
-                onClick = { mostrarConfirmacion = true },
-                enabled = formularioValido,
-                modifier = Modifier.fillMaxWidth().height(50.dp),
-                shape = RoundedCornerShape(25.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = AccentOrange,
-                    disabledContainerColor = BorderLight
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(EduAmarilloClaro, RoundedCornerShape(16.dp))
+                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Icon(Icons.Rounded.Info, contentDescription = null, tint = EduAmarilloOscuro, modifier = Modifier.size(22.dp))
+                Text(
+                    "Al actualizarla se cerrará tu sesión y deberás ingresar con la nueva contraseña.",
+                    modifier = Modifier.weight(1f), fontFamily = Nunito, fontWeight = FontWeight.SemiBold,
+                    fontSize = 13.sp, lineHeight = 18.sp, color = EduAmarilloOscuro
                 )
-            ) {
-                Text(text = "Actualizar contraseña", fontFamily = Roboto, fontWeight = FontWeight.Bold,
-                    fontSize = 20.sp, color = if (formularioValido) TextWhite else TextSecondary)
             }
+        }
 
-            Button(
-                onClick = onBack,
-                modifier = Modifier.fillMaxWidth().height(46.dp),
-                shape = RoundedCornerShape(25.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = BackgroundWhite)
-            ) {
-                Text(text = "Cancelar", fontFamily = Roboto, fontWeight = FontWeight.Bold,
-                    fontSize = 20.sp, color = TextSecondary)
-            }
-
-            Spacer(modifier = Modifier.height(20.dp))
+        // BOTONES FIJOS
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(EduFondo)
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            BotonSecundarioEdu(texto = "Cancelar", modifier = Modifier.weight(1f), onClick = onBack)
+            BotonPrincipalEdu(
+                texto = "Actualizar",
+                tipo = TipoBotonEdu.ACTUALIZAR,
+                icono = Icons.Rounded.Sync,
+                modifier = Modifier.weight(1f),
+                habilitado = formularioValido && !procesando,
+                onClick = { mostrarConfirmacion = true }
+            )
         }
 
         barraInferior()
     }
 
-    // ===================== POPUPS (PopupsEdu.kt) =====================
+    // ===================== POPUPS =====================
     if (mostrarConfirmacion) {
         PopupConfirmacionEdu(
             titulo = "¿Cambiar tu contraseña?",
             mensaje = "Se cerrará tu sesión y deberás ingresar con la nueva contraseña.",
             textoConfirmar = "Cambiar",
+            colorConfirmar = TipoBotonEdu.ACTUALIZAR.fondo,
+            icono = Icons.Rounded.Key,
             onCancelar = { mostrarConfirmacion = false },
             onConfirmar = {
                 mostrarConfirmacion = false
@@ -262,8 +257,8 @@ fun CambiarContrasenaScreen(
 
     alerta?.let {
         PopupAlertaEdu(
-            icono = Icons.Filled.Warning,
-            color = NaranjaMedia,
+            icono = Icons.Rounded.Warning,
+            color = EduAmarillo,
             titulo = it.titulo,
             mensaje = it.mensaje,
             onCerrar = onCerrarAlerta
@@ -271,9 +266,9 @@ fun CambiarContrasenaScreen(
     }
 }
 
-// Campo de contraseña con ojo para mostrar/ocultar
+// Campo de contraseña: vacío gris; con texto blanco y borde turquesa; error granate; ojo para mostrar
 @Composable
-private fun CampoClave(
+private fun CampoClaveEdu(
     etiqueta: String,
     valor: String,
     onCambio: (String) -> Unit,
@@ -281,89 +276,91 @@ private fun CampoClave(
     ok: Boolean = false
 ) {
     var visible by remember { mutableStateOf(false) }
-    Column {
-        Text(text = etiqueta, fontFamily = Roboto, fontSize = 15.sp, color = TextPrimary)
-        Spacer(modifier = Modifier.height(6.dp))
-        OutlinedTextField(
+    val lleno = valor.isNotEmpty()
+    val forma = RoundedCornerShape(16.dp)
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(etiqueta, fontFamily = Nunito, fontWeight = FontWeight.ExtraBold, fontSize = 14.sp, color = EduEtiqueta)
+        BasicTextField(
             value = valor,
             onValueChange = { if (it.length <= 72) onCambio(it) },
             singleLine = true,
-            isError = error != null,
             visualTransformation = if (visible) VisualTransformation.None else PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-            trailingIcon = {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (ok) Icon(Icons.Filled.CheckCircle, contentDescription = null,
-                        tint = VerdeOk, modifier = Modifier.size(20.dp))
+            textStyle = TextStyle(fontFamily = Nunito, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = EduTexto),
+            cursorBrush = SolidColor(EduTeal),
+            modifier = Modifier.fillMaxWidth(),
+            decorationBox = { inner ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 54.dp)
+                        .clip(forma)
+                        .background(
+                            when {
+                                error != null -> EduCoralClaro
+                                lleno -> Color.White
+                                else -> EduCampo
+                            }
+                        )
+                        .border(
+                            if (lleno) 2.dp else 1.5.dp,
+                            when {
+                                error != null -> EduCoralOscuro
+                                lleno -> EduTeal
+                                else -> EduBorde
+                            },
+                            forma
+                        )
+                        .padding(start = 14.dp, end = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(modifier = Modifier.weight(1f).padding(vertical = 14.dp)) { inner() }
+                    if (ok) Icon(Icons.Rounded.CheckCircle, contentDescription = null, tint = EduTeal, modifier = Modifier.size(20.dp))
                     IconButton(onClick = { visible = !visible }) {
                         Icon(
-                            imageVector = if (visible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                            if (visible) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
                             contentDescription = if (visible) "Ocultar" else "Mostrar",
-                            tint = TextSecondary
+                            tint = EduTextoSecundario
                         )
                     }
                 }
-            },
-            shape = RoundedCornerShape(10.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = EduconnectBlue,
-                unfocusedBorderColor = if (ok) VerdeOk else BorderLight,
-                errorBorderColor = RojoError,
-                focusedTextColor = TextBlue,
-                unfocusedTextColor = TextBlue,
-                errorTextColor = TextBlue,
-                focusedContainerColor = FondoCampoClave,
-                unfocusedContainerColor = FondoCampoClave,
-                errorContainerColor = FondoCampoClave
-            ),
-            modifier = Modifier.fillMaxWidth()
+            }
         )
         if (error != null) {
-            Text(text = error, fontFamily = Roboto, fontSize = 13.sp, color = RojoError,
-                modifier = Modifier.padding(start = 4.dp, top = 4.dp))
+            Text(error, fontFamily = Nunito, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = EduCoralOscuro)
         }
     }
 }
 
-// Barra de 3 segmentos: Débil (rojo), Media (naranja), Fuerte (verde)
+// Barra de 3 segmentos: Débil (granate), Media (amarillo), Fuerte (turquesa)
 @Composable
 private fun IndicadorSeguridad(nivel: Int) {
     if (nivel == 0) return
-    val (texto, color) = when (nivel) {
-        1 -> "Débil" to RojoError
-        2 -> "Media" to NaranjaMedia
-        else -> "Fuerte" to VerdeOk
+    val (texto, color, colorTexto) = when (nivel) {
+        1 -> Triple("Débil", EduCoral, EduCoralOscuro)
+        2 -> Triple("Media", EduAmarillo, EduAmarilloOscuro)
+        else -> Triple("Fuerte", EduTeal, EduTealOscuro)
     }
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         repeat(3) { i ->
             Box(
                 modifier = Modifier
                     .weight(1f)
-                    .height(6.dp)
-                    .background(if (i < nivel) color else BorderLight, RoundedCornerShape(3.dp))
+                    .height(7.dp)
+                    .background(if (i < nivel) color else EduAzulOscuroClaro, RoundedCornerShape(50))
             )
         }
         Spacer(modifier = Modifier.width(4.dp))
-        Text(text = "Seguridad: $texto", fontFamily = Roboto, fontWeight = FontWeight.Bold,
-            fontSize = 13.sp, color = color)
+        Text(texto, fontFamily = Nunito, fontWeight = FontWeight.Black, fontSize = 13.sp, color = colorTexto)
     }
 }
 
 @Composable
 private fun Requisito(texto: String, cumple: Boolean) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        Icon(
-            imageVector = if (cumple) Icons.Filled.CheckCircle else Icons.Filled.RadioButtonUnchecked,
-            contentDescription = null,
-            tint = if (cumple) VerdeOk else TextSecondary,
-            modifier = Modifier.size(18.dp)
-        )
-        Text(text = texto, fontFamily = Roboto, fontSize = 14.sp,
-            color = if (cumple) VerdeOk else TextSecondary)
-    }
+    ChipEdu(texto, if (cumple) TonoEdu.VERDE else TonoEdu.GRIS, icono = if (cumple) Icons.Rounded.Check else null)
 }
 
-@Preview(showBackground = true)
+@Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
 fun CambiarContrasenaPreview() {
     EduConnectAppTheme { CambiarContrasenaScreen() }
