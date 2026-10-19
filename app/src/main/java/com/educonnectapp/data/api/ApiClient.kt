@@ -821,18 +821,28 @@ suspend fun obtenerHistorialDocente(
     seccionId: Long, cursoId: Long, desde: String? = null, hasta: String? = null
 ): List<DiaHistorialResponse> = llamar { api.historialAsistencia(seccionId, cursoId, desde, hasta) }
 
+// Hojas de asistencia de HOY de todas las asignaciones (1 petición por asignación, en paralelo).
+// El Inicio del docente las usa para saber qué clases ya tienen la asistencia tomada.
+suspend fun obtenerHojasAsistenciaHoy(asignaciones: List<AsignacionResponse>): List<HojaAsistenciaResponse> {
+    if (asignaciones.isEmpty()) return emptyList()
+    return coroutineScope {
+        asignaciones.map { a -> async { obtenerHojaAsistencia(a.seccionId, a.cursoId) } }.awaitAll()
+    }
+}
+
+// Resumen del día (realizados, pendientes, % asistencia) a partir de hojas ya descargadas (sin peticiones)
+fun resumenAsistenciasDeHojas(hojas: List<HojaAsistenciaResponse>): Triple<Int, Int, Int> {
+    val realizadas = hojas.filter { it.yaRegistrado }
+    // Se cuenta desde los estados de cada alumno: Presente (A) y Tardanza (T) son asistencia
+    val estados = realizadas.flatMap { h -> h.alumnos.mapNotNull { it.estado } }
+    return Triple(realizadas.size, hojas.size - realizadas.size, porcentajeAsistencia(estados))
+}
+
 // Resumen del día para AsistenciasScreen: (realizados, pendientes, % asistencia)
 // 1 petición por asignación, todas en paralelo
 suspend fun obtenerResumenAsistenciasHoy(asignaciones: List<AsignacionResponse>): Triple<Int, Int, Int> {
     if (asignaciones.isEmpty()) return Triple(0, 0, 0)
-    val hojas = coroutineScope {
-        asignaciones.map { a -> async { obtenerHojaAsistencia(a.seccionId, a.cursoId) } }.awaitAll()
-    }
-    val realizadas = hojas.filter { it.yaRegistrado }
-    // Se cuenta desde los estados de cada alumno: Presente (A) y Tardanza (T) son asistencia
-    val estados = realizadas.flatMap { h -> h.alumnos.mapNotNull { it.estado } }
-    val porcentaje = porcentajeAsistencia(estados)
-    return Triple(realizadas.size, hojas.size - realizadas.size, porcentaje)
+    return resumenAsistenciasDeHojas(obtenerHojasAsistenciaHoy(asignaciones))
 }
 
 // =====================================================================
