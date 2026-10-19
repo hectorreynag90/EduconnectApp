@@ -1,87 +1,85 @@
-package com.educonnectapp.ui.screens
+package com.educonnectapp.ui.screens.acceso
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Badge
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Email
-import androidx.compose.material.icons.filled.Key
-import androidx.compose.material.icons.filled.PersonAdd
-import androidx.compose.material.icons.filled.Phone
-import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.AdminPanelSettings
+import androidx.compose.material.icons.rounded.Badge
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Email
+import androidx.compose.material.icons.rounded.FamilyRestroom
+import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Key
+import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.PersonAdd
+import androidx.compose.material.icons.rounded.Phone
+import androidx.compose.material.icons.rounded.School
+import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.coerceAtLeast
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
-import kotlinx.coroutines.delay
-import com.educonnectapp.R
-import com.educonnectapp.ui.theme.AccentOrange
-import com.educonnectapp.ui.theme.BackgroundLight
-import com.educonnectapp.ui.theme.BackgroundWhite
-import com.educonnectapp.ui.theme.BorderLight
-import com.educonnectapp.ui.theme.BorderMedium
+import com.educonnectapp.ui.components.BotonIconoCabeceraEdu
+import com.educonnectapp.ui.components.BotonPrincipalEdu
+import com.educonnectapp.ui.components.CampoTextoEdu
+import com.educonnectapp.ui.components.ChipEdu
+import com.educonnectapp.ui.components.ColorModulo
+import com.educonnectapp.ui.components.PopupExitoEdu
+import com.educonnectapp.ui.components.TipoBotonEdu
+import com.educonnectapp.ui.components.TonoEdu
+import com.educonnectapp.ui.theme.EduAmarillo
+import com.educonnectapp.ui.theme.EduAmarilloOscuro
+import com.educonnectapp.ui.theme.EduBorde
+import com.educonnectapp.ui.theme.EduCampo
 import com.educonnectapp.ui.theme.EduConnectAppTheme
-import com.educonnectapp.ui.theme.EduconnectBlue
-import com.educonnectapp.ui.theme.EduconnectBlueMedium
-import com.educonnectapp.ui.theme.Roboto
-import com.educonnectapp.ui.theme.TextBlue
-import com.educonnectapp.ui.theme.TextPrimary
-import com.educonnectapp.ui.theme.TextSecondary
-import com.educonnectapp.ui.theme.TextWhite
-
-// Colores de los popups
-private val VerdeExito      = Color(0xFF1B7F3B)   // check verde
-private val VerdeOscuro     = Color(0xFF1B5E20)   // texto "Cuenta registrada"
-private val RojoAlerta      = Color(0xFFE53935)
-private val NaranjaAlerta   = Color(0xFFF59E0B)
-
-// Tiempo que se muestra el popup de cuenta registrada antes de ir al inicio de sesión
-private const val SEGUNDOS_EXITO = 5
+import com.educonnectapp.ui.theme.EduCoral
+import com.educonnectapp.ui.theme.EduEtiqueta
+import com.educonnectapp.ui.theme.EduFondo
+import com.educonnectapp.ui.theme.EduTeal
+import com.educonnectapp.ui.theme.EduTealClaro
+import com.educonnectapp.ui.theme.EduTealOscuro
+import com.educonnectapp.ui.theme.EduTexto
+import com.educonnectapp.ui.theme.EduTextoSecundario
+import com.educonnectapp.ui.theme.Nunito
 
 // Alerta que devuelve el servidor al registrar (la arma MainActivity con la respuesta del backend)
 // tipo: "CORREO" (correo ya registrado) | "DNI" (DNI ya registrado) | "ERROR" (cualquier otro)
@@ -107,36 +105,35 @@ fun RegisterScreen(
     var telefono by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
-    var passwordVisible by remember { mutableStateOf(false) }
     var rolSeleccionado by remember { mutableStateOf("Docente") }
 
     // Alerta de validación local (antes de llamar al backend)
     var alertaLocal by remember { mutableStateOf<Alerta?>(null) }
 
-    // Validación al presionar "Crear Cuenta". Devuelve la alerta a mostrar, o null si todo está bien.
+    // Validación al presionar "Crear cuenta". Devuelve la alerta a mostrar, o null si todo está bien.
     fun validar(): Alerta? = when {
         nombre.isBlank() || dni.isBlank() || telefono.isBlank() || email.isBlank() || password.isEmpty() -> Alerta(
-            Icons.Filled.Warning, NaranjaAlerta,
+            Icons.Rounded.Warning, EduAmarillo,
             "Faltan datos",
             "Completa todos los campos para crear tu cuenta."
         )
         dni.length != 8 -> Alerta(
-            Icons.Filled.Badge, NaranjaAlerta,
+            Icons.Rounded.Badge, EduAmarillo,
             "DNI incompleto",
             "El DNI debe tener 8 dígitos."
         )
         telefono.length != 9 -> Alerta(
-            Icons.Filled.Phone, NaranjaAlerta,
+            Icons.Rounded.Phone, EduAmarillo,
             "Teléfono incompleto",
             "El teléfono debe tener 9 dígitos."
         )
         !REGEX_CORREO.matches(email.trim()) -> Alerta(
-            Icons.Filled.Email, NaranjaAlerta,
+            Icons.Rounded.Email, EduAmarillo,
             "Correo no válido",
             "Ingresa un correo electrónico válido, por ejemplo: nombre@correo.com"
         )
         password.length < 8 || !password.any { it.isLetter() } || !password.any { it.isDigit() } -> Alerta(
-            Icons.Filled.Key, RojoAlerta,
+            Icons.Rounded.Key, EduCoral,
             "Contraseña no válida",
             "La contraseña ingresada no cumple con los requisitos mínimos. " +
                     "Ingresa una contraseña de 8 caracteres o más, con letras y números."
@@ -148,422 +145,226 @@ fun RegisterScreen(
     val alertaDelServidor = alertaServidor?.let {
         when (it.tipo) {
             "CORREO" -> Alerta(
-                Icons.Filled.Email, RojoAlerta,
+                Icons.Rounded.Email, EduCoral,
                 "Correo ya registrado",
                 "El correo \"${email.trim()}\" ya está registrado en EduConnect. Ingresa un correo diferente."
             )
             "DNI" -> Alerta(
-                Icons.Filled.Badge, RojoAlerta,
+                Icons.Rounded.Badge, EduCoral,
                 "DNI ya registrado",
                 "El DNI $dni ya está registrado en EduConnect. Verifica el número ingresado."
             )
             else -> Alerta(
-                Icons.Filled.Warning, RojoAlerta,
+                Icons.Rounded.Warning, EduCoral,
                 "No se pudo crear la cuenta",
                 it.mensaje.ifBlank { "Inténtalo nuevamente en unos minutos." }
             )
         }
     }
 
-    // POPUP DE ALERTA (local o del servidor)
+    // POPUP DE ALERTA (local o del servidor). PopupAlertaEdu está en RecuperarContrasenaScreen.kt
     (alertaLocal ?: alertaDelServidor)?.let { alerta ->
-        PopupAlertaRegistro(
-            alerta = alerta,
-            onCerrar = {
-                if (alertaLocal != null) alertaLocal = null else onCerrarAlerta()
-            }
+        PopupAlertaEdu(
+            alerta.icono, alerta.color, alerta.titulo, alerta.mensaje,
+            onCerrar = { if (alertaLocal != null) alertaLocal = null else onCerrarAlerta() }
         )
     }
 
-    // POPUP CUENTA REGISTRADA: se cierra solo a los 5 segundos y lleva al inicio de sesión
+    // POPUP CUENTA REGISTRADA: PopupExitoEdu se cierra solo a los 5 s y lleva al inicio de sesión
     if (registroExitoso) {
-        LaunchedEffect(Unit) {
-            delay(SEGUNDOS_EXITO * 1000L)
-            onIrALogin()
-        }
-        PopupCuentaRegistrada(rol = rolSeleccionado, onCerrar = onIrALogin)
+        PopupExitoEdu(
+            titulo = "¡Cuenta registrada!",
+            mensaje = "Tu cuenta de ${rolSeleccionado.lowercase()} fue creada correctamente. " +
+                    "Ahora inicia sesión con tu correo y contraseña.",
+            onCerrar = onIrALogin
+        )
     }
 
-    Column(
+    // Alto real de la cabecera: el contenido desplazable empieza 44 dp antes de su final,
+    // así la tarjeta se monta sobre el color y la cabecera queda FIJA al hacer scroll.
+    val densidad = LocalDensity.current
+    var altoCabecera by remember { mutableStateOf(0.dp) }
+
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
+            .background(EduFondo)
     ) {
-        // HEADER AZUL
+        // CABECERA FIJA (color del módulo: amarillo, con texto oscuro)
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(EduconnectBlue)
-                .padding(vertical = 10.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+                .onSizeChanged { altoCabecera = with(densidad) { it.height.toDp() } }
+                .background(ColorModulo.Registro, RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp))
+                .statusBarsPadding()
+                .padding(start = 20.dp, end = 20.dp, top = 14.dp, bottom = 62.dp)
         ) {
-            Row(modifier = Modifier.fillMaxWidth().padding(start = 2.dp),
-                horizontalArrangement = Arrangement.Start,
-                verticalAlignment = Alignment.CenterVertically)
-            {
-                IconButton(
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                BotonIconoCabeceraEdu(
+                    icono = Icons.AutoMirrored.Rounded.ArrowBack,
+                    descripcion = "Volver",
                     onClick = onBack,
-                    modifier = Modifier.size(35.dp).offset(x = (10).dp)
-                ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.arrowleft_white),
-                        contentDescription = "Volver",
-                        modifier = Modifier.size(18.dp)
+                    colorCabecera = ColorModulo.Registro
+                )
+                Column {
+                    Text(
+                        text = "Crear cuenta",
+                        fontFamily = Nunito,
+                        fontWeight = FontWeight.Black,
+                        fontSize = 26.sp,
+                        color = EduTexto
+                    )
+                    Text(
+                        text = "Completa tus datos para empezar.",
+                        fontFamily = Nunito,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp,
+                        color = EduEtiqueta
                     )
                 }
             }
-            Box(modifier = Modifier.size(60.dp).background(
-                color = EduconnectBlueMedium, shape = RoundedCornerShape(50.dp)),
-                contentAlignment = Alignment.Center) {
-                Icon(imageVector = Icons.Filled.PersonAdd, contentDescription = null,
-                    tint = TextWhite, modifier = Modifier.size(45.dp))
-            }
-
-            Spacer(modifier = Modifier.height(6.dp))
-
-            Text(text = "Crear cuenta",
-                fontFamily = Roboto,
-                fontWeight = FontWeight.Bold,
-                fontSize = 22.sp,
-                color = TextWhite)
-
-            Text(text = "$rolSeleccionado - EduConnect",
-                fontFamily = Roboto,
-                fontWeight = FontWeight.Normal,
-                fontSize = 14.sp,
-                color = TextWhite)
-
-            Spacer(modifier = Modifier.height(6.dp))
         }
 
-        // BODY BLANCO
+        // CONTENIDO DESPLAZABLE: solo esta parte se mueve al hacer scroll
         Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .background(BackgroundWhite)
-                .padding(horizontal = 20.dp,
-                    vertical = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+                .fillMaxSize()
+                .padding(top = (altoCabecera - 44.dp).coerceAtLeast(0.dp))
+                .imePadding()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp)
+                .navigationBarsPadding()
+                .padding(bottom = 16.dp)
         ) {
-            // SELECTOR ROL
-            Row(
+            // TARJETA BLANCA CON EL FORMULARIO
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(4.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    .shadow(
+                        elevation = 12.dp, shape = RoundedCornerShape(28.dp),
+                        ambientColor = EduAmarilloOscuro.copy(alpha = 0.25f), spotColor = EduAmarilloOscuro.copy(alpha = 0.25f)
+                    )
+                    .background(Color.White, RoundedCornerShape(28.dp))
+                    .padding(horizontal = 18.dp, vertical = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Button(
-                    onClick = { rolSeleccionado = "Docente" },
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(20.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (rolSeleccionado == "Docente") EduconnectBlue else BorderLight
-                    )
-                ) {
-                    Text(text = "Docente",
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 19.sp,
-                        color = if (rolSeleccionado == "Docente") TextWhite else TextSecondary)
-                }
-                Button(
-                    onClick = { rolSeleccionado = "Padre" },
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(20.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (rolSeleccionado == "Padre") EduconnectBlue else BorderLight
-                    )
-                ) {
-                    Text(text = "Padre",
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 19.sp,
-                        color = if (rolSeleccionado == "Padre") TextWhite else TextSecondary)
-                }
-            }
+                // SELECTOR DE ROL (la misma pantalla sirve para docente, padre y director)
+                SelectorRol(rolSeleccionado = rolSeleccionado, onSeleccionar = { rolSeleccionado = it })
 
-            Spacer(modifier = Modifier.height(4.dp))
+                // NOMBRE
+                CampoTextoEdu(
+                    valor = nombre,
+                    onValorCambia = { nombre = it },
+                    etiqueta = "Nombre completo",
+                    placeholder = "Ingresa tu nombre completo",
+                    icono = Icons.Rounded.Person
+                )
 
-            // NOMBRE
-            Text(text = "NOMBRE COMPLETO",
-                fontFamily = Roboto,
-                fontWeight = FontWeight.Bold,
-                fontSize = 13.sp,
-                color = TextBlue,
-                letterSpacing = 1.sp
-            )
-            OutlinedTextField(
-                value = nombre, onValueChange = { nombre = it },
-                placeholder = {
+                // DNI Y TELÉFONO: solo números (8 y 9 dígitos)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    CampoTextoEdu(
+                        valor = dni,
+                        onValorCambia = { nuevo -> dni = nuevo.filter { it.isDigit() }.take(8) },
+                        etiqueta = "DNI",
+                        placeholder = "00000000",
+                        icono = Icons.Rounded.Badge,
+                        tipoTeclado = KeyboardType.NumberPassword,
+                        modifier = Modifier.weight(1f)
+                    )
+                    CampoTextoEdu(
+                        valor = telefono,
+                        onValorCambia = { nuevo -> telefono = nuevo.filter { it.isDigit() }.take(9) },
+                        etiqueta = "Teléfono",
+                        placeholder = "999999999",
+                        icono = Icons.Rounded.Phone,
+                        tipoTeclado = KeyboardType.NumberPassword,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                // CORREO
+                CampoTextoEdu(
+                    valor = email,
+                    onValorCambia = { email = it.trim() },
+                    etiqueta = "Correo electrónico",
+                    placeholder = "nombre@correo.com",
+                    icono = Icons.Rounded.Email,
+                    tipoTeclado = KeyboardType.Email
+                )
+
+                // CONTRASEÑA + requisitos que se marcan al cumplirse
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    CampoTextoEdu(
+                        valor = password,
+                        onValorCambia = { password = it },
+                        etiqueta = "Contraseña",
+                        placeholder = "Mínimo 8 caracteres",
+                        icono = Icons.Rounded.Lock,
+                        esContrasena = true,
+                        accionTeclado = ImeAction.Done
+                    )
+                    RequisitosContrasenaEdu(password)
+                }
+
+                // AVISO SEGÚN ROL
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(EduTealClaro, RoundedCornerShape(14.dp))
+                        .padding(horizontal = 12.dp, vertical = 9.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Rounded.Info, contentDescription = null, tint = EduTealOscuro, modifier = Modifier.size(20.dp))
                     Text(
-                        text = "Ingrese nombre completo",
-                        color = TextSecondary,
-                        fontSize = 14.sp,
-                        fontFamily = Roboto
-                    ) },
-                leadingIcon = {
-                    Image(
-                        painter = painterResource(id = R.drawable.user_circle_darkgray),
-                        contentDescription = null, modifier = Modifier.size(25.dp)
-                    )},
-                shape = RoundedCornerShape(10.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = EduconnectBlue,
-                    unfocusedBorderColor = BorderMedium,
-                    focusedTextColor = TextPrimary,
-                    unfocusedTextColor = TextPrimary,
-                    cursorColor = EduconnectBlue),
-                modifier = Modifier.fillMaxWidth().height(50.dp),
-                singleLine = true
-            )
-
-            //DNI Y TELÉFONO
-            Row(modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-
-                //DNI: solo números, máximo 8
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(text = "DNI",
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 13.sp,
-                        color = TextBlue,
-                        letterSpacing = 1.sp
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-
-                    OutlinedTextField(
-                        value = dni,
-                        onValueChange = { nuevo -> dni = nuevo.filter { it.isDigit() }.take(8) },
-                        placeholder = {
-                            Text(
-                                text = "00000000",
-                                color = TextSecondary,
-                                fontSize = 14.sp,
-                                fontFamily = Roboto
-                            )},
-                        leadingIcon = {
-                            Image(painter = painterResource(id = R.drawable.dni_darkgray),
-                                contentDescription = null,
-                                modifier = Modifier.size(22.dp))
+                        text = when (rolSeleccionado) {
+                            "Docente" -> "Podrás asignar grado, sección y curso desde tu perfil."
+                            "Padre" -> "Podrás asociar a tus hijos desde tu perfil."
+                            else -> "Recibirás los avisos y las correcciones de asistencia de la institución."
                         },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
-                        shape = RoundedCornerShape(10.dp),
-
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = EduconnectBlue,
-                            unfocusedBorderColor = BorderMedium,
-                            focusedTextColor = TextPrimary,
-                            unfocusedTextColor = TextPrimary,
-                            cursorColor = EduconnectBlue),
-                        modifier = Modifier.fillMaxWidth().height(50.dp), singleLine = true
+                        fontFamily = Nunito, fontWeight = FontWeight.SemiBold, fontSize = 13.5.sp,
+                        lineHeight = 18.sp, color = EduEtiqueta
                     )
                 }
 
-                // TELÉFONO: solo números, máximo 9
-                Column(modifier = Modifier.weight(1f)) {
+                // BOTÓN CREAR CUENTA: valida y, si todo está bien, envía al backend
+                BotonPrincipalEdu(
+                    texto = "Crear cuenta",
+                    onClick = {
+                        val alerta = validar()
+                        if (alerta != null) alertaLocal = alerta
+                        else onRegister(nombre.trim(), dni, telefono, email.trim(), password, rolSeleccionado)
+                    },
+                    tipo = TipoBotonEdu.GUARDAR,
+                    icono = Icons.Rounded.PersonAdd,
+                    cargando = registrando,
+                    textoCargando = "Creando cuenta...",
+                    habilitado = !registroExitoso
+                )
+
+                // ¿YA TIENES CUENTA? (dentro de la tarjeta para ahorrar espacio)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Text(
-                        text = "TELÉFONO",
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 13.sp,
-                        color = TextBlue,
-                        letterSpacing = 1.sp)
-                    Spacer(modifier = Modifier.height(4.dp)
+                        text = "¿Ya tienes cuenta? ",
+                        fontFamily = Nunito, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = EduTextoSecundario
                     )
-                    OutlinedTextField(
-                        value = telefono,
-                        onValueChange = { nuevo -> telefono = nuevo.filter { it.isDigit() }.take(9) },
-                        placeholder = {
-                            Text(
-                                text = "999999999",
-                                color = TextSecondary,
-                                fontSize = 14.sp,
-                                fontFamily = Roboto)},
-                        leadingIcon = {
-                            Image(
-                                painter = painterResource(id = R.drawable.phone_darkgray),
-                                contentDescription = null,
-                                modifier = Modifier.size(22.dp)
-                            )},
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
-                        shape = RoundedCornerShape(10.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = EduconnectBlue,
-                            unfocusedBorderColor = BorderMedium,
-                            focusedTextColor = TextPrimary,
-                            unfocusedTextColor = TextPrimary,
-                            cursorColor = EduconnectBlue),
-                        modifier = Modifier.fillMaxWidth().height(50.dp),
-                        singleLine = true
-                    )
-                }
-            }
-
-            // CORREO
-            Text(
-                text = "CORREO ELECTRÓNICO",
-                fontFamily = Roboto,
-                fontWeight = FontWeight.Bold,
-                fontSize = 13.sp,
-                color = TextBlue,
-                letterSpacing = 1.sp)
-            OutlinedTextField(
-                value = email, onValueChange = { email = it.trim() },
-                placeholder = {
-                    Text(
-                        text = "Ingrese correo",
-                        color = TextSecondary,
-                        fontSize = 14.sp,
-                        fontFamily = Roboto
-                    ) },
-                leadingIcon = {
-                    Image(
-                        painter = painterResource(id = R.drawable.mail_darkgray),
-                        contentDescription = null,
-                        modifier = Modifier.size(25.dp)
-                    )},
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-                shape = RoundedCornerShape(10.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = EduconnectBlue,
-                    unfocusedBorderColor = BorderMedium,
-                    focusedTextColor = TextPrimary,
-                    unfocusedTextColor = TextPrimary,
-                    cursorColor = EduconnectBlue),
-                modifier = Modifier.fillMaxWidth().height(50.dp), singleLine = true
-            )
-
-            // CONTRASEÑA
-            Text(
-                text = "CONTRASEÑA",
-                fontFamily = Roboto,
-                fontWeight = FontWeight.Bold,
-                fontSize = 13.sp,
-                color = TextBlue,
-                letterSpacing = 1.sp)
-            OutlinedTextField(
-                value = password, onValueChange = { password = it },
-                placeholder = {
-                    Text(
-                        text = "Mínimo 8 caracteres",
-                        color = TextSecondary,
-                        fontSize = 14.sp,
-                        fontFamily = Roboto
-                    )},
-                leadingIcon = {
-                    Image(painter = painterResource(id = R.drawable.closed_darkgray),
-                        contentDescription = null, modifier = Modifier.size(25.dp)) },
-                trailingIcon = {
-                    IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                        Image(
-                            painter = painterResource(
-                                id = if (passwordVisible) R.drawable.eye_darkgray
-                                else R.drawable.eyeoff_darkgray),
-                            contentDescription = null,
-                            modifier = Modifier.size(25.dp)
-                        )
-                    }
-                },
-                visualTransformation = if (passwordVisible) VisualTransformation.None
-                else PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                shape = RoundedCornerShape(10.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = EduconnectBlue,
-                    unfocusedBorderColor = BorderMedium,
-                    focusedTextColor = TextPrimary,
-                    unfocusedTextColor = TextPrimary,
-                    cursorColor = EduconnectBlue),
-                modifier = Modifier.fillMaxWidth().height(50.dp), singleLine = true
-            )
-
-            // AVISO SEGÚN ROL
-            Row(modifier = Modifier.fillMaxWidth()
-                .background(color = BackgroundLight, shape = RoundedCornerShape(10.dp))
-                .padding(12.dp),
-                horizontalArrangement = Arrangement.spacedBy(5.dp),
-                verticalAlignment = Alignment.Top) {
-                Image(
-                    painter = painterResource(id = R.drawable.alerta_darkgray),
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp)
-                )
-                Text(
-                    text = if (rolSeleccionado == "Docente")
-                        "Podrás asignar grado, sección y curso desde tu perfil."
-                    else
-                        "Podrás asociar a tus hijos desde tu perfil.",
-                    fontFamily = Roboto,
-                    fontWeight = FontWeight.Normal,
-                    fontSize = 14.sp,
-                    color = TextPrimary,
-                    lineHeight = 15.sp
-                )
-            }
-
-            // BOTÓN CREAR CUENTA: valida y, si todo está bien, envía al backend
-            Button(
-                onClick = {
-                    val alerta = validar()
-                    if (alerta != null) alertaLocal = alerta
-                    else onRegister(nombre.trim(), dni, telefono, email.trim(), password, rolSeleccionado)
-                },
-                enabled = !registrando && !registroExitoso,
-                modifier = Modifier.fillMaxWidth().height(48.dp),
-                shape = RoundedCornerShape(25.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = AccentOrange,
-                    disabledContainerColor = AccentOrange.copy(alpha = 0.6f)
-                )
-            ) {
-                if (registrando) {
-                    CircularProgressIndicator(
-                        color = TextWhite,
-                        strokeWidth = 2.5.dp,
-                        modifier = Modifier.size(22.dp)
-                    )
-                    Spacer(modifier = Modifier.size(10.dp))
-                    Text(
-                        text = "Creando cuenta...",
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 18.sp,
-                        color = TextWhite)
-                } else {
-                    Icon(
-                        imageVector = Icons.Filled.PersonAdd, contentDescription = null,
-                        tint = TextWhite, modifier = Modifier.size(28.dp))
-                    Spacer(
-                        modifier = Modifier.size(8.dp))
-                    Text(
-                        text = "Crear Cuenta",
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 18.sp,
-                        color = TextWhite)
-                }
-            }
-
-            // ¿YA TIENES CUENTA?
-            Row(modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = "¿Ya tienes cuenta? ",
-                    fontFamily = Roboto,
-                    fontSize = 15.sp,
-                    color = TextSecondary
-                )
-                TextButton(onClick = onBack,
-                    contentPadding = PaddingValues(0.dp)) {
                     Text(
                         text = "Inicia sesión",
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 15.sp,
-                        color = TextBlue
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable(onClick = onBack)
+                            .padding(horizontal = 4.dp, vertical = 4.dp),
+                        fontFamily = Nunito, fontWeight = FontWeight.Black, fontSize = 15.sp, color = EduTealOscuro
                     )
                 }
             }
@@ -571,110 +372,83 @@ fun RegisterScreen(
     }
 }
 
-// Popup de alerta: ícono en círculo de color, título, mensaje y botón "Entendido"
+// Selector de rol con tres tarjetas: Docente / Padre / Director.
+// Guarda "Docente", "Padre" o "Director" (el texto que se envía al backend).
+private data class OpcionRol(val valor: String, val texto: String, val icono: ImageVector)
+
+private val OPCIONES_ROL = listOf(
+    OpcionRol("Docente", "Docente", Icons.Rounded.School),
+    OpcionRol("Padre", "Padre", Icons.Rounded.FamilyRestroom),
+    OpcionRol("Director", "Director", Icons.Rounded.AdminPanelSettings)
+)
+
 @Composable
-private fun PopupAlertaRegistro(alerta: Alerta, onCerrar: () -> Unit) {
-    Dialog(onDismissRequest = onCerrar) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(BackgroundWhite, RoundedCornerShape(20.dp))
-                .padding(horizontal = 24.dp, vertical = 24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+private fun SelectorRol(rolSeleccionado: String, onSeleccionar: (String) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(
+            text = "¿Quién eres?",
+            fontFamily = Nunito, fontWeight = FontWeight.ExtraBold, fontSize = 14.sp, color = EduEtiqueta
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Box(
-                modifier = Modifier
-                    .size(68.dp)
-                    .background(alerta.color.copy(alpha = 0.12f), CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = alerta.icono,
-                    contentDescription = null,
-                    tint = alerta.color,
-                    modifier = Modifier.size(38.dp)
-                )
-            }
-            Text(
-                text = alerta.titulo,
-                fontFamily = Roboto,
-                fontWeight = FontWeight.Bold,
-                fontSize = 20.sp,
-                color = TextBlue,
-                textAlign = TextAlign.Center
-            )
-            Text(
-                text = alerta.mensaje,
-                fontFamily = Roboto,
-                fontSize = 15.sp,
-                color = TextPrimary,
-                textAlign = TextAlign.Center,
-                lineHeight = 20.sp
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Button(
-                onClick = onCerrar,
-                modifier = Modifier.fillMaxWidth().height(46.dp),
-                shape = RoundedCornerShape(23.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = EduconnectBlue)
-            ) {
-                Text(
-                    text = "Entendido",
-                    fontFamily = Roboto,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp,
-                    color = TextWhite
-                )
+            OPCIONES_ROL.forEach { opcion ->
+                val activo = rolSeleccionado == opcion.valor
+                val forma = RoundedCornerShape(14.dp)
+                Row(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(48.dp)
+                        .clip(forma)
+                        .background(if (activo) EduTealClaro else EduCampo)
+                        .border(if (activo) 2.dp else 1.5.dp, if (activo) EduTeal else EduBorde, forma)
+                        .clickable { onSeleccionar(opcion.valor) }
+                        .padding(horizontal = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(5.dp, Alignment.CenterHorizontally)
+                ) {
+                    Icon(
+                        opcion.icono, contentDescription = null,
+                        tint = if (activo) EduTeal else EduTextoSecundario,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Text(
+                        text = opcion.texto,
+                        fontFamily = Nunito,
+                        fontWeight = if (activo) FontWeight.Black else FontWeight.Bold,
+                        fontSize = 13.5.sp,
+                        color = if (activo) EduTealOscuro else EduTextoSecundario,
+                        textAlign = TextAlign.Center,
+                        maxLines = 1
+                    )
+                }
             }
         }
     }
 }
 
-// Popup de éxito: check verde arriba y "¡Cuenta registrada!" en verde oscuro. Se cierra solo.
+// Chips con los requisitos de la contraseña: se ponen en verde con check al cumplirse.
+// Público para reutilizarlo en Recuperar y Cambiar contraseña.
 @Composable
-private fun PopupCuentaRegistrada(rol: String, onCerrar: () -> Unit) {
-    Dialog(
-        onDismissRequest = onCerrar,
-        properties = DialogProperties(dismissOnClickOutside = false)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(BackgroundWhite, RoundedCornerShape(20.dp))
-                .clickable { onCerrar() }
-                .padding(horizontal = 24.dp, vertical = 28.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Filled.CheckCircle,
-                contentDescription = null,
-                tint = VerdeExito,
-                modifier = Modifier.size(84.dp)
-            )
-            Text(
-                text = "¡Cuenta registrada!",
-                fontFamily = Roboto,
-                fontWeight = FontWeight.Bold,
-                fontSize = 22.sp,
-                color = VerdeOscuro,
-                textAlign = TextAlign.Center
-            )
-            Text(
-                text = "Tu cuenta de ${rol.lowercase()} fue creada correctamente. " +
-                        "Ahora inicia sesión con tu correo y contraseña.",
-                fontFamily = Roboto,
-                fontSize = 15.sp,
-                color = TextPrimary,
-                textAlign = TextAlign.Center,
-                lineHeight = 20.sp
+fun RequisitosContrasenaEdu(password: String, modifier: Modifier = Modifier) {
+    val reglas = listOf(
+        "8 caracteres" to (password.length >= 8),
+        "Letras" to password.any { it.isLetter() },
+        "Números" to password.any { it.isDigit() }
+    )
+    Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        reglas.forEach { (texto, cumple) ->
+            ChipEdu(
+                texto = texto,
+                tono = if (cumple) TonoEdu.VERDE else TonoEdu.GRIS,
+                icono = if (cumple) Icons.Rounded.Check else null
             )
         }
     }
 }
 
-@Preview(showBackground = true)
+@Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
 fun RegisterScreenPreview() {
     EduConnectAppTheme {
