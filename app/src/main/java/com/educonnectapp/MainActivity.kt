@@ -17,92 +17,93 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import android.app.NotificationManager
+import android.content.Intent
+import android.net.Uri
 import android.os.Build
+import android.provider.Settings
 
 
-import com.educonnectapp.ui.screens.CambioAsistenciaItem
-import com.educonnectapp.ui.screens.AgregarAsignacionScreen
-import com.educonnectapp.ui.screens.AlertaAsignacion
-import com.educonnectapp.ui.screens.AlertaDatos
-import com.educonnectapp.ui.screens.AsignacionGestion
-import com.educonnectapp.ui.screens.BottomNavBarDocente
-import com.educonnectapp.ui.screens.EditarDatosScreen
-import com.educonnectapp.ui.screens.MisAsignacionesScreen
-import com.educonnectapp.ui.screens.AlertaHijo
-import com.educonnectapp.ui.screens.BottomNavBarPadre
-import com.educonnectapp.ui.screens.MisHijosScreen
-import com.educonnectapp.ui.screens.CambiarContrasenaScreen
-import com.educonnectapp.ui.screens.NotificacionesConfigScreen
-import com.educonnectapp.ui.screens.AlumnoEncontrado
-import com.educonnectapp.ui.screens.AsistenciasScreen
-import com.educonnectapp.ui.screens.AsociarHijoScreen
-import com.educonnectapp.ui.screens.ConfirmacionAsistenciaScreen
-import com.educonnectapp.ui.screens.ConfirmacionComunicadoScreen
-import com.educonnectapp.ui.screens.ComunicadosScreen
-import com.educonnectapp.ui.screens.DetalleAsistenciaScreen
-import com.educonnectapp.ui.screens.HistorialAsistenciasScreen
-import com.educonnectapp.ui.screens.HomeDocenteScreen
-import com.educonnectapp.ui.screens.HomePadreScreen
-import com.educonnectapp.ui.screens.LoginScreen
-import com.educonnectapp.ui.screens.NuevoComunicadoScreen
-import com.educonnectapp.ui.screens.PerfilDocenteScreen
-import com.educonnectapp.ui.screens.PerfilPadreScreen
-import com.educonnectapp.ui.screens.AlertaRegistro
-import com.educonnectapp.ui.screens.AlertaRecuperacion
-import com.educonnectapp.ui.screens.ContrasenaActualizadaScreen
-import com.educonnectapp.ui.screens.ErrorLogin
-import com.educonnectapp.ui.screens.NuevaContrasenaScreen
-import com.educonnectapp.ui.screens.RecuperarCorreoScreen
-import com.educonnectapp.ui.screens.VerificarCodigoScreen
-import com.educonnectapp.ui.screens.RegisterScreen
-import com.educonnectapp.ui.screens.RegistroAsistenciaScreen
-import com.educonnectapp.ui.screens.SeleccionarEstudianteScreen
-import com.educonnectapp.ui.screens.SeleccionarSeccionScreen
+import com.educonnectapp.ui.screens.docente.asistencia.CambioAsistenciaItem
+import com.educonnectapp.ui.screens.docente.perfil.AgregarAsignacionScreen
+import com.educonnectapp.ui.screens.docente.perfil.AlertaAsignacion
+import com.educonnectapp.ui.screens.comun.AlertaDatos
+import com.educonnectapp.ui.screens.docente.perfil.AsignacionGestion
+import com.educonnectapp.ui.screens.docente.inicio.BottomNavBarDocente
+import com.educonnectapp.ui.screens.comun.EditarDatosScreen
+import com.educonnectapp.ui.screens.docente.perfil.MisAsignacionesScreen
+import com.educonnectapp.ui.screens.padre.perfil.AlertaHijo
+import com.educonnectapp.ui.screens.padre.inicio.BottomNavBarPadre
+import com.educonnectapp.ui.screens.padre.perfil.MisHijosScreen
+import com.educonnectapp.ui.screens.comun.CambiarContrasenaScreen
+import com.educonnectapp.ui.screens.comun.NotificacionesConfigScreen
+import com.educonnectapp.ui.screens.padre.perfil.AlumnoEncontrado
+import com.educonnectapp.ui.screens.docente.asistencia.AsistenciasScreen
+import com.educonnectapp.ui.screens.padre.perfil.AsociarHijoScreen
+import com.educonnectapp.ui.screens.docente.asistencia.ConfirmacionAsistenciaScreen
+import com.educonnectapp.ui.screens.docente.comunicados.ConfirmacionComunicadoScreen
+import com.educonnectapp.ui.screens.docente.comunicados.ComunicadosScreen
+import com.educonnectapp.ui.screens.padre.asistencia.DetalleAsistenciaScreen
+import com.educonnectapp.ui.screens.padre.asistencia.HistorialAsistenciasScreen
+import com.educonnectapp.ui.screens.docente.inicio.HomeDocenteScreen
+import com.educonnectapp.ui.screens.docente.inicio.ClaseHoyItem
+import com.educonnectapp.ui.screens.docente.inicio.EnviadoInicioItem
+import com.educonnectapp.ui.screens.padre.inicio.HomePadreScreen
+import com.educonnectapp.ui.screens.acceso.LoginScreen
+import com.educonnectapp.ui.screens.docente.comunicados.NuevoComunicadoScreen
+import com.educonnectapp.ui.screens.docente.perfil.PerfilDocenteScreen
+import com.educonnectapp.ui.screens.padre.perfil.PerfilPadreScreen
+import com.educonnectapp.ui.screens.acceso.AlertaRegistro
+import com.educonnectapp.ui.screens.acceso.AlertaRecuperacion
+import com.educonnectapp.ui.screens.acceso.ContrasenaActualizadaScreen
+import com.educonnectapp.ui.screens.acceso.ErrorLogin
+import com.educonnectapp.ui.screens.acceso.NuevaContrasenaScreen
+import com.educonnectapp.ui.screens.acceso.RecuperarCorreoScreen
+import com.educonnectapp.ui.screens.acceso.VerificarCodigoScreen
+import com.educonnectapp.ui.screens.acceso.RegisterScreen
+import com.educonnectapp.ui.screens.docente.asistencia.RegistroAsistenciaScreen
+import com.educonnectapp.ui.screens.padre.asistencia.SeleccionarEstudianteScreen
 import com.educonnectapp.ui.theme.EduConnectAppTheme
 import com.educonnectapp.ui.theme.TextPrimary
-import com.educonnectapp.ui.screens.HijoAsociado
+import com.educonnectapp.ui.screens.padre.perfil.HijoAsociado
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
-import com.educonnectapp.ui.screens.AsignacionItem
-import com.educonnectapp.ui.screens.AlumnoItem
-import com.educonnectapp.ui.screens.GradoItem
-import com.educonnectapp.ui.screens.SeccionItem
-import com.educonnectapp.ui.screens.CursoItem
-import com.educonnectapp.ui.screens.HijoItem
-import com.educonnectapp.ui.screens.AsistenciaItem
-import com.educonnectapp.ui.screens.CursoItem2
-import com.educonnectapp.ui.screens.DetalleAsistencia
+import com.educonnectapp.ui.screens.docente.perfil.AsignacionItem
+import com.educonnectapp.ui.screens.docente.asistencia.AlumnoItem
+import com.educonnectapp.ui.screens.docente.asistencia.ClaseHistorialItem
+import com.educonnectapp.ui.screens.padre.asistencia.HijoItem
+import com.educonnectapp.ui.screens.padre.asistencia.AsistenciaItem
+import com.educonnectapp.ui.screens.padre.asistencia.CursoItem2
+import com.educonnectapp.ui.screens.padre.asistencia.DetalleAsistencia
 
-import com.educonnectapp.ui.screens.SeccionDestinatario
-import com.educonnectapp.ui.screens.SeleccionarComunicadoScreen
-import com.educonnectapp.ui.screens.BusquedaComunicadoScreen
-import com.educonnectapp.ui.screens.DetalleComunicadoScreen
-import com.educonnectapp.ui.screens.SeccionComunicadoItem
-import com.educonnectapp.ui.screens.ComunicadoResumenItem
-import com.educonnectapp.ui.screens.PadreLecturaItem
-import com.educonnectapp.ui.screens.PublicacionesScreen
-import com.educonnectapp.ui.screens.SeleccionarCursoPublicacionScreen
-import com.educonnectapp.ui.screens.NuevaTareaScreen
-import com.educonnectapp.ui.screens.NuevaEvaluacionScreen
-import com.educonnectapp.ui.screens.ConfirmacionPublicacionScreen
-import com.educonnectapp.ui.screens.SeleccionarHijoAgendaScreen
-import com.educonnectapp.ui.screens.AgendaEscolarScreen
-import com.educonnectapp.ui.screens.DetalleAgendaScreen
-import com.educonnectapp.ui.screens.HijoAgendaItem
-import com.educonnectapp.ui.screens.PublicacionAgendaItem
-import com.educonnectapp.ui.screens.ComunicadosPadresScreen
-import com.educonnectapp.ui.screens.SeleccionarEstudianteComunicadoScreen
-import com.educonnectapp.ui.screens.ComunicadosRecibidosScreen
-import com.educonnectapp.ui.screens.DetalleComunicadoPadreScreen
-import com.educonnectapp.ui.screens.HijoComunicadoItem
-import com.educonnectapp.ui.screens.ComunicadoPadreItem
-import com.educonnectapp.ui.screens.WelcomeScreen
-import com.educonnectapp.ui.screens.HistorialAsistenciaScreen
-import com.educonnectapp.ui.screens.HistorialItem
-import com.educonnectapp.ui.screens.DetalleAlumnoItem
-import com.educonnectapp.ui.screens.SeleccionarSeccionHistorialScreen
+import com.educonnectapp.ui.screens.docente.comunicados.SeccionDestinatario
+import com.educonnectapp.ui.screens.docente.comunicados.ClaseComunicadoItem
+import com.educonnectapp.ui.screens.docente.comunicados.BusquedaComunicadoScreen
+import com.educonnectapp.ui.screens.docente.comunicados.DetalleComunicadoScreen
+import com.educonnectapp.ui.screens.docente.comunicados.ComunicadoResumenItem
+import com.educonnectapp.ui.screens.docente.comunicados.PadreLecturaItem
+import com.educonnectapp.ui.screens.docente.publicaciones.PublicacionesScreen
+import com.educonnectapp.ui.screens.docente.publicaciones.ClasePublicacionItem
+import com.educonnectapp.ui.screens.docente.publicaciones.NuevaTareaScreen
+import com.educonnectapp.ui.screens.docente.publicaciones.NuevaEvaluacionScreen
+import com.educonnectapp.ui.screens.docente.publicaciones.ConfirmacionPublicacionScreen
+import com.educonnectapp.ui.screens.padre.agenda.SeleccionarHijoAgendaScreen
+import com.educonnectapp.ui.screens.padre.agenda.AgendaEscolarScreen
+import com.educonnectapp.ui.screens.padre.agenda.DetalleAgendaScreen
+import com.educonnectapp.ui.screens.padre.agenda.HijoAgendaItem
+import com.educonnectapp.ui.screens.padre.agenda.PublicacionAgendaItem
+import com.educonnectapp.ui.screens.padre.comunicados.ComunicadosPadresScreen
+import com.educonnectapp.ui.screens.padre.comunicados.SeleccionarEstudianteComunicadoScreen
+import com.educonnectapp.ui.screens.padre.comunicados.ComunicadosRecibidosScreen
+import com.educonnectapp.ui.screens.padre.comunicados.DetalleComunicadoPadreScreen
+import com.educonnectapp.ui.screens.padre.comunicados.HijoComunicadoItem
+import com.educonnectapp.ui.screens.padre.comunicados.ComunicadoPadreItem
+import com.educonnectapp.ui.screens.acceso.WelcomeScreen
+import com.educonnectapp.ui.screens.docente.asistencia.HistorialAsistenciaScreen
+import com.educonnectapp.ui.screens.docente.asistencia.HistorialItem
+import com.educonnectapp.ui.screens.docente.asistencia.DetalleAlumnoItem
+import com.educonnectapp.ui.screens.docente.asistencia.SeleccionarSeccionHistorialScreen
 
 // Backend propio (Spring Boot)
 import com.educonnectapp.data.api.restablecerContrasena
@@ -140,6 +141,8 @@ import com.educonnectapp.data.api.registrarAsistencia
 import com.educonnectapp.data.api.actualizarAsistenciaDia
 import com.educonnectapp.data.api.obtenerHistorialDocente
 import com.educonnectapp.data.api.obtenerResumenAsistenciasHoy
+import com.educonnectapp.data.api.obtenerHojasAsistenciaHoy
+import com.educonnectapp.data.api.resumenAsistenciasDeHojas
 import com.educonnectapp.data.api.obtenerAsistenciasHijo
 import com.educonnectapp.data.api.formatearHora
 import com.educonnectapp.data.api.formatearFechaLarga
@@ -174,13 +177,15 @@ import com.educonnectapp.data.api.DetallePublicacionDocenteResponse
 import com.educonnectapp.data.api.CalificacionRequest
 import com.educonnectapp.data.api.obtenerDetallePublicacionDocente
 import com.educonnectapp.data.api.registrarCalificaciones
-import com.educonnectapp.ui.screens.HistorialPublicacionesScreen
-import com.educonnectapp.ui.screens.PublicacionHistorialItem
-import com.educonnectapp.ui.screens.CalificarPublicacionScreen
-import com.educonnectapp.ui.screens.DetallePublicacionItem
-import com.educonnectapp.ui.screens.AlumnoCalificacionItem
-import com.educonnectapp.ui.screens.PanelNotificaciones
-import com.educonnectapp.ui.screens.NotificacionItem
+import com.educonnectapp.ui.screens.docente.publicaciones.HistorialPublicacionesScreen
+import com.educonnectapp.ui.screens.docente.publicaciones.PublicacionHistorialItem
+import com.educonnectapp.ui.screens.docente.publicaciones.CalificarPublicacionScreen
+import com.educonnectapp.ui.screens.docente.publicaciones.DetallePublicacionItem
+import com.educonnectapp.ui.screens.docente.publicaciones.AlumnoCalificacionItem
+import com.educonnectapp.ui.components.PanelNotificaciones
+import com.educonnectapp.ui.components.NotificacionItem
+import com.educonnectapp.ui.screens.docente.asistencia.DetalleAsistenciaDocenteScreen
+import com.google.firebase.messaging.FirebaseMessaging
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -189,15 +194,15 @@ import kotlinx.coroutines.coroutineScope
 enum class Screen {
     WELCOME,
     LOGIN, REGISTER, HOME_DOCENTE, HOME_PADRE, ASISTENCIAS,
-    SELECCIONAR_SECCION, REGISTRO_ASISTENCIA, CONFIRMACION_ASISTENCIA,
+    REGISTRO_ASISTENCIA, CONFIRMACION_ASISTENCIA,
     SELECCIONAR_ESTUDIANTE, HISTORIAL_ASISTENCIAS, DETALLE_ASISTENCIA, SELECCIONAR_SECCION_HISTORIAL, HISTORIAL_ASISTENCIA_DOCENTE,
     DETALLE_ASISTENCIA_DOCENTE,
     COMUNICADOS, NUEVO_COMUNICADO, CONFIRMACION_COMUNICADO,
     PERFIL_DOCENTE, PERFIL_PADRE, AGREGAR_ASIGNACION, ASOCIAR_HIJO,
     MIS_ASIGNACIONES, EDITAR_DATOS_DOCENTE, MIS_HIJOS, EDITAR_DATOS_PADRE,
     CAMBIAR_CONTRASENA, CONFIG_NOTIFICACIONES,
-    SELECCIONAR_COMUNICADO, BUSQUEDA_COMUNICADO, DETALLE_COMUNICADO,
-    PUBLICACIONES, SELECCIONAR_CURSO_PUBLICACION, NUEVA_TAREA, NUEVA_EVALUACION, CONFIRMACION_PUBLICACION,
+    BUSQUEDA_COMUNICADO, DETALLE_COMUNICADO,
+    PUBLICACIONES, NUEVA_TAREA, NUEVA_EVALUACION, CONFIRMACION_PUBLICACION,
     SELECCIONAR_HIJO_AGENDA, AGENDA_ESCOLAR, DETALLE_AGENDA,
     COMUNICADOS_PADRE, SELECCIONAR_ESTUDIANTE_COMUNICADO, COMUNICADOS_RECIBIDOS, DETALLE_COMUNICADO_PADRE,
     HISTORIAL_PUBLICACIONES, CALIFICAR_PUBLICACION,
@@ -332,10 +337,6 @@ fun EduConnectApp() {
     var seccionesDisp by remember { mutableStateOf<Map<String, List<String>>>(emptyMap()) }
     var cursosDisp by remember { mutableStateOf<List<String>>(emptyList()) }
     var listaAlumnosSel by remember { mutableStateOf<List<AlumnoItem>>(emptyList()) }
-    var listaGradosSel by remember { mutableStateOf<List<GradoItem>>(emptyList()) }
-    var listaSeccionesSel by remember { mutableStateOf<List<SeccionItem>>(emptyList()) }
-    var listaCursosSel by remember { mutableStateOf<List<CursoItem>>(emptyList()) }
-    var cantidadAlumnosSel by remember { mutableStateOf(0) }
     var isLoginLoading by remember { mutableStateOf(false) }
     var listaHijosSel by remember { mutableStateOf<List<HijoItem>>(emptyList()) }
     var todasAsistenciasSel by remember { mutableStateOf<List<AsistenciaItem>>(emptyList()) }
@@ -345,7 +346,11 @@ fun EduConnectApp() {
     var totalEnviadosSel by remember { mutableStateOf(0) }
     var totalHoySel by remember { mutableStateOf(0) }
     var sinLeerSel by remember { mutableStateOf(0) }
-    var seccionesComunicadoSel by remember { mutableStateOf<List<SeccionComunicadoItem>>(emptyList()) }
+    // Comunicados (rediseño 2026)
+    var comunicadoAdjuntoSel by remember { mutableStateOf("") }                      // nombre del adjunto enviado
+    var comunicadoArchivoSel by remember { mutableStateOf<ArchivoResponse?>(null) }  // adjunto del detalle
+    var destinoComunicadoInicialSel by remember { mutableStateOf<SeccionDestinatario?>(null) }  // clase ya elegida
+    var origenNuevoComunicado by remember { mutableStateOf(Screen.COMUNICADOS) }
     var comunicadosListaSel by remember { mutableStateOf<List<ComunicadoResumenItem>>(emptyList()) }
     var padresLecturaSel by remember { mutableStateOf<List<PadreLecturaItem>>(emptyList()) }
     var comunicadoIdSel by remember { mutableStateOf(0L) }
@@ -374,7 +379,10 @@ fun EduConnectApp() {
     var resumenPorcentajeSel by remember { mutableStateOf(0) }
     var tardanzasSel by remember { mutableStateOf(0) }
     var asignacionesApiSel by remember { mutableStateOf<List<AsignacionResponse>>(emptyList()) }
-    var todosGradosSel by remember { mutableStateOf<List<GradoItem>>(emptyList()) }
+    // Historial (rediseño 2026): historial de cada clase (seccionId, cursoId) -> días registrados.
+    // Se usa para la fecha del último registro y para abrir el historial de una clase sin esperar
+    var historialesClaseSel by remember { mutableStateOf<Map<Pair<Long, Long>, List<HistorialItem>>>(emptyMap()) }
+    var historialesClaseCargados by remember { mutableStateOf(false) }
     // Catálogo para AGREGAR_ASIGNACION: nombre -> id ("1er Grado|A" -> seccionId)
     var seccionIdPorNombre by remember { mutableStateOf<Map<String, Long>>(emptyMap()) }
     var cursoIdPorNombre by remember { mutableStateOf<Map<String, Long>>(emptyMap()) }
@@ -493,6 +501,14 @@ fun EduConnectApp() {
     var datosDocenteCargados by remember { mutableStateOf(false) }
     var comunicadosDocenteCargados by remember { mutableStateOf(false) }
     var comunicadosTodosSel by remember { mutableStateOf<List<ComunicadoDocenteResponse>>(emptyList()) }
+    // Inicio del docente (rediseño 2026): clases con asistencia tomada hoy (seccionId, cursoId)
+    var clasesTomadasHoySel by remember { mutableStateOf<Set<Pair<Long, Long>>>(emptySet()) }
+    var clasesHoyCargadas by remember { mutableStateOf(false) }
+    var cargandoInicioDocente by remember { mutableStateOf(true) }
+    // Pantalla a la que vuelven el registro de asistencia, el detalle de comunicado y el seguimiento de tarea
+    var origenRegistroAsistencia by remember { mutableStateOf(Screen.ASISTENCIAS) }
+    var origenDetalleComunicado by remember { mutableStateOf(Screen.BUSQUEDA_COMUNICADO) }
+    var origenCalificar by remember { mutableStateOf(Screen.HISTORIAL_PUBLICACIONES) }
     var historialDocenteCargado by remember { mutableStateOf(false) }
     var hijosApiSel by remember { mutableStateOf<List<HijoResponse>?>(null) }
     var hijosAsistenciaCargados by remember { mutableStateOf(false) }
@@ -502,7 +518,11 @@ fun EduConnectApp() {
     // Publicaciones (docente)
     var publicacionesDocenteSel by remember { mutableStateOf<List<PublicacionDocenteResponse>>(emptyList()) }
     var publicacionesCargadas by remember { mutableStateOf(false) }
-    var seccionesPublicacionSel by remember { mutableStateOf<List<SeccionComunicadoItem>>(emptyList()) }
+    // Publicaciones (rediseño 2026)
+    var destinoPublicacionInicialSel by remember { mutableStateOf<SeccionDestinatario?>(null) }  // clase ya elegida
+    var origenNuevaPublicacion by remember { mutableStateOf(Screen.PUBLICACIONES) }
+    var adjuntoPublicacionSel by remember { mutableStateOf("") }
+    var claseHistorialPublicacionSel by remember { mutableStateOf<Pair<Long, Long>?>(null) }      // (seccionId, cursoId)
     var asignacionPublicacionSel by remember { mutableStateOf<AsignacionResponse?>(null) }
     var publicandoSel by remember { mutableStateOf(false) }
     var publicacionNotificadosSel by remember { mutableStateOf(0) }
@@ -529,34 +549,119 @@ fun EduConnectApp() {
     // ASIGNACIONES DEL DOCENTE (1 sola petición: ya traen nombres y cantidad de alumnos)
     fun aplicarAsignaciones(lista: List<AsignacionResponse>) {
         asignacionesApiSel = lista
-        todosGradosSel = lista.distinctBy { it.gradoId }.map { GradoItem(it.gradoId, it.grado) }.sortedBy { it.nombre }
-        asignacionesSel = lista.map { AsignacionItem(it.grado, it.seccion, it.curso) }
-        listaGradosSel = todosGradosSel
-        listaSeccionesSel = emptyList()
-        listaCursosSel = emptyList()
-        cantidadAlumnosSel = 0
+        asignacionesSel = lista.map { AsignacionItem(it.grado, it.seccion, it.curso, it.cantidadAlumnos.toInt()) }
     }
-
-    // Filtros LOCALES sobre las asignaciones (sin peticiones al backend)
-    fun seccionesDeGrado(gradoId: Long): List<SeccionItem> =
-        asignacionesApiSel.filter { it.gradoId == gradoId }
-            .distinctBy { it.seccionId }
-            .map { SeccionItem(it.seccionId, it.seccion) }
-            .sortedBy { it.nombre }
-
-    fun cursosDeSeccion(seccionId: Long): List<CursoItem> =
-        asignacionesApiSel.filter { it.seccionId == seccionId }
-            .distinctBy { it.cursoId }
-            .map { CursoItem(it.cursoId, it.curso) }
-            .sortedBy { it.nombre }
-
-    fun alumnosDeSeccion(seccionId: Long): Int =
-        asignacionesApiSel.firstOrNull { it.seccionId == seccionId }?.cantidadAlumnos?.toInt() ?: 0
 
     fun actualizarResumen(resumen: Triple<Int, Int, Int>) {
         resumenRealizadosSel = resumen.first
         resumenPendientesSel = resumen.second
         resumenPorcentajeSel = resumen.third
+    }
+
+    // Clases del docente (asignaciones) con el estado de la asistencia de hoy (Inicio y Asistencia)
+    fun clasesDeHoy(): List<ClaseHoyItem> = asignacionesApiSel.map { a ->
+        ClaseHoyItem(
+            gradoId = a.gradoId, grado = a.grado,
+            seccionId = a.seccionId, seccion = a.seccion,
+            cursoId = a.cursoId, curso = a.curso,
+            cantidadAlumnos = a.cantidadAlumnos.toInt(),
+            tomada = (a.seccionId to a.cursoId) in clasesTomadasHoySel
+        )
+    }
+
+    // Clases del docente para el Historial, con la fecha de su último registro
+    fun clasesHistorial(): List<ClaseHistorialItem> {
+        val hoy = java.time.LocalDate.now(java.time.ZoneId.of("America/Lima")).toString()
+        return asignacionesApiSel.map { a ->
+            val dias = historialesClaseSel[a.seccionId to a.cursoId]
+            val ultimo = dias?.maxByOrNull { it.fecha }
+            ClaseHistorialItem(
+                gradoId = a.gradoId, grado = a.grado,
+                seccionId = a.seccionId, seccion = a.seccion,
+                cursoId = a.cursoId, curso = a.curso,
+                cantidadAlumnos = a.cantidadAlumnos.toInt(),
+                ultimoRegistro = when {
+                    dias == null -> null                                  // consultando
+                    ultimo == null -> ""                                  // sin registros
+                    ultimo.fecha == hoy -> "Hoy · ${ultimo.hora}"
+                    else -> formatearFechaDiaCorta(ultimo.fecha)          // "vie 16 oct"
+                },
+                ultimoEsHoy = ultimo?.fecha == hoy
+            )
+        }
+    }
+
+    // Clases del docente para Comunicados: cantidad de comunicados y fecha del último envío
+    // (los comunicados sin curso se cuentan en todas las clases de su sección)
+    fun clasesComunicado(): List<ClaseComunicadoItem> {
+        val hoy = java.time.LocalDate.now().toString()
+        return asignacionesApiSel.map { a ->
+            val deLaClase = comunicadosTodosSel.filter {
+                it.seccionId == a.seccionId && (it.cursoId == null || it.cursoId == a.cursoId)
+            }
+            val ultimaFecha = deLaClase.map { fechaLocal(it.enviadoEn) }.filter { it.isNotBlank() }.maxOrNull()
+            ClaseComunicadoItem(
+                gradoId = a.gradoId, grado = a.grado,
+                seccionId = a.seccionId, seccion = a.seccion,
+                cursoId = a.cursoId, curso = a.curso,
+                totalPadres = a.cantidadAlumnos.toInt(),
+                cantidadComunicados = deLaClase.size,
+                ultimoEnvio = when (ultimaFecha) {
+                    null -> ""
+                    hoy -> "Hoy"
+                    else -> formatearFechaDiaCorta(ultimaFecha ?: "")
+                },
+                ultimoEsHoy = ultimaFecha == hoy
+            )
+        }
+    }
+
+    // Clase elegida (seccionIdSel + cursoIdSel) como destinatario de un comunicado nuevo
+    fun destinoDeClaseSel(): SeccionDestinatario? =
+        asignacionesApiSel.firstOrNull { it.seccionId == seccionIdSel && it.cursoId == cursoIdSel }?.let {
+            SeccionDestinatario(
+                gradoId = it.gradoId, seccionId = it.seccionId, cursoId = it.cursoId,
+                gradoNombre = it.grado, seccionNombre = it.seccion, cursoNombre = it.curso,
+                totalPadres = it.cantidadAlumnos.toInt()
+            )
+        }
+
+    // Asignaciones del docente como destinatarios (Para) de comunicados y publicaciones
+    fun destinatariosDocente(): List<SeccionDestinatario> = asignacionesApiSel.map {
+        SeccionDestinatario(
+            gradoId = it.gradoId, seccionId = it.seccionId, cursoId = it.cursoId,
+            gradoNombre = it.grado, seccionNombre = it.seccion, cursoNombre = it.curso,
+            totalPadres = it.cantidadAlumnos.toInt()
+        )
+    }
+
+    // Clases del docente para Publicaciones: tareas y evaluaciones vigentes y la próxima fecha
+    fun clasesPublicacion(): List<ClasePublicacionItem> {
+        val hoy = java.time.LocalDate.now().toString()
+        val vigentes = publicacionesDocenteSel.filter { it.estado != "ANULADA" }
+        return asignacionesApiSel.map { a ->
+            val deLaClase = vigentes.filter { it.seccionId == a.seccionId && it.cursoId == a.cursoId }
+            ClasePublicacionItem(
+                gradoId = a.gradoId, grado = a.grado,
+                seccionId = a.seccionId, seccion = a.seccion,
+                cursoId = a.cursoId, curso = a.curso,
+                totalAlumnos = a.cantidadAlumnos.toInt(),
+                tareas = deLaClase.count { it.tipo == "TAREA" },
+                evaluaciones = deLaClase.count { it.tipo == "EVALUACION" },
+                proximaFecha = deLaClase.filter { it.estado == "ACTIVA" }
+                    .mapNotNull { it.fechaEntrega?.take(10) }
+                    .filter { it >= hoy }
+                    .minOrNull() ?: ""
+            )
+        }
+    }
+
+    // Abre el formulario de tarea o aviso de evaluación (destino = clase ya elegida o null)
+    fun irANuevaPublicacion(tipo: String, destino: SeccionDestinatario?, origen: Screen) {
+        tipoPublicacionSel = tipo
+        destinoPublicacionInicialSel = destino
+        origenNuevaPublicacion = origen
+        currentScreen = if (tipo == "Tarea") Screen.NUEVA_TAREA else Screen.NUEVA_EVALUACION
     }
 
     // Hijos del padre: se piden 1 sola vez por sesión (se actualizan en PERFIL_PADRE y al asociar)
@@ -804,8 +909,7 @@ fun EduConnectApp() {
         seccion: SeccionDestinatario, fechaEntrega: String, hora: String
     ) {
         if (publicandoSel) return   // evita doble envío
-        publicandoSel = true
-        aviso(if (adjunto.isNotEmpty()) "Subiendo adjunto y publicando..." else "Publicando...")
+        publicandoSel = true   // la pantalla muestra el popup "Publicando..."
         CoroutineScope(Dispatchers.Main).launch {
             try {
                 val archivoId = if (adjunto.isNotEmpty())
@@ -818,6 +922,13 @@ fun EduConnectApp() {
                 fechaEntregaSel = publicada.fechaEntrega ?: fechaEntrega
                 horaPublicacionSel = hora
                 publicacionNotificadosSel = publicada.totalAlumnos.toInt()
+                adjuntoPublicacionSel = publicada.archivo?.nombre ?: ""
+                // Clase de la publicación: para la confirmación, "Ver publicaciones de la clase" y "Nueva tarea"
+                asignacionPublicacionSel = asignacionesApiSel.find {
+                    it.seccionId == seccion.seccionId && it.cursoId == seccion.cursoId
+                } ?: asignacionPublicacionSel
+                claseHistorialPublicacionSel = seccion.seccionId to seccion.cursoId
+                destinoPublicacionInicialSel = seccion
                 publicacionesCargadas = false   // el resumen cambió
                 currentScreen = Screen.CONFIRMACION_PUBLICACION
             } catch (e: ApiException) {
@@ -885,9 +996,14 @@ fun EduConnectApp() {
         comunicadoPadreSel = null
         adjuntosComunicadoSel = emptyMap()
         datosDocenteCargados = false
+        clasesHoyCargadas = false
+        clasesTomadasHoySel = emptySet()
+        cargandoInicioDocente = true
         comunicadosDocenteCargados = false
         comunicadosTodosSel = emptyList()
         historialDocenteCargado = false
+        historialesClaseSel = emptyMap()
+        historialesClaseCargados = false
         hijosApiSel = null
         hijosAsistenciaCargados = false
         historialHijoCargadoDe = null
@@ -896,7 +1012,8 @@ fun EduConnectApp() {
         publicacionesDocenteSel = emptyList()
         publicacionesCargadas = false
         detallePublicacionSel = null
-        seccionesPublicacionSel = emptyList()
+        claseHistorialPublicacionSel = null
+        destinoPublicacionInicialSel = null
         asignacionPublicacionSel = null
         agendaPorHijoSel = emptyMap()
         agendaCargada = false
@@ -959,7 +1076,7 @@ fun EduConnectApp() {
                                         currentScreen = if (usuario.rol == "DOCENTE") Screen.HOME_DOCENTE else Screen.HOME_PADRE
 
                                         // Registrar token FCM del dispositivo en el backend
-                                        com.google.firebase.messaging.FirebaseMessaging.getInstance().token
+                                        FirebaseMessaging.getInstance().token
                                             .addOnCompleteListener { task ->
                                                 if (task.isSuccessful) {
                                                     val token = task.result
@@ -1184,22 +1301,78 @@ fun EduConnectApp() {
                 Screen.HOME_DOCENTE -> {
                     androidx.compose.runtime.LaunchedEffect(usuarioLogueado?.id) {
                         if (usuarioLogueado == null) return@LaunchedEffect
-                        if (datosDocenteCargados) return@LaunchedEffect   // ya cargado en esta sesión
                         try {
-                            // Precarga de asignaciones y resumen del día (1 sola vez por sesión;
-                            // el resumen se refresca al guardar una asistencia)
-                            val asignaciones = obtenerAsignaciones()
-                            aplicarAsignaciones(asignaciones)
-                            actualizarResumen(obtenerResumenAsistenciasHoy(asignaciones))
+                            // Asignaciones: 1 sola vez por sesión (ya traen nombres y cantidad de alumnos)
+                            val asignaciones = if (datosDocenteCargados) asignacionesApiSel
+                            else obtenerAsignaciones().also { aplicarAsignaciones(it) }
+                            // Estado de hoy de cada clase + resumen del día (1 petición por clase, en paralelo).
+                            // Se recarga al volver de tomar asistencia.
+                            if (!clasesHoyCargadas || !datosDocenteCargados) {
+                                val hojas = obtenerHojasAsistenciaHoy(asignaciones)
+                                clasesTomadasHoySel = hojas.filter { it.yaRegistrado }
+                                    .map { it.seccionId to it.cursoId }.toSet()
+                                actualizarResumen(resumenAsistenciasDeHojas(hojas))
+                                clasesHoyCargadas = true
+                            }
                             datosDocenteCargados = true
+                            cargandoInicioDocente = false
+                            // "Lo que enviaste": comunicados y publicaciones (sin peticiones si ya están cargados;
+                            // se recargan al entrar a esos módulos)
+                            comunicadosDelDocente()
+                            if (!publicacionesCargadas) {
+                                publicacionesDocenteSel = obtenerPublicacionesDocente()
+                                publicacionesCargadas = true
+                            }
                         } catch (e: kotlinx.coroutines.CancellationException) {
                             throw e
-                        } catch (e: Exception) { /* silencioso */ }
+                        } catch (e: Exception) { /* silencioso */ } finally {
+                            cargandoInicioDocente = false
+                        }
                     }
+
+                    // Último comunicado y última tarea (los más recientes)
+                    val ultimoComunicado = comunicadosTodosSel
+                        .maxByOrNull { aFechaHoraLocal(it.enviadoEn) ?: java.time.LocalDateTime.MIN }
+                    val ultimaTarea = publicacionesDocenteSel
+                        .filter { it.tipo == "TAREA" }
+                        .maxByOrNull { aFechaHoraLocal(it.publicadoEn) ?: java.time.LocalDateTime.MIN }
+
                     HomeDocenteScreen(
                         usuarioNombre = usuarioLogueado?.nombrecompleto ?: "",
                         fotoUrl = usuarioLogueado?.fotoId?.let { urlArchivo(it) },
+                        clases = clasesDeHoy(),
+                        cargandoClases = cargandoInicioDocente,
+                        ultimoComunicado = ultimoComunicado?.let { c ->
+                            EnviadoInicioItem(
+                                id = c.id,
+                                titulo = c.asunto,
+                                detalle = listOfNotNull("${c.grado} ${c.seccion}", c.curso).joinToString(" · "),
+                                fecha = fechaLocal(c.enviadoEn),
+                                hechos = c.totalLeidos.toInt(),
+                                total = c.totalNotificados
+                            )
+                        },
+                        ultimaTarea = ultimaTarea?.let { t ->
+                            EnviadoInicioItem(
+                                id = t.id,
+                                titulo = t.titulo,
+                                detalle = "${t.grado} ${t.seccion} · ${t.curso}" +
+                                        (t.fechaEntrega?.let { " · Entrega: ${formatearFechaCorta(it)}" } ?: ""),
+                                fecha = fechaLocal(t.publicadoEn),
+                                hechos = t.calificados.toInt(),
+                                total = t.totalAlumnos.toInt()
+                            )
+                        },
+                        tieneNotificaciones = false,   // el docente aún no tiene bandeja de notificaciones
+                        onTomarAsistencia = { clase ->
+                            gradoIdSel = clase.gradoId; seccionIdSel = clase.seccionId; cursoIdSel = clase.cursoId
+                            gradoSel = clase.grado; seccionSel = clase.seccion; cursoSel = clase.curso
+                            origenRegistroAsistencia = Screen.HOME_DOCENTE
+                            clasesHoyCargadas = false            // al volver se actualiza "Tomada"
+                            currentScreen = Screen.REGISTRO_ASISTENCIA
+                        },
                         onAsistencias = {
+                            clasesHoyCargadas = false
                             currentScreen = Screen.ASISTENCIAS
                         },
                         onComunicados = {
@@ -1210,7 +1383,47 @@ fun EduConnectApp() {
                             publicacionesCargadas = false
                             currentScreen = Screen.PUBLICACIONES
                         },
-                        onAlumnos = {},
+                        onVerComunicado = { id ->
+                            comunicadosTodosSel.find { it.id == id }?.let { c ->
+                                comunicadosDocenteSel = listOf(c)
+                                comunicadosListaSel = listOf(
+                                    ComunicadoResumenItem(
+                                        id = c.id,
+                                        asunto = c.asunto,
+                                        mensaje = c.mensaje,
+                                        fecha = fechaLocal(c.enviadoEn),
+                                        totalNotificados = c.totalNotificados,
+                                        totalLeidos = c.totalLeidos.toInt()
+                                    )
+                                )
+                                gradoSel = c.grado; seccionSel = c.seccion; cursoSel = c.curso ?: ""
+                                seccionIdSel = c.seccionId
+                                c.cursoId?.let { cursoIdSel = it }
+                            }
+                            comunicadoIdSel = id
+                            origenDetalleComunicado = Screen.HOME_DOCENTE
+                            currentScreen = Screen.DETALLE_COMUNICADO
+                        },
+                        onVerTarea = { id ->
+                            publicacionIdSel = id
+                            origenCalificar = Screen.HOME_DOCENTE
+                            currentScreen = Screen.CALIFICAR_PUBLICACION
+                        },
+                        onCrearComunicado = {
+                            comunicadosDocenteCargados = false
+                            destinoComunicadoInicialSel = null
+                            origenNuevoComunicado = Screen.HOME_DOCENTE
+                            currentScreen = Screen.NUEVO_COMUNICADO
+                        },
+                        onCrearTarea = {
+                            publicacionesCargadas = false
+                            irANuevaPublicacion("Tarea", null, Screen.HOME_DOCENTE)
+                        },
+                        onCrearEvaluacion = {
+                            publicacionesCargadas = false
+                            irANuevaPublicacion("Evaluación", null, Screen.HOME_DOCENTE)
+                        },
+                        onAlumnos = { aviso("Alumnos disponible próximamente") },
                         onAvisos = {
                             comunicadosDocenteCargados = false
                             currentScreen = Screen.COMUNICADOS
@@ -1252,13 +1465,17 @@ fun EduConnectApp() {
                 Screen.ASISTENCIAS -> {
                     androidx.compose.runtime.LaunchedEffect(Unit) {
                         if (usuarioLogueado == null) return@LaunchedEffect
-                        // El resumen ya se calculó en HOME_DOCENTE (y se refresca al guardar una asistencia)
-                        if (datosDocenteCargados) return@LaunchedEffect
+                        // Si ya se cargó el estado de hoy (desde el Inicio o al guardar), no se repite
+                        if (datosDocenteCargados && clasesHoyCargadas) return@LaunchedEffect
                         try {
-                            val asignaciones = asignacionesApiSel.ifEmpty {
-                                obtenerAsignaciones().also { aplicarAsignaciones(it) }
-                            }
-                            actualizarResumen(obtenerResumenAsistenciasHoy(asignaciones))
+                            val asignaciones = if (datosDocenteCargados) asignacionesApiSel
+                            else obtenerAsignaciones().also { aplicarAsignaciones(it) }
+                            // Estado de hoy de cada clase + resumen del día (1 petición por clase, en paralelo)
+                            val hojas = obtenerHojasAsistenciaHoy(asignaciones)
+                            clasesTomadasHoySel = hojas.filter { it.yaRegistrado }
+                                .map { it.seccionId to it.cursoId }.toSet()
+                            actualizarResumen(resumenAsistenciasDeHojas(hojas))
+                            clasesHoyCargadas = true
                             datosDocenteCargados = true
                         } catch (e: kotlinx.coroutines.CancellationException) {
                             throw e
@@ -1266,10 +1483,9 @@ fun EduConnectApp() {
                     }
                     AsistenciasScreen(
                         onBack = { currentScreen = Screen.HOME_DOCENTE },
-                        onRegistrarAsistencia = { currentScreen = Screen.SELECCIONAR_SECCION },
                         onHistorial = { currentScreen = Screen.SELECCIONAR_SECCION_HISTORIAL },
                         onHomeDocente = { currentScreen = Screen.HOME_DOCENTE },
-                        onAlumnos = {},
+                        onAlumnos = { aviso("Alumnos disponible próximamente") },
                         onAvisos = {
                             comunicadosDocenteCargados = false
                             currentScreen = Screen.COMUNICADOS
@@ -1278,56 +1494,13 @@ fun EduConnectApp() {
                         onNotificaciones = {},
                         realizados = resumenRealizadosSel,
                         pendientes = resumenPendientesSel,
-                        porcentajeAsistencias = resumenPorcentajeSel
-                    )
-                }
-
-                Screen.SELECCIONAR_SECCION -> {
-                    androidx.compose.runtime.LaunchedEffect(usuarioLogueado?.id) {
-                        if (usuarioLogueado == null) return@LaunchedEffect
-                        if (asignacionesApiSel.isNotEmpty()) {
-                            // Ya cargadas en HOME_DOCENTE: solo reiniciar la selección
-                            aplicarAsignaciones(asignacionesApiSel)
-                            return@LaunchedEffect
-                        }
-                        try {
-                            aplicarAsignaciones(obtenerAsignaciones())
-                        } catch (e: kotlinx.coroutines.CancellationException) {
-                            throw e
-                        } catch (e: Exception) { aviso("Error cargando datos: ${e.message}") }
-                    }
-                    SeleccionarSeccionScreen(
-                        docenteId = usuarioLogueado?.id?.toString() ?: "",
-                        listaGrados = listaGradosSel,
-                        listaSecciones = listaSeccionesSel,
-                        listaCursos = listaCursosSel,
-                        cantidadAlumnos = cantidadAlumnosSel,
-
-                        // Filtro LOCAL — sin peticiones al backend
-                        onGradoSeleccionado = { grado ->
-                            listaSeccionesSel = seccionesDeGrado(grado.id)
-                            listaCursosSel = emptyList()
-                            cantidadAlumnosSel = 0
-                        },
-
-                        // Filtro LOCAL — la cantidad de alumnos ya viene en la asignación
-                        onSeccionSeleccionada = { seccion ->
-                            listaCursosSel = cursosDeSeccion(seccion.id)
-                            cantidadAlumnosSel = alumnosDeSeccion(seccion.id)
-                            listaAlumnosSel = emptyList()  // la lista de alumnos se carga en REGISTRO_ASISTENCIA (Etapa 3)
-                        },
-
-                        onBack = {
-                            currentScreen = Screen.ASISTENCIAS
-                        },
-                        onHomeDocente = { currentScreen = Screen.HOME_DOCENTE },
-                        onAlumnos = {},
-                        onAvisos = { currentScreen = Screen.COMUNICADOS },
-                        onPerfilDocente = { currentScreen = Screen.PERFIL_DOCENTE },
-                        onNotificaciones = {},
-                        onContinuar = { gradoId, seccionId, cursoId, grado, seccion, curso ->
-                            gradoIdSel = gradoId; seccionIdSel = seccionId; cursoIdSel = cursoId
-                            gradoSel = grado; seccionSel = seccion; cursoSel = curso
+                        porcentajeAsistencias = resumenPorcentajeSel,
+                        clases = clasesDeHoy(),
+                        cargandoClases = !clasesHoyCargadas,
+                        onTomarAsistencia = { clase ->
+                            gradoIdSel = clase.gradoId; seccionIdSel = clase.seccionId; cursoIdSel = clase.cursoId
+                            gradoSel = clase.grado; seccionSel = clase.seccion; cursoSel = clase.curso
+                            origenRegistroAsistencia = Screen.ASISTENCIAS
                             currentScreen = Screen.REGISTRO_ASISTENCIA
                         }
                     )
@@ -1375,7 +1548,7 @@ fun EduConnectApp() {
                         horaRegistro = horaRegistroHoy,
                         fechaHoja = fechaHojaSel,
                         cargando = cargandoHoja,
-                        onBack = { currentScreen = Screen.SELECCIONAR_SECCION },
+                        onBack = { currentScreen = origenRegistroAsistencia },
                         onHomeDocente = { currentScreen = Screen.HOME_DOCENTE },
                         onAlumnos = {},
                         onAvisos = { currentScreen = Screen.COMUNICADOS },
@@ -1402,9 +1575,11 @@ fun EduConnectApp() {
                                         } ?: emptyList()
                                     } else {
                                         registrarAsistencia(seccionIdSel, cursoIdSel, estados.filterValues { it.isNotEmpty() })
+                                        clasesTomadasHoySel = clasesTomadasHoySel + (seccionIdSel to cursoIdSel)
                                         cambiosAsistenciaSel = emptyList()
                                     }
                                     esActualizacionAsistenciaSel = esActualizacion
+                                    historialesClaseCargados = false   // el historial cambió: recargar al entrar
                                     // El backend ya envió el push a los padres: solo mostrar la confirmación
                                     presentesSel = presentes
                                     ausentesSel = ausentes
@@ -1431,7 +1606,7 @@ fun EduConnectApp() {
                     fecha = fechaHojaSel,
                     esActualizacion = esActualizacionAsistenciaSel,
                     cambios = cambiosAsistenciaSel,
-                    onNuevaAsistencia = { currentScreen = Screen.HOME_DOCENTE },
+                    onNuevaAsistencia = { currentScreen = Screen.ASISTENCIAS },
                     onVerHistorial = { currentScreen = Screen.SELECCIONAR_SECCION_HISTORIAL },
                     onClose = { currentScreen = Screen.HOME_DOCENTE }
                 )
@@ -1568,10 +1743,13 @@ fun EduConnectApp() {
                 }
 
                 Screen.COMUNICADOS -> {
+                    var cargandoClasesComunicado by remember { mutableStateOf(true) }
                     androidx.compose.runtime.LaunchedEffect(Unit) {
                         if (usuarioLogueado == null) return@LaunchedEffect
                         try {
-                            // Resumen del día: 1 petición (el backend ya trae notificados y leídos)
+                            // Clases del docente (ya cargadas si pasó por Inicio o Asistencia)
+                            if (asignacionesApiSel.isEmpty()) aplicarAsignaciones(obtenerAsignaciones())
+                            // 1 petición: todos los comunicados (ya traen notificados y leídos)
                             val hoy = java.time.LocalDate.now().toString()
                             val deHoy = comunicadosDelDocente().filter { fechaLocal(it.enviadoEn) == hoy }
                             totalHoySel = deHoy.size
@@ -1580,7 +1758,9 @@ fun EduConnectApp() {
                         } catch (e: kotlinx.coroutines.CancellationException) {
                             throw e
                         } catch (e: Exception) {
-                            aviso("Error cargando resumen: ${e.message}")
+                            aviso("Error cargando comunicados: ${e.message}")
+                        } finally {
+                            cargandoClasesComunicado = false
                         }
                     }
                     ComunicadosScreen(
@@ -1591,12 +1771,22 @@ fun EduConnectApp() {
                         sinLeer = sinLeerSel,
                         onBack = { currentScreen = Screen.HOME_DOCENTE },
                         onHomeDocente = { currentScreen = Screen.HOME_DOCENTE },
-                        onAlumnos = {},
-                        onAvisos = { currentScreen = Screen.COMUNICADOS },
+                        onAlumnos = { aviso("Alumnos disponible próximamente") },
+                        onAvisos = {},   // ya está en Comunicados
                         onPerfilDocente = { currentScreen = Screen.PERFIL_DOCENTE },
                         onNotificaciones = {},
-                        onNuevoComunicado = { currentScreen = Screen.NUEVO_COMUNICADO },
-                        onHistorial = { currentScreen = Screen.SELECCIONAR_COMUNICADO }
+                        onNuevoComunicado = {
+                            destinoComunicadoInicialSel = null
+                            origenNuevoComunicado = Screen.COMUNICADOS
+                            currentScreen = Screen.NUEVO_COMUNICADO
+                        },
+                        clases = clasesComunicado(),
+                        cargandoClases = cargandoClasesComunicado,
+                        onElegirClase = { clase ->
+                            gradoIdSel = clase.gradoId; seccionIdSel = clase.seccionId; cursoIdSel = clase.cursoId
+                            gradoSel = clase.grado; seccionSel = clase.seccion; cursoSel = clase.curso
+                            currentScreen = Screen.BUSQUEDA_COMUNICADO
+                        }
                     )
                 }
 
@@ -1627,10 +1817,12 @@ fun EduConnectApp() {
                         docenteId = usuarioLogueado?.id?.toString() ?: "",
                         docenteNombre = usuarioLogueado?.nombrecompleto ?: "",
                         listaDestinatarios = listaDestinatariosSel,
-                        onBack = { currentScreen = Screen.COMUNICADOS },
+                        destinatarioInicial = destinoComunicadoInicialSel,
+                        enviando = enviandoComunicado,
+                        onBack = { currentScreen = origenNuevoComunicado },
                         onHomeDocente = { currentScreen = Screen.HOME_DOCENTE },
-                        onAlumnos = {},
-                        { currentScreen = Screen.COMUNICADOS },
+                        onAlumnos = { aviso("Alumnos disponible próximamente") },
+                        onAvisos = { currentScreen = Screen.COMUNICADOS },
                         onPerfilDocente = { currentScreen = Screen.PERFIL_DOCENTE },
                         onNotificaciones = {},
                         onEnviado = { asunto, mensaje, adjunto, destinatario, curso, _, _, _ ->
@@ -1639,13 +1831,12 @@ fun EduConnectApp() {
                             val dest = listaDestinatariosSel.find {
                                 "${it.gradoNombre} Sec. ${it.seccionNombre}" == destinatario && it.cursoNombre == curso
                             } ?: return@NuevoComunicadoScreen
-                            enviandoComunicado = true
-                            aviso(if (adjunto.isNotEmpty()) "Subiendo adjunto y enviando..." else "Enviando comunicado...")
+                            enviandoComunicado = true   // muestra el popup "Enviando comunicado..."
                             CoroutineScope(Dispatchers.Main).launch {
                                 try {
                                     // 1) Subir el adjunto (si hay) y obtener su id
                                     val archivoId = if (adjunto.isNotEmpty())
-                                        subirArchivo(context.contentResolver, android.net.Uri.parse(adjunto)).id
+                                        subirArchivo(context.contentResolver, Uri.parse(adjunto)).id
                                     else null
                                     // 2) Enviar el comunicado: el backend notifica por push a los padres
                                     val enviado = enviarComunicado(dest.seccionId, dest.cursoId, asunto, mensaje, archivoId)
@@ -1655,7 +1846,12 @@ fun EduConnectApp() {
                                     comunicadoNotificadosSel = enviado.totalNotificados
                                     comunicadoHoraSel = horaLocal(enviado.enviadoEn)
                                     comunicadoFechaSel = fechaLocal(enviado.enviadoEn)
+                                    comunicadoAdjuntoSel = enviado.archivo?.nombre ?: ""
                                     comunicadosDocenteCargados = false   // hay un comunicado nuevo
+                                    // La clase del envío: para "Ver comunicados de la clase" y "Nuevo comunicado"
+                                    gradoIdSel = dest.gradoId; seccionIdSel = dest.seccionId; cursoIdSel = dest.cursoId
+                                    gradoSel = dest.gradoNombre; seccionSel = dest.seccionNombre; cursoSel = dest.cursoNombre
+                                    destinoComunicadoInicialSel = dest
                                     currentScreen = Screen.CONFIRMACION_COMUNICADO
                                 } catch (e: ApiException) {
                                     aviso(when (e.codigo) {
@@ -1681,9 +1877,14 @@ fun EduConnectApp() {
                     totalNotificados = comunicadoNotificadosSel,
                     hora = comunicadoHoraSel,
                     fecha = comunicadoFechaSel,
-                    onNuevoComunicado = { currentScreen = Screen.NUEVO_COMUNICADO },
-                    onVerHistorial = { currentScreen = Screen.SELECCIONAR_COMUNICADO },
-                    onClose = { currentScreen = Screen.HOME_DOCENTE }
+                    adjunto = comunicadoAdjuntoSel,
+                    onNuevoComunicado = {
+                        // Misma clase ya elegida (se puede cambiar en "Para")
+                        origenNuevoComunicado = Screen.COMUNICADOS
+                        currentScreen = Screen.NUEVO_COMUNICADO
+                    },
+                    onVerHistorial = { currentScreen = Screen.BUSQUEDA_COMUNICADO },
+                    onClose = { currentScreen = Screen.COMUNICADOS }
                 )
 
                 Screen.PERFIL_DOCENTE -> {
@@ -2123,9 +2324,9 @@ fun EduConnectApp() {
                         },
                         // Ajustes de notificaciones de Android para EduConnect (sonido, vibración, bloquear)
                         onAbrirAjustesSistema = {
-                            val intent = android.content.Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
-                                .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, context.packageName)
-                                .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                            val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                                .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                             try { context.startActivity(intent) } catch (e: Exception) { aviso("No se pudo abrir los ajustes") }
                         },
                         procesando = guardandoPreferencias,
@@ -2228,52 +2429,14 @@ fun EduConnectApp() {
                     }
                 )
 
-                Screen.SELECCIONAR_COMUNICADO -> {
-                    androidx.compose.runtime.LaunchedEffect(usuarioLogueado?.id) {
-                        if (usuarioLogueado == null) return@LaunchedEffect
-                        try {
-                            // Sin peticiones si se viene de COMUNICADOS (asignaciones y comunicados ya cargados)
-                            val asignaciones = asignacionesApiSel.ifEmpty {
-                                obtenerAsignaciones().also { aplicarAsignaciones(it) }
-                            }
-                            val porSeccion = comunicadosDelDocente().groupingBy { it.seccionId }.eachCount()
-                            seccionesComunicadoSel = asignaciones.map { a ->
-                                SeccionComunicadoItem(
-                                    seccionId = a.seccionId,
-                                    gradoNombre = a.grado,
-                                    seccionNombre = a.seccion,
-                                    cursoNombre = a.curso,
-                                    cantidadAlumnos = a.cantidadAlumnos.toInt(),
-                                    cantidadComunicados = porSeccion[a.seccionId] ?: 0
-                                )
-                            }
-                        } catch (e: kotlinx.coroutines.CancellationException) {
-                            throw e
-                        } catch (e: Exception) { aviso("Error cargando secciones: ${e.message}") }
-                    }
-                    SeleccionarComunicadoScreen(
-                        secciones = seccionesComunicadoSel,
-                        onBack = { currentScreen = Screen.COMUNICADOS },
-                        onHomeDocente = { currentScreen = Screen.HOME_DOCENTE },
-                        onAlumnos = {},
-                        onAvisos = { currentScreen = Screen.COMUNICADOS },
-                        onPerfilDocente = { currentScreen = Screen.PERFIL_DOCENTE },
-                        onNotificaciones = {},
-                        onSeleccionarSeccion = { seccionId, gradoNombre, seccionNombre, cursoNombre ->
-                            seccionIdSel = seccionId
-                            gradoSel = gradoNombre
-                            seccionSel = seccionNombre
-                            cursoSel = cursoNombre
-                            currentScreen = Screen.BUSQUEDA_COMUNICADO
-                        }
-                    )
-                }
-
                 Screen.BUSQUEDA_COMUNICADO -> {
-                    androidx.compose.runtime.LaunchedEffect(seccionIdSel) {
+                    androidx.compose.runtime.LaunchedEffect(seccionIdSel, cursoIdSel) {
                         try {
-                            // Filtro LOCAL: los comunicados ya se cargaron (traen notificados y leídos)
-                            val comunicados = comunicadosDelDocente().filter { it.seccionId == seccionIdSel }
+                            // Filtro LOCAL por sección y curso (los comunicados ya traen notificados y leídos).
+                            // Los comunicados sin curso se muestran en todas las clases de su sección.
+                            val comunicados = comunicadosDelDocente().filter {
+                                it.seccionId == seccionIdSel && (it.cursoId == null || it.cursoId == cursoIdSel)
+                            }
                             comunicadosDocenteSel = comunicados
                             comunicadosListaSel = comunicados.map { com ->
                                 ComunicadoResumenItem(
@@ -2282,7 +2445,8 @@ fun EduConnectApp() {
                                     mensaje = com.mensaje,
                                     fecha = fechaLocal(com.enviadoEn),
                                     totalNotificados = com.totalNotificados,
-                                    totalLeidos = com.totalLeidos.toInt()
+                                    totalLeidos = com.totalLeidos.toInt(),
+                                    hora = horaLocal(com.enviadoEn)
                                 )
                             }.sortedByDescending { it.fecha }
                         } catch (e: kotlinx.coroutines.CancellationException) {
@@ -2294,29 +2458,40 @@ fun EduConnectApp() {
                         seccionNombre = seccionSel,
                         cursoNombre = cursoSel,
                         comunicados = comunicadosListaSel,
-                        onBack = { currentScreen = Screen.SELECCIONAR_COMUNICADO },
+                        onBack = { currentScreen = Screen.COMUNICADOS },
                         onHomeDocente = { currentScreen = Screen.HOME_DOCENTE },
-                        onAlumnos = {},
-                        onAvisos = {currentScreen = Screen.COMUNICADOS },
+                        onAlumnos = { aviso("Alumnos disponible próximamente") },
+                        onAvisos = { currentScreen = Screen.COMUNICADOS },
                         onPerfilDocente = { currentScreen = Screen.PERFIL_DOCENTE },
                         onNotificaciones = {},
                         onVerDetalle = { comunicadoId ->
                             comunicadoIdSel = comunicadoId
+                            origenDetalleComunicado = Screen.BUSQUEDA_COMUNICADO
                             currentScreen = Screen.DETALLE_COMUNICADO
+                        },
+                        onNuevoComunicado = {
+                            destinoComunicadoInicialSel = destinoDeClaseSel()
+                            origenNuevoComunicado = Screen.BUSQUEDA_COMUNICADO
+                            currentScreen = Screen.NUEVO_COMUNICADO
                         }
                     )
                 }
 
                 Screen.DETALLE_COMUNICADO -> {
+                    var cargandoLectura by remember { mutableStateOf(true) }
                     androidx.compose.runtime.LaunchedEffect(comunicadoIdSel) {
                         // Mostrar de inmediato lo que ya se tiene de la lista
+                        comunicadoArchivoSel = null
                         comunicadosDocenteSel.find { it.id == comunicadoIdSel }?.let { c ->
                             comunicadoAsuntoSel = c.asunto
                             comunicadoMensajeSel = c.mensaje
                             comunicadoTotalNotifSel = c.totalNotificados
                             comunicadoHoraSel = horaLocal(c.enviadoEn)
+                            comunicadoFechaSel = fechaLocal(c.enviadoEn)
+                            comunicadoArchivoSel = c.archivo
                         }
                         padresLecturaSel = emptyList()
+                        cargandoLectura = true
                         try {
                             // 1 petición: padres que leyeron y que no, con sus hijos
                             val detalle = obtenerDetalleComunicadoDocente(comunicadoIdSel)
@@ -2324,6 +2499,8 @@ fun EduConnectApp() {
                             comunicadoMensajeSel = detalle.comunicado.mensaje
                             comunicadoTotalNotifSel = detalle.comunicado.totalNotificados
                             comunicadoHoraSel = horaLocal(detalle.comunicado.enviadoEn)
+                            comunicadoFechaSel = fechaLocal(detalle.comunicado.enviadoEn)
+                            comunicadoArchivoSel = detalle.comunicado.archivo ?: comunicadoArchivoSel
                             padresLecturaSel = detalle.lecturas.map { l ->
                                 PadreLecturaItem(
                                     padreId = l.padreId.toString(),
@@ -2334,19 +2511,23 @@ fun EduConnectApp() {
                             }
                         } catch (e: kotlinx.coroutines.CancellationException) {
                             throw e
-                        } catch (e: Exception) { aviso("Error cargando detalle: ${e.message}") }
+                        } catch (e: Exception) {
+                            aviso("Error cargando detalle: ${e.message}")
+                        } finally {
+                            cargandoLectura = false
+                        }
                     }
                     DetalleComunicadoScreen(
                         asunto = comunicadoAsuntoSel,
                         mensaje = comunicadoMensajeSel,
-                        fecha = comunicadosListaSel.find { it.id == comunicadoIdSel }?.fecha ?: "",
+                        fecha = comunicadoFechaSel,
                         hora = comunicadoHoraSel,
                         gradoNombre = gradoSel,
                         seccionNombre = seccionSel,
                         cursoNombre = cursoSel,
                         totalNotificados = comunicadoTotalNotifSel,
                         padres = padresLecturaSel,
-                        onBack = { currentScreen = Screen.BUSQUEDA_COMUNICADO },
+                        onBack = { currentScreen = origenDetalleComunicado },
                         onHomeDocente = { currentScreen = Screen.HOME_DOCENTE },
                         onAlumnos = {},
                         onAvisos = {currentScreen = Screen.COMUNICADOS },
@@ -2355,155 +2536,99 @@ fun EduConnectApp() {
                         onReenviar = {
                             // Pendiente: el backend aún no tiene endpoint de reenvío
                             aviso("Reenvío disponible próximamente")
-                        }
+                        },
+                        adjuntoNombre = comunicadoArchivoSel?.nombre ?: "",
+                        onAbrirAdjunto = { comunicadoArchivoSel?.let { abrirAdjunto(it) } },
+                        cargando = cargandoLectura
                     )
                 }
 
                 Screen.PUBLICACIONES -> {
+                    var cargandoClasesPub by remember { mutableStateOf(true) }
                     androidx.compose.runtime.LaunchedEffect(usuarioLogueado?.id) {
                         if (usuarioLogueado == null) return@LaunchedEffect
-                        if (publicacionesCargadas) return@LaunchedEffect   // al volver de la selección de curso
                         try {
+                            // Clases del docente (ya cargadas si pasó por Inicio)
+                            if (asignacionesApiSel.isEmpty()) aplicarAsignaciones(obtenerAsignaciones())
                             // 1 petición: todas las publicaciones del docente
-                            publicacionesDocenteSel = obtenerPublicacionesDocente()
-                            publicacionesCargadas = true
+                            if (!publicacionesCargadas) {
+                                publicacionesDocenteSel = obtenerPublicacionesDocente()
+                                publicacionesCargadas = true
+                            }
                         } catch (e: kotlinx.coroutines.CancellationException) {
                             throw e
-                        } catch (e: Exception) { aviso("Error cargando publicaciones: ${e.message}") }
+                        } catch (e: Exception) {
+                            aviso("Error cargando publicaciones: ${e.message}")
+                        } finally {
+                            cargandoClasesPub = false
+                        }
                     }
-                    // Resumen (local): tareas y exámenes vigentes, y los que vencen hoy
+                    // Resumen (local): tareas y evaluaciones vigentes, y las que vencen hoy
                     val vigentes = publicacionesDocenteSel.filter { it.estado != "ANULADA" }
                     val hoy = java.time.LocalDate.now().toString()
                     PublicacionesScreen(
                         totalTareas = vigentes.count { it.tipo == "TAREA" },
                         totalEvaluaciones = vigentes.count { it.tipo == "EVALUACION" },
-                        venceHoy = vigentes.count { it.fechaEntrega == hoy },
+                        venceHoy = vigentes.count { it.fechaEntrega?.take(10) == hoy },
                         totalPublicacionesHoy = vigentes.count { fechaLocal(it.publicadoEn) == hoy },
                         onBack = { currentScreen = Screen.HOME_DOCENTE },
                         onHomeDocente = { currentScreen = Screen.HOME_DOCENTE },
-                        onAlumnos = {},
+                        onAlumnos = { aviso("Alumnos disponible próximamente") },
                         onAvisos = {
                             comunicadosDocenteCargados = false
                             currentScreen = Screen.COMUNICADOS
                         },
                         onPerfilDocente = { currentScreen = Screen.PERFIL_DOCENTE },
                         onNotificaciones = {},
-                        onNuevaTarea = {
-                            tipoPublicacionSel = "Tarea"
-                            currentScreen = Screen.SELECCIONAR_CURSO_PUBLICACION
-                        },
-                        onNuevaEvaluacion = {
-                            tipoPublicacionSel = "Evaluación"
-                            currentScreen = Screen.SELECCIONAR_CURSO_PUBLICACION
-                        },
-                        onHistorial = { currentScreen = Screen.HISTORIAL_PUBLICACIONES }
-                    )
-                }
-
-                Screen.SELECCIONAR_CURSO_PUBLICACION -> {
-                    androidx.compose.runtime.LaunchedEffect(usuarioLogueado?.id) {
-                        if (usuarioLogueado == null) return@LaunchedEffect
-                        try {
-                            // Sin peticiones si las asignaciones ya están cargadas (traen nombres y alumnos)
-                            val asignaciones = asignacionesApiSel.ifEmpty {
-                                obtenerAsignaciones().also { aplicarAsignaciones(it) }
-                            }
-                            seccionesPublicacionSel = asignaciones.map { a ->
-                                SeccionComunicadoItem(
-                                    seccionId = a.seccionId,
-                                    gradoNombre = a.grado,
-                                    seccionNombre = a.seccion,
-                                    cursoNombre = a.curso,
-                                    cantidadAlumnos = a.cantidadAlumnos.toInt(),
-                                    cantidadComunicados = 0
-                                )
-                            }
-                        } catch (e: kotlinx.coroutines.CancellationException) {
-                            throw e
-                        } catch (e: Exception) { aviso("Error cargando cursos: ${e.message}") }
-                    }
-                    SeleccionarCursoPublicacionScreen(
-                        tipo = tipoPublicacionSel,
-                        secciones = seccionesPublicacionSel,
-                        onBack = { currentScreen = Screen.PUBLICACIONES },
-                        onHomeDocente = { currentScreen = Screen.HOME_DOCENTE },
-                        onAlumnos = {},
-                        onAvisos = {
-                            comunicadosDocenteCargados = false
-                            currentScreen = Screen.COMUNICADOS
-                        },
-                        onPerfilDocente = { currentScreen = Screen.PERFIL_DOCENTE },
-                        onNotificaciones = {},
-                        onSeleccionar = { seccion ->
-                            // La tarjeta no trae el id del curso: se busca la asignación por sección y curso
-                            val asignacion = asignacionesApiSel.find {
-                                it.seccionId == seccion.seccionId && it.curso == seccion.cursoNombre
-                            }
-                            if (asignacion == null) {
-                                aviso("No se encontró la asignación, vuelve a intentarlo")
-                            } else {
-                                asignacionPublicacionSel = asignacion
-                                currentScreen = if (tipoPublicacionSel == "Tarea") Screen.NUEVA_TAREA else Screen.NUEVA_EVALUACION
-                            }
+                        onNuevaTarea = { irANuevaPublicacion("Tarea", null, Screen.PUBLICACIONES) },
+                        onNuevaEvaluacion = { irANuevaPublicacion("Evaluación", null, Screen.PUBLICACIONES) },
+                        clases = clasesPublicacion(),
+                        cargandoClases = cargandoClasesPub,
+                        onElegirClase = { clase ->
+                            claseHistorialPublicacionSel = clase.seccionId to clase.cursoId
+                            currentScreen = Screen.HISTORIAL_PUBLICACIONES
                         }
                     )
                 }
 
-                Screen.NUEVA_TAREA -> {
-                    val asignacion = asignacionPublicacionSel
-                    if (asignacion != null) {
+                Screen.NUEVA_TAREA, Screen.NUEVA_EVALUACION -> {
+                    androidx.compose.runtime.LaunchedEffect(usuarioLogueado?.id) {
+                        if (usuarioLogueado == null || asignacionesApiSel.isNotEmpty()) return@LaunchedEffect
+                        try {
+                            aplicarAsignaciones(obtenerAsignaciones())
+                        } catch (e: kotlinx.coroutines.CancellationException) {
+                            throw e
+                        } catch (e: Exception) { aviso("Error cargando tus clases: ${e.message}") }
+                    }
+                    val volver = { currentScreen = origenNuevaPublicacion }
+                    val irAvisos = {
+                        comunicadosDocenteCargados = false
+                        currentScreen = Screen.COMUNICADOS
+                    }
+                    if (currentScreen == Screen.NUEVA_TAREA) {
                         NuevaTareaScreen(
-                            listaDestinatarios = listOf(
-                                SeccionDestinatario(
-                                    gradoId = asignacion.gradoId,
-                                    seccionId = asignacion.seccionId,
-                                    cursoId = asignacion.cursoId,
-                                    gradoNombre = asignacion.grado,
-                                    seccionNombre = asignacion.seccion,
-                                    cursoNombre = asignacion.curso,
-                                    totalPadres = asignacion.cantidadAlumnos.toInt()
-                                )
-                            ),
-                            cursoNombre = asignacion.curso,
-                            onBack = { currentScreen = Screen.SELECCIONAR_CURSO_PUBLICACION },
+                            listaDestinatarios = destinatariosDocente(),
+                            destinatarioInicial = destinoPublicacionInicialSel,
+                            publicando = publicandoSel,
+                            onBack = volver,
                             onHomeDocente = { currentScreen = Screen.HOME_DOCENTE },
-                            onAlumnos = {},
-                            onAvisos = {
-                                comunicadosDocenteCargados = false
-                                currentScreen = Screen.COMUNICADOS
-                            },
+                            onAlumnos = { aviso("Alumnos disponible próximamente") },
+                            onAvisos = irAvisos,
                             onPerfilDocente = { currentScreen = Screen.PERFIL_DOCENTE },
                             onNotificaciones = {},
                             onPublicar = { titulo, descripcion, adjunto, seccion, fechaEntrega, _, hora ->
                                 publicar("TAREA", titulo, descripcion, adjunto, seccion, fechaEntrega, hora)
                             }
                         )
-                    }
-                }
-
-                Screen.NUEVA_EVALUACION -> {
-                    val asignacion = asignacionPublicacionSel
-                    if (asignacion != null) {
+                    } else {
                         NuevaEvaluacionScreen(
-                            listaDestinatarios = listOf(
-                                SeccionDestinatario(
-                                    gradoId = asignacion.gradoId,
-                                    seccionId = asignacion.seccionId,
-                                    cursoId = asignacion.cursoId,
-                                    gradoNombre = asignacion.grado,
-                                    seccionNombre = asignacion.seccion,
-                                    cursoNombre = asignacion.curso,
-                                    totalPadres = asignacion.cantidadAlumnos.toInt()
-                                )
-                            ),
-                            cursoNombre = asignacion.curso,
-                            onBack = { currentScreen = Screen.SELECCIONAR_CURSO_PUBLICACION },
+                            listaDestinatarios = destinatariosDocente(),
+                            destinatarioInicial = destinoPublicacionInicialSel,
+                            publicando = publicandoSel,
+                            onBack = volver,
                             onHomeDocente = { currentScreen = Screen.HOME_DOCENTE },
-                            onAlumnos = {},
-                            onAvisos = {
-                                comunicadosDocenteCargados = false
-                                currentScreen = Screen.COMUNICADOS
-                            },
+                            onAlumnos = { aviso("Alumnos disponible próximamente") },
+                            onAvisos = irAvisos,
                             onPerfilDocente = { currentScreen = Screen.PERFIL_DOCENTE },
                             onNotificaciones = {},
                             onPublicar = { titulo, descripcion, adjunto, seccion, fechaEvaluacion, _, hora ->
@@ -2522,9 +2647,9 @@ fun EduConnectApp() {
                     totalNotificados = publicacionNotificadosSel,
                     fechaEntrega = fechaEntregaSel,
                     hora = horaPublicacionSel,
-                    onNuevaPublicacion = {
-                        currentScreen = Screen.SELECCIONAR_CURSO_PUBLICACION
-                    },
+                    adjunto = adjuntoPublicacionSel,
+                    // Otra del mismo tipo para la misma clase (se puede cambiar en "Para")
+                    onNuevaPublicacion = { irANuevaPublicacion(tipoPublicacionSel, destinoPublicacionInicialSel, Screen.PUBLICACIONES) },
                     onVerHistorial = { currentScreen = Screen.HISTORIAL_PUBLICACIONES },
                     onVolver = { currentScreen = Screen.PUBLICACIONES }
                 )
@@ -2540,10 +2665,27 @@ fun EduConnectApp() {
                             throw e
                         } catch (e: Exception) { aviso("Error cargando publicaciones: ${e.message}") }
                     }
+                    // Clase elegida (si no hay, se muestran todas las publicaciones)
+                    val clasePub = claseHistorialPublicacionSel
+                    val asignacionClase = clasePub?.let { (s, c) ->
+                        asignacionesApiSel.find { it.seccionId == s && it.cursoId == c }
+                    }
+                    val destinoClase = asignacionClase?.let {
+                        SeccionDestinatario(
+                            gradoId = it.gradoId, seccionId = it.seccionId, cursoId = it.cursoId,
+                            gradoNombre = it.grado, seccionNombre = it.seccion, cursoNombre = it.curso,
+                            totalPadres = it.cantidadAlumnos.toInt()
+                        )
+                    }
                     HistorialPublicacionesScreen(
+                        titulo = asignacionClase?.curso ?: "Publicaciones",
+                        subtitulo = asignacionClase?.let { "Publicaciones · ${it.grado} ${it.seccion}" } ?: "Todas tus clases",
+                        onNuevaTarea = { irANuevaPublicacion("Tarea", destinoClase, Screen.HISTORIAL_PUBLICACIONES) },
+                        onNuevaEvaluacion = { irANuevaPublicacion("Evaluación", destinoClase, Screen.HISTORIAL_PUBLICACIONES) },
                         // Sin peticiones extra: la lista ya trae alumnos, calificados y lecturas
                         publicaciones = publicacionesDocenteSel
                             .filter { it.tipo == "TAREA" || it.tipo == "EVALUACION" }
+                            .filter { p -> clasePub == null || (p.seccionId == clasePub.first && p.cursoId == clasePub.second) }
                             .sortedByDescending { aFechaHoraLocal(it.publicadoEn) }
                             .map { p ->
                                 PublicacionHistorialItem(
@@ -2573,6 +2715,7 @@ fun EduConnectApp() {
                         onNotificaciones = {},
                         onVerDetalle = { item ->
                             publicacionIdSel = item.id
+                            origenCalificar = Screen.HISTORIAL_PUBLICACIONES
                             currentScreen = Screen.CALIFICAR_PUBLICACION
                         }
                     )
@@ -2626,7 +2769,7 @@ fun EduConnectApp() {
                         guardando = guardandoCalificaciones,
                         descargandoAdjunto = descargandoAdjunto,
                         onAbrirAdjunto = { detalle?.publicacion?.archivo?.let { abrirAdjunto(it) } },
-                        onBack = { currentScreen = Screen.HISTORIAL_PUBLICACIONES },
+                        onBack = { currentScreen = origenCalificar },
                         onHomeDocente = { currentScreen = Screen.HOME_DOCENTE },
                         onAlumnos = {},
                         onAvisos = {
@@ -2872,70 +3015,66 @@ fun EduConnectApp() {
                 }
 
                 Screen.SELECCIONAR_SECCION_HISTORIAL -> {
+                    var cargandoClasesHistorial by remember { mutableStateOf(asignacionesApiSel.isEmpty()) }
                     androidx.compose.runtime.LaunchedEffect(usuarioLogueado?.id) {
                         if (usuarioLogueado == null) return@LaunchedEffect
-                        // Limpiar historial previo para que no se muestre al volver con otro curso
-                        historialDocenteSel = emptyList()
-                        historialDocenteCargado = false
-                        if (asignacionesApiSel.isNotEmpty()) {
-                            // Ya cargadas — solo restablecer las listas de selección
-                            aplicarAsignaciones(asignacionesApiSel)
-                            return@LaunchedEffect
-                        }
                         try {
-                            aplicarAsignaciones(obtenerAsignaciones())
+                            // 1) Clases del docente (ya cargadas si pasó por Inicio o Asistencia)
+                            val asignaciones = if (asignacionesApiSel.isNotEmpty()) asignacionesApiSel
+                            else obtenerAsignaciones().also { aplicarAsignaciones(it) }
+                            cargandoClasesHistorial = false
+                            // 2) Historial de cada clase en paralelo (fecha del último registro).
+                            //    Se omite si ya está cargado y no hubo cambios desde entonces.
+                            val todas = asignaciones.all { (it.seccionId to it.cursoId) in historialesClaseSel }
+                            if (historialesClaseCargados && todas) return@LaunchedEffect
+                            val resultados = coroutineScope {
+                                asignaciones.map { a ->
+                                    async {
+                                        val clave = a.seccionId to a.cursoId
+                                        val dias = try {
+                                            cargarHistorialDocente(a.seccionId, a.cursoId, a.grado, a.seccion, a.curso)
+                                        } catch (e: kotlinx.coroutines.CancellationException) {
+                                            throw e
+                                        } catch (e: Exception) { null }
+                                        clave to dias
+                                    }
+                                }.awaitAll()
+                            }
+                            // Si una clase falla, se conserva lo que ya se tenía de ella
+                            historialesClaseSel = historialesClaseSel +
+                                    resultados.mapNotNull { (clave, dias) -> dias?.let { clave to it } }
+                            historialesClaseCargados = resultados.all { it.second != null }
                         } catch (e: kotlinx.coroutines.CancellationException) {
                             throw e
                         } catch (e: Exception) {
-                            aviso("Error cargando grados: ${e.message}")
+                            cargandoClasesHistorial = false
+                            aviso("Error cargando tus clases: ${e.message}")
                         }
                     }
                     SeleccionarSeccionHistorialScreen(
-                        docenteId = usuarioLogueado?.id?.toString() ?: "",
-                        listaGrados = listaGradosSel,
-                        listaSecciones = listaSeccionesSel,
-                        listaCursos = listaCursosSel,
-                        cantidadAlumnos = cantidadAlumnosSel,
-                        // Filtro LOCAL — sin peticiones al backend
-                        onGradoSeleccionado = { grado ->
-                            listaSeccionesSel = seccionesDeGrado(grado.id)
-                            listaCursosSel = emptyList()
-                            cantidadAlumnosSel = 0
-                        },
-                        // Filtro LOCAL — la cantidad de alumnos ya viene en la asignación
-                        onSeccionSeleccionada = { seccion ->
-                            listaCursosSel = cursosDeSeccion(seccion.id)
-                            cantidadAlumnosSel = alumnosDeSeccion(seccion.id)
-                        },
-                        onBack = {
-                            currentScreen = Screen.ASISTENCIAS
-                        },
-                        onHomeDocente = { currentScreen = Screen.HOME_DOCENTE },
-                        onAlumnos = {},
-                        onAvisos = { currentScreen = Screen.COMUNICADOS },
-                        onPerfilDocente = { currentScreen = Screen.PERFIL_DOCENTE },
-                        onNotificaciones = {},
-                        onContinuar = { gradoId, seccionId, cursoId, grado, seccion, curso ->
-                            gradoIdSel   = gradoId
-                            seccionIdSel = seccionId
-                            cursoIdSel   = cursoId
-                            gradoSel     = grado
-                            seccionSel   = seccion
-                            cursoSel     = curso
-                            // Cargar historial primero y navegar solo cuando los datos están listos
-                            historialDocenteSel = emptyList()
+                        clases = clasesHistorial(),
+                        cargandoClases = cargandoClasesHistorial,
+                        onElegirClase = { clase ->
+                            gradoIdSel   = clase.gradoId
+                            seccionIdSel = clase.seccionId
+                            cursoIdSel   = clase.cursoId
+                            gradoSel     = clase.grado
+                            seccionSel   = clase.seccion
+                            cursoSel     = clase.curso
+                            // Se muestra al instante lo que ya se tiene y se actualiza en HISTORIAL_ASISTENCIA_DOCENTE
+                            historialDocenteSel = historialesClaseSel[clase.seccionId to clase.cursoId] ?: emptyList()
                             historialDocenteCargado = false
-                            CoroutineScope(Dispatchers.Main).launch {
-                                try {
-                                    historialDocenteSel = cargarHistorialDocente(seccionId, cursoId, grado, seccion, curso)
-                                    historialDocenteCargado = true   // aunque esté vacío: no volver a pedirlo
-                                } catch (e: Exception) {
-                                    aviso("Error cargando historial: ${e.message}")
-                                }
-                                // Navegar DESPUÉS de que los datos ya están en historialDocenteSel
-                                currentScreen = Screen.HISTORIAL_ASISTENCIA_DOCENTE
-                            }
-                        }
+                            currentScreen = Screen.HISTORIAL_ASISTENCIA_DOCENTE
+                        },
+                        onBack = { currentScreen = Screen.ASISTENCIAS },
+                        onHomeDocente = { currentScreen = Screen.HOME_DOCENTE },
+                        onAlumnos = { aviso("Alumnos disponible próximamente") },
+                        onAvisos = {
+                            comunicadosDocenteCargados = false
+                            currentScreen = Screen.COMUNICADOS
+                        },
+                        onPerfilDocente = { currentScreen = Screen.PERFIL_DOCENTE },
+                        onNotificaciones = {}
                     )
                 }
 
@@ -2945,6 +3084,8 @@ fun EduConnectApp() {
                         try {
                             historialDocenteSel = cargarHistorialDocente(seccionIdSel, cursoIdSel, gradoSel, seccionSel, cursoSel)
                             historialDocenteCargado = true
+                            // También actualiza la fecha del último registro en la lista de clases
+                            historialesClaseSel = historialesClaseSel + ((seccionIdSel to cursoIdSel) to historialDocenteSel)
                         } catch (e: kotlinx.coroutines.CancellationException) {
                             throw e
                         } catch (e: Exception) {
@@ -2982,32 +3123,39 @@ fun EduConnectApp() {
                     }
 
                     historialItemSel?.let { item ->
-                        com.educonnectapp.ui.screens.DetalleAsistenciaDocenteScreen(
-                            item             = item,
-                            alumnos          = detalleAlumnosSel,
-                            onBack           = { currentScreen = Screen.HISTORIAL_ASISTENCIA_DOCENTE },
-                            onHomeDocente    = { currentScreen = Screen.HOME_DOCENTE },
-                            onAlumnos        = {},
-                            onAvisos         = { currentScreen = Screen.COMUNICADOS },
-                            onPerfilDocente  = { currentScreen = Screen.PERFIL_DOCENTE },
+                        DetalleAsistenciaDocenteScreen(
+                            item = item,
+                            alumnos = detalleAlumnosSel,
+                            onBack = { currentScreen = Screen.HISTORIAL_ASISTENCIA_DOCENTE },
+                            onHomeDocente = { currentScreen = Screen.HOME_DOCENTE },
+                            onAlumnos = {},
+                            onAvisos = { currentScreen = Screen.COMUNICADOS },
+                            onPerfilDocente = { currentScreen = Screen.PERFIL_DOCENTE },
                             onNotificaciones = {},
                             onGuardarCambios = { alumnosEditados, motivo, onDone ->
                                 CoroutineScope(Dispatchers.Main).launch {
                                     try {
                                         // Solo los alumnos cuyo estado cambió
-                                        val originales = detalleAlumnosSel.associate { it.id to it.estado }
+                                        val originales =
+                                            detalleAlumnosSel.associate { it.id to it.estado }
                                         val cambios = alumnosEditados
                                             .filter { originales[it.id] != it.estado }
                                             .associate { it.id to it.estado }
                                         if (cambios.isNotEmpty()) {
                                             // El backend guarda, audita, avisa al director por correo y notifica a los padres
                                             actualizarAsistenciaDia(
-                                                seccionIdSel, cursoIdSel, item.fecha,
-                                                motivo.ifBlank { "Corrección de asistencia" }, cambios
+                                                seccionIdSel,
+                                                cursoIdSel,
+                                                item.fecha,
+                                                motivo.ifBlank { "Corrección de asistencia" },
+                                                cambios
                                             )
                                         }
-                                        detalleAlumnosSel = cargarDetalleDia(seccionIdSel, cursoIdSel, item.fecha)
-                                        historialDocenteCargado = false  // los totales cambiaron: recargar al volver
+                                        detalleAlumnosSel =
+                                            cargarDetalleDia(seccionIdSel, cursoIdSel, item.fecha)
+                                        historialDocenteCargado =
+                                            false  // los totales cambiaron: recargar al volver
+                                        historialesClaseCargados = false
                                     } catch (e: Exception) {
                                         aviso("Error al guardar: ${e.message}")
                                     }
@@ -3089,3 +3237,17 @@ fun EduConnectApp() {
     // Al cambiar de pantalla, el panel se cierra
     androidx.compose.runtime.LaunchedEffect(currentScreen) { mostrarNotificaciones = false }
 }
+
+// "2026-10-16" -> "vie 16 oct" (último registro en el Historial del docente)
+fun formatearFechaDiaCorta(fecha: String): String = try {
+    java.time.LocalDate.parse(fecha.take(10))
+        .format(java.time.format.DateTimeFormatter.ofPattern("EEE d MMM", java.util.Locale("es", "PE")))
+        .replace(".", "")
+} catch (e: Exception) { fecha }
+
+// "2026-10-22" -> "22 oct" (para textos cortos del Inicio del docente)
+fun formatearFechaCorta(fecha: String): String = try {
+    java.time.LocalDate.parse(fecha.take(10))
+        .format(java.time.format.DateTimeFormatter.ofPattern("d MMM", java.util.Locale("es", "PE")))
+        .replace(".", "")
+} catch (e: Exception) { fecha }

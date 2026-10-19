@@ -39,7 +39,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.educonnectapp.R
 import com.educonnectapp.ui.components.AvatarPerfilEditable
-import com.educonnectapp.ui.screens.AlertaDatos
+import com.educonnectapp.ui.screens.comun.AlertaDatos
 import com.educonnectapp.ui.screens.docente.perfil.BotonTitulo
 import com.educonnectapp.ui.screens.docente.perfil.FilaAccion
 import com.educonnectapp.ui.screens.docente.perfil.FilaPerfil

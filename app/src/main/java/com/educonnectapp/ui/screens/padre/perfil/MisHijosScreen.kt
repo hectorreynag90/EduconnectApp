@@ -1,4 +1,4 @@
-package com.educonnectapp.ui.screens
+package com.educonnectapp.ui.screens.padre.perfil
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
