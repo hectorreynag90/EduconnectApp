@@ -1,4 +1,4 @@
-package com.educonnectapp.ui.screens
+package com.educonnectapp.ui.components
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -15,8 +16,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -28,6 +29,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -36,77 +38,97 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.educonnectapp.R
-import com.educonnectapp.ui.theme.AccentOrange
-import com.educonnectapp.ui.theme.BackgroundLight
-import com.educonnectapp.ui.theme.BackgroundWhite
-import com.educonnectapp.ui.theme.EduconnectBlue
-import com.educonnectapp.ui.theme.Roboto
-import com.educonnectapp.ui.theme.TextBlue
-import com.educonnectapp.ui.theme.TextPrimary
-import com.educonnectapp.ui.theme.TextSecondary
-import com.educonnectapp.ui.theme.TextWhite
-import com.educonnectapp.ui.theme.VerdeOk
-import com.educonnectapp.ui.theme.VerdeTexto
+import com.educonnectapp.ui.theme.EduAmarillo
+import com.educonnectapp.ui.theme.EduEtiqueta
+import com.educonnectapp.ui.theme.EduFondo
+import com.educonnectapp.ui.theme.EduTeal
+import com.educonnectapp.ui.theme.EduTealClaro
+import com.educonnectapp.ui.theme.EduTealOscuro
+import com.educonnectapp.ui.theme.EduTexto
+import com.educonnectapp.ui.theme.EduTextoSecundario
+import com.educonnectapp.ui.theme.Nunito
 import kotlinx.coroutines.delay
 
 // =====================================================================
-// POPUPS COMUNES DE EDUCONNECT
-// Flujo: confirmación -> procesando (círculo de carga) -> éxito (check verde, X, 5 s)
-// Los usan: AgregarAsignacionScreen, MisAsignacionesScreen y EditarDatosScreen.
+// POPUPS COMUNES DE EDUCONNECT (rediseño 2026)
+// Flujo: confirmación -> procesando (círculo de carga) -> éxito (check turquesa, X, 5 s)
+// Los usan: AgregarAsignacionScreen, MisAsignacionesScreen, EditarDatosScreen, etc.
 // Las alertas de error usan PopupAlertaEdu (RecuperarContrasenaScreen.kt).
 // =====================================================================
 
 // Segundos que permanece visible el popup de éxito antes de cerrarse solo
 const val SEGUNDOS_POPUP_EXITO = 5
 
-private val FondoAzulResumen = Color(0xFFE6F1FB)
+private val FormaPopup = RoundedCornerShape(28.dp)
 
-// 1. Confirmación: título, mensaje, contenido opcional (resumen) y botones Cancelar / Confirmar
+// 1. Confirmación: ícono opcional, título, mensaje, contenido opcional (resumen) y botones Cancelar / Confirmar
+// colorConfirmar: usar el color del tipo de acción, p. ej. TipoBotonEdu.ELIMINAR.fondo para "Quitar"
 @Composable
 fun PopupConfirmacionEdu(
     titulo: String,
     mensaje: String,
     textoConfirmar: String = "Confirmar",
-    colorConfirmar: Color = AccentOrange,
+    colorConfirmar: Color = TipoBotonEdu.GUARDAR.fondo,
     onCancelar: () -> Unit,
     onConfirmar: () -> Unit,
+    icono: ImageVector? = null,
     contenido: @Composable ColumnScope.() -> Unit = {}
 ) {
     Dialog(onDismissRequest = onCancelar) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(BackgroundWhite, RoundedCornerShape(20.dp))
-                .padding(24.dp),
+                .background(Color.White, FormaPopup)
+                .padding(horizontal = 22.dp, vertical = 26.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text(text = titulo, fontFamily = Roboto, fontWeight = FontWeight.Bold,
-                fontSize = 21.sp, color = TextBlue, textAlign = TextAlign.Center)
-            Text(text = mensaje, fontFamily = Roboto, fontSize = 15.sp, color = TextPrimary,
-                textAlign = TextAlign.Center, lineHeight = 20.sp)
+            if (icono != null) {
+                Box(
+                    modifier = Modifier.size(72.dp).background(colorConfirmar.copy(alpha = 0.14f), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(icono, contentDescription = null,
+                        tint = if (colorConfirmar == EduAmarillo) EduTexto else colorConfirmar,
+                        modifier = Modifier.size(34.dp))
+                }
+            }
+            Text(text = titulo, fontFamily = Nunito, fontWeight = FontWeight.Black,
+                fontSize = 21.sp, color = EduTexto, textAlign = TextAlign.Center)
+            Text(text = mensaje, fontFamily = Nunito, fontWeight = FontWeight.SemiBold, fontSize = 15.sp,
+                color = EduEtiqueta, textAlign = TextAlign.Center, lineHeight = 21.sp)
             contenido()
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Button(
                     onClick = onCancelar,
-                    modifier = Modifier.weight(1f).height(46.dp),
-                    shape = RoundedCornerShape(23.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = BackgroundLight)
+                    modifier = Modifier.weight(1f).height(52.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = EduFondo),
+                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp)
                 ) {
-                    Text("Cancelar", fontFamily = Roboto, fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp, color = TextSecondary)
+                    Text(
+                        "Cancelar", fontFamily = Nunito, fontWeight = FontWeight.Black,
+                        fontSize = 15.sp, color = EduEtiqueta,
+                        textAlign = TextAlign.Center, maxLines = 2, lineHeight = 17.sp
+                    )
                 }
                 Button(
                     onClick = onConfirmar,
-                    modifier = Modifier.weight(1f).height(46.dp),
-                    shape = RoundedCornerShape(23.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = colorConfirmar)
+                    modifier = Modifier.weight(1f).height(52.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = colorConfirmar),
+                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp)
                 ) {
-                    Text(textoConfirmar, fontFamily = Roboto, fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp, color = TextWhite)
+                    Text(
+                        textoConfirmar, fontFamily = Nunito, fontWeight = FontWeight.Black,
+                        fontSize = 15.sp, color = textoSobre(colorConfirmar),
+                        textAlign = TextAlign.Center, maxLines = 2, lineHeight = 17.sp
+                    )
                 }
             }
         }
@@ -126,25 +148,26 @@ fun PopupProcesandoEdu(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(BackgroundWhite, RoundedCornerShape(20.dp))
+                .background(Color.White, FormaPopup)
                 .padding(horizontal = 24.dp, vertical = 32.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             CircularProgressIndicator(
-                color = EduconnectBlue,
-                strokeWidth = 5.dp,
+                color = EduTeal,
+                trackColor = EduTealClaro,
+                strokeWidth = 6.dp,
                 modifier = Modifier.size(64.dp)
             )
-            Text(text = titulo, fontFamily = Roboto, fontWeight = FontWeight.Bold,
-                fontSize = 19.sp, color = TextBlue, textAlign = TextAlign.Center)
-            Text(text = mensaje, fontFamily = Roboto, fontSize = 15.sp,
-                color = TextSecondary, textAlign = TextAlign.Center)
+            Text(text = titulo, fontFamily = Nunito, fontWeight = FontWeight.Black,
+                fontSize = 19.sp, color = EduTexto, textAlign = TextAlign.Center)
+            Text(text = mensaje, fontFamily = Nunito, fontWeight = FontWeight.SemiBold, fontSize = 15.sp,
+                color = EduTextoSecundario, textAlign = TextAlign.Center)
         }
     }
 }
 
-// 3. Éxito: check verde arriba, X en la esquina y cierre automático a los 5 segundos
+// 3. Éxito: check turquesa arriba, X en la esquina y cierre automático a los 5 segundos
 @Composable
 fun PopupExitoEdu(
     titulo: String,
@@ -163,7 +186,7 @@ fun PopupExitoEdu(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(BackgroundWhite, RoundedCornerShape(20.dp))
+                .background(Color.White, FormaPopup)
         ) {
             Column(
                 modifier = Modifier
@@ -172,38 +195,47 @@ fun PopupExitoEdu(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Filled.CheckCircle,
-                    contentDescription = null,
-                    tint = VerdeOk,
-                    modifier = Modifier.size(84.dp)
-                )
-                Text(text = titulo, fontFamily = Roboto, fontWeight = FontWeight.Bold,
-                    fontSize = 21.sp, color = VerdeTexto, textAlign = TextAlign.Center)
+                // Check dentro de un círculo turquesa con halo claro
+                Box(
+                    modifier = Modifier.size(96.dp).background(EduTealClaro, CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Box(
+                        modifier = Modifier.size(72.dp).background(EduTeal, CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Rounded.Check, contentDescription = null,
+                            tint = Color.White, modifier = Modifier.size(42.dp))
+                    }
+                }
+                Text(text = titulo, fontFamily = Nunito, fontWeight = FontWeight.Black,
+                    fontSize = 21.sp, color = EduTealOscuro, textAlign = TextAlign.Center)
                 if (!detalle.isNullOrBlank()) {
-                    Text(text = detalle, fontFamily = Roboto, fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp, color = EduconnectBlue,
+                    Text(text = detalle, fontFamily = Nunito, fontWeight = FontWeight.ExtraBold,
+                        fontSize = 16.sp, color = EduTexto,
                         textAlign = TextAlign.Center, lineHeight = 21.sp)
                 }
                 if (mensaje.isNotBlank()) {
-                    Text(text = mensaje, fontFamily = Roboto, fontSize = 15.sp,
-                        color = TextPrimary, textAlign = TextAlign.Center, lineHeight = 20.sp)
+                    Text(text = mensaje, fontFamily = Nunito, fontWeight = FontWeight.SemiBold, fontSize = 15.sp,
+                        color = EduEtiqueta, textAlign = TextAlign.Center, lineHeight = 21.sp)
                 }
+                Text(text = "Se cierra solo en $SEGUNDOS_POPUP_EXITO s", fontFamily = Nunito,
+                    fontWeight = FontWeight.Bold, fontSize = 12.5.sp, color = EduTextoSecundario)
             }
             // X para cerrar
             IconButton(
                 onClick = onCerrar,
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .padding(6.dp)
-                    .size(36.dp)
+                    .padding(8.dp)
+                    .size(40.dp)
             ) {
                 Box(
-                    modifier = Modifier.size(28.dp).background(BackgroundLight, CircleShape),
+                    modifier = Modifier.size(34.dp).background(EduFondo, RoundedCornerShape(12.dp)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(Icons.Filled.Close, contentDescription = "Cerrar",
-                        tint = TextSecondary, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Rounded.Close, contentDescription = "Cerrar",
+                        tint = EduTextoSecundario, modifier = Modifier.size(18.dp))
                 }
             }
         }
@@ -216,29 +248,30 @@ fun ResumenAsignacionEdu(
     grado: String,
     seccion: String,
     curso: String,
-    colorBorde: Color = EduconnectBlue
+    colorBorde: Color = EduTeal
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(FondoAzulResumen, RoundedCornerShape(12.dp))
-            .border(1.dp, colorBorde, RoundedCornerShape(12.dp))
+            .background(EduTealClaro, RoundedCornerShape(16.dp))
+            .border(1.5.dp, colorBorde, RoundedCornerShape(16.dp))
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp)
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Box(
-            modifier = Modifier.size(40.dp)
-                .background(EduconnectBlue, RoundedCornerShape(10.dp)),
+            modifier = Modifier.size(42.dp)
+                .background(EduTeal, CircleShape),
             contentAlignment = Alignment.Center
         ) {
             Image(painter = painterResource(id = R.drawable.teacher_white),
                 contentDescription = null, modifier = Modifier.size(22.dp))
         }
         Column(modifier = Modifier.weight(1f)) {
-            Text(text = "$grado · Sec. $seccion", fontFamily = Roboto,
-                fontWeight = FontWeight.Bold, fontSize = 17.sp, color = EduconnectBlue)
-            Text(text = curso, fontFamily = Roboto, fontSize = 15.sp, color = TextBlue)
+            Text(text = "$grado · Sec. $seccion", fontFamily = Nunito,
+                fontWeight = FontWeight.Black, fontSize = 17.sp, color = EduTealOscuro)
+            Text(text = curso, fontFamily = Nunito, fontWeight = FontWeight.Bold,
+                fontSize = 15.sp, color = EduTexto)
         }
     }
 }

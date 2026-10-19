@@ -8,6 +8,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 
+// Fuente anterior: la siguen usando las pantallas que aún no se migran
 val Roboto = FontFamily(
     Font(R.font.roboto_regular, FontWeight.Normal),
     Font(R.font.roboto_medium, FontWeight.Medium),
@@ -15,12 +16,22 @@ val Roboto = FontFamily(
     Font(R.font.roboto_bold, FontWeight.Bold),
 )
 
+// Fuente del rediseño 2026 (archivos en res/font)
+val Nunito = FontFamily(
+    Font(R.font.nunito_regular, FontWeight.Normal),
+    Font(R.font.nunito_medium, FontWeight.Medium),
+    Font(R.font.nunito_semibold, FontWeight.SemiBold),
+    Font(R.font.nunito_bold, FontWeight.Bold),
+    Font(R.font.nunito_extrabold, FontWeight.ExtraBold),
+    Font(R.font.nunito_black, FontWeight.Black),
+)
+
 // Set of Material typography styles to start with
 val Typography = Typography(
     //Texto Título principal
     displayLarge = TextStyle(
-        fontFamily = Roboto,
-        fontWeight = FontWeight.Bold,
+        fontFamily = Nunito,
+        fontWeight = FontWeight.Black,
         fontSize = 32.sp,
         lineHeight = 40.sp,
         letterSpacing = (-0.5).sp
@@ -28,8 +39,8 @@ val Typography = Typography(
 
     //Texto Título de pantalla
     displayMedium = TextStyle(
-        fontFamily = Roboto,
-        fontWeight = FontWeight.SemiBold,
+        fontFamily = Nunito,
+        fontWeight = FontWeight.Black,
         fontSize = 22.sp,
         lineHeight = 30.sp,
         letterSpacing = 0.sp
@@ -37,8 +48,8 @@ val Typography = Typography(
 
     //Texto Saludo en header
     displaySmall = TextStyle(
-        fontFamily = Roboto,
-        fontWeight = FontWeight.Medium,
+        fontFamily = Nunito,
+        fontWeight = FontWeight.Bold,
         fontSize = 16.sp,
         lineHeight = 24.sp,
         letterSpacing = 0.sp
@@ -46,8 +57,8 @@ val Typography = Typography(
 
     //Texto Subtítulo de módulo
     headlineMedium = TextStyle(
-        fontFamily = Roboto,
-        fontWeight = FontWeight.Medium,
+        fontFamily = Nunito,
+        fontWeight = FontWeight.Bold,
         fontSize = 14.sp,
         lineHeight = 20.sp,
         letterSpacing = 0.sp
@@ -55,8 +66,8 @@ val Typography = Typography(
 
     //Texto Título de tarjetas y secciones
     headlineSmall = TextStyle(
-        fontFamily = Roboto,
-        fontWeight = FontWeight.SemiBold,
+        fontFamily = Nunito,
+        fontWeight = FontWeight.ExtraBold,
         fontSize = 16.sp,
         lineHeight = 22.sp,
         letterSpacing = 0.sp
@@ -64,55 +75,55 @@ val Typography = Typography(
 
     //Texto Principal
     bodyLarge = TextStyle(
-        fontFamily = Roboto,
-        fontWeight = FontWeight.Normal,
-        fontSize = 14.sp,
-        lineHeight = 20.sp,
-        letterSpacing = 0.25.sp
+        fontFamily = Nunito,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 15.sp,
+        lineHeight = 21.sp,
+        letterSpacing = 0.1.sp
     ),
 
     //Texto secundario
     bodyMedium = TextStyle(
-        fontFamily = Roboto,
-        fontWeight = FontWeight.Normal,
-        fontSize = 13.sp,
-        lineHeight = 18.sp,
-        letterSpacing = 0.25.sp
+        fontFamily = Nunito,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 14.sp,
+        lineHeight = 19.sp,
+        letterSpacing = 0.1.sp
     ),
 
     //Texto Caption / Badges / Etiquetas pequeñas
     bodySmall = TextStyle(
-        fontFamily = Roboto,
-        fontWeight = FontWeight.Medium,
-        fontSize = 11.sp,
+        fontFamily = Nunito,
+        fontWeight = FontWeight.Bold,
+        fontSize = 12.sp,
         lineHeight = 16.sp,
-        letterSpacing = 0.4.sp
+        letterSpacing = 0.2.sp
     ),
 
     //Texto de botones
     labelLarge = TextStyle(
-        fontFamily = Roboto,
-        fontWeight = FontWeight.SemiBold,
-        fontSize = 14.sp,
+        fontFamily = Nunito,
+        fontWeight = FontWeight.Black,
+        fontSize = 16.sp,
         lineHeight = 20.sp,
-        letterSpacing = 0.1.sp
+        letterSpacing = 0.sp
     ),
 
     //Texto de header y  navbar
     labelMedium = TextStyle(
-        fontFamily = Roboto,
-        fontWeight = FontWeight.SemiBold,
+        fontFamily = Nunito,
+        fontWeight = FontWeight.ExtraBold,
         fontSize = 13.sp,
         lineHeight = 18.sp,
-        letterSpacing = 0.5.sp
+        letterSpacing = 0.2.sp
     ),
 
     //Texto pequeño y hints
     labelSmall = TextStyle(
-        fontFamily = Roboto,
-        fontWeight = FontWeight.Normal,
+        fontFamily = Nunito,
+        fontWeight = FontWeight.SemiBold,
         fontSize = 12.sp,
         lineHeight = 16.sp,
-        letterSpacing = 0.5.sp
+        letterSpacing = 0.2.sp
     ),
 )
