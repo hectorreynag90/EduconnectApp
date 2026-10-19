@@ -1,35 +1,35 @@
 package com.educonnectapp.ui.screens.docente.asistencia
 
 import android.app.DatePickerDialog
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.CalendarMonth
-import androidx.compose.material.icons.outlined.Close
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.material.icons.rounded.CalendarMonth
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Event
+import androidx.compose.material.icons.rounded.EventBusy
+import androidx.compose.material.icons.rounded.FilterAlt
+import androidx.compose.material.icons.rounded.Notifications
+import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -39,36 +39,40 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.educonnectapp.R
+import com.educonnectapp.ui.components.BotonIconoCabeceraEdu
+import com.educonnectapp.ui.components.BotonPrincipalEdu
+import com.educonnectapp.ui.components.BotonSecundarioEdu
+import com.educonnectapp.ui.components.CabeceraEdu
+import com.educonnectapp.ui.components.ChipCabeceraEdu
+import com.educonnectapp.ui.components.ChipEdu
+import com.educonnectapp.ui.components.ColorModulo
+import com.educonnectapp.ui.components.IconoCirculoEdu
+import com.educonnectapp.ui.components.TarjetaEdu
+import com.educonnectapp.ui.components.TipoBotonEdu
+import com.educonnectapp.ui.components.TituloSeccionEdu
+import com.educonnectapp.ui.components.TonoEdu
+import com.educonnectapp.ui.components.coloresDeTono
 import com.educonnectapp.ui.screens.docente.inicio.BottomNavBarDocente
-import com.educonnectapp.ui.theme.AccentOrange
-import com.educonnectapp.ui.theme.AsistentTardanza
-import com.educonnectapp.ui.theme.BackgroundLight
-import com.educonnectapp.ui.theme.BackgroundWhite
-import com.educonnectapp.ui.theme.BorderBlue
-import com.educonnectapp.ui.theme.BorderGreen
+import com.educonnectapp.ui.theme.EduAzulOscuro
+import com.educonnectapp.ui.theme.EduAzulOscuroClaro
+import com.educonnectapp.ui.theme.EduBorde
+import com.educonnectapp.ui.theme.EduCampo
 import com.educonnectapp.ui.theme.EduConnectAppTheme
-import com.educonnectapp.ui.theme.EduconnectBlue
-import com.educonnectapp.ui.theme.Roboto
-import com.educonnectapp.ui.theme.TextBlue
-import com.educonnectapp.ui.theme.TextSecondary
-import com.educonnectapp.ui.theme.TextWhite
+import com.educonnectapp.ui.theme.EduEtiqueta
+import com.educonnectapp.ui.theme.EduFondo
+import com.educonnectapp.ui.theme.EduTexto
+import com.educonnectapp.ui.theme.EduTextoSecundario
+import com.educonnectapp.ui.theme.Nunito
 import java.util.Calendar
-
-private val VerdeAsistencia  = Color(0xFF26C281)
-private val RojoFalta        = Color(0xFFE53935)
-private val AmarilloTardanza = Color(0xFFF59E0B)
-private val BgVerde          = Color(0xFFE8F8F2)
-private val BgRojo           = Color(0xFFFDECEC)
-private val BgAmarillo       = Color(0xFFFFF8E1)
 
 /** Modelo de un registro de asistencia en el historial */
 data class HistorialItem(
@@ -84,6 +88,11 @@ data class HistorialItem(
     val total: Int,
     val tardanzas: Int = 0
 )
+
+// =====================================================================
+// HISTORIAL DE ASISTENCIA de una clase (rediseño 2026)
+// Cabecera fija azul oscuro · resumen (registros y %) · filtro por fecha · lista de días
+// =====================================================================
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -115,11 +124,9 @@ fun HistorialAsistenciaScreen(
                 fechaDesde.isNotEmpty() && fechaHasta.isNotEmpty() ->
                     item.fecha >= fechaDesde && item.fecha <= fechaHasta
                 // Solo Desde → día exacto
-                fechaDesde.isNotEmpty() ->
-                    item.fecha == fechaDesde
+                fechaDesde.isNotEmpty() -> item.fecha == fechaDesde
                 // Solo Hasta → día exacto
-                fechaHasta.isNotEmpty() ->
-                    item.fecha == fechaHasta
+                fechaHasta.isNotEmpty() -> item.fecha == fechaHasta
                 // Sin filtro
                 else -> true
             }
@@ -127,249 +134,128 @@ fun HistorialAsistenciaScreen(
     }
     val filtroActivo = fechaDesde.isNotEmpty() || fechaHasta.isNotEmpty()
 
-    val totalRegistros     = historialFiltrado.size
+    val totalRegistros = historialFiltrado.size
     val totalAlumnosHistorial = historialFiltrado.sumOf { it.total }
     // Asistencia = Presentes + Tardanzas (la tardanza cuenta como asistió)
     val promedioAsistencia = if (totalAlumnosHistorial > 0) {
         historialFiltrado.sumOf { it.presentes + it.tardanzas }.toFloat() / totalAlumnosHistorial.toFloat() * 100
     } else 0f
-    val promedioFaltas    = if (totalAlumnosHistorial > 0) {
+    val promedioFaltas = if (totalAlumnosHistorial > 0) {
         historialFiltrado.sumOf { it.ausentes }.toFloat() / totalAlumnosHistorial.toFloat() * 100
     } else 0f
     val promedioTardanzas = if (totalAlumnosHistorial > 0) {
         historialFiltrado.sumOf { it.tardanzas }.toFloat() / totalAlumnosHistorial.toFloat() * 100
     } else 0f
 
+    val textoFiltro = buildString {
+        if (fechaDesde.isNotEmpty()) append(labelDesde)
+        if (fechaDesde.isNotEmpty() && fechaHasta.isNotEmpty()) append(" — ")
+        if (fechaHasta.isNotEmpty()) append(labelHasta)
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(BackgroundLight)
+            .background(EduFondo)
     ) {
-        // HEADER AZUL
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(EduconnectBlue)
-                .padding(horizontal = 20.dp, vertical = 16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Row(
-                modifier = Modifier.weight(1f),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                IconButton(
-                    onClick = onBack,
-                    modifier = Modifier.size(32.dp).offset(x = (-5).dp)
-                ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.arrowleft_white),
-                        contentDescription = "Volver",
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-                Column {
-                    Text(
-                        text = "Historial de Asistencias",
-                        fontFamily = Roboto, fontWeight = FontWeight.Bold,
-                        fontSize = 20.sp, color = TextWhite
-                    )
-                    Text(
-                        text = curso,
-                        fontFamily = Roboto, fontWeight = FontWeight.SemiBold,
-                        fontSize = 15.sp, color = TextWhite
-                    )
-                    Text(
-                        text = "$grado - Sec. $seccion",
-                        fontFamily = Roboto, fontWeight = FontWeight.Normal,
-                        fontSize = 15.sp, color = TextWhite
-                    )
-                }
-            }
-            IconButton(onClick = onNotificaciones) {
-                Image(
-                    painter = painterResource(id = R.drawable.notification_white),
-                    contentDescription = "Notificaciones",
-                    modifier = Modifier.size(35.dp)
+        // CABECERA FIJA
+        CabeceraEdu(
+            titulo = curso,
+            subtitulo = "Historial · $grado $seccion",
+            onVolver = onBack,
+            colorFondo = ColorModulo.Asistencia,
+            acciones = {
+                BotonIconoCabeceraEdu(
+                    icono = Icons.Rounded.Notifications,
+                    descripcion = "Notificaciones",
+                    onClick = onNotificaciones,
+                    colorCabecera = ColorModulo.Asistencia
+                )
+            },
+            contenidoInferior = {
+                ChipCabeceraEdu(
+                    if (totalRegistros == 1) "1 registro" else "$totalRegistros registros",
+                    modifier = Modifier.padding(top = 14.dp),
+                    colorCabecera = ColorModulo.Asistencia
                 )
             }
-        }
+        )
 
-        // CONTENIDO
+        // CONTENIDO DESPLAZABLE
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
-                .padding(horizontal = 16.dp, vertical = 14.dp),
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            // CHIPS DE RESUMEN
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                ResumenChip(
-                    valor = "$totalRegistros",
-                    etiqueta = "REGISTROS",
-                    colorValor = TextBlue,
-                    modifier = Modifier.weight(1f)
-                )
-                ResumenChip(
-                    valor = "${promedioAsistencia.toInt()}%",
-                    etiqueta = "ASISTENCIA",
-                    colorValor = BorderGreen,
-                    modifier = Modifier.weight(1f)
-                )
-                ResumenChip(
-                    valor = "${promedioTardanzas.toInt()}%",
-                    etiqueta = "TARDANZAS",
-                    colorValor = AccentOrange,
-                    modifier = Modifier.weight(1f)
-                )
-                ResumenChip(
-                    valor = "${promedioFaltas.toInt()}%",
-                    etiqueta = "FALTAS",
-                    colorValor = RojoFalta,
-                    modifier = Modifier.weight(1f)
-                )
+            // RESUMEN
+            TituloSeccionEdu(if (filtroActivo) "Resumen del filtro" else "Resumen")
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ContadorHistorial("$totalRegistros", "Registros", TonoEdu.AZUL, Modifier.weight(1f))
+                ContadorHistorial("${promedioAsistencia.toInt()}%", "Asistencia", TonoEdu.VERDE, Modifier.weight(1f))
+                ContadorHistorial("${promedioTardanzas.toInt()}%", "Tardanza", TonoEdu.AMARILLO, Modifier.weight(1f))
+                ContadorHistorial("${promedioFaltas.toInt()}%", "Faltas", TonoEdu.CORAL, Modifier.weight(1f))
             }
 
-            // ENCABEZADO LISTA + BOTÓN FILTRAR
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "REGISTROS",
-                    fontFamily = Roboto, fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp, color = TextBlue
-                )
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .background(
-                                if (filtroActivo) EduconnectBlue else BackgroundWhite,
-                                RoundedCornerShape(20.dp)
-                            )
-                            .border(
-                                1.dp,
-                                if (filtroActivo) EduconnectBlue else BorderBlue,
-                                RoundedCornerShape(20.dp)
-                            )
-                            .clickable { mostrarFiltro = true }
-                            .padding(horizontal = 10.dp, vertical = 5.dp)
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Outlined.CalendarMonth,
-                                contentDescription = null,
-                                tint = if (filtroActivo) TextWhite else TextBlue,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Text(
-                                text = "Filtrar",
-                                fontFamily = Roboto, fontWeight = FontWeight.SemiBold,
-                                fontSize = 13.sp,
-                                color = if (filtroActivo) TextWhite else TextBlue
-                            )
-                        }
-                    }
-                    Box(
-                        modifier = Modifier
-                            .background(EduconnectBlue, RoundedCornerShape(20.dp))
-                            .padding(horizontal = 12.dp, vertical = 4.dp)
-                    ) {
-                        Text(
-                            text = "$totalRegistros",
-                            fontFamily = Roboto, fontWeight = FontWeight.Bold,
-                            fontSize = 15.sp, color = TextWhite
-                        )
-                    }
-                }
+            // REGISTROS + BOTÓN FILTRAR
+            Spacer(modifier = Modifier.height(4.dp))
+            TituloSeccionEdu("Registros") {
+                BotonFiltro(activo = filtroActivo, onClick = { mostrarFiltro = true })
             }
 
-            // CHIP FILTRO ACTIVO
+            // CHIP DEL FILTRO ACTIVO (con X para quitarlo)
             if (filtroActivo) {
                 Row(
                     modifier = Modifier
-                        .background(Color(0xFFE3F0FB), RoundedCornerShape(20.dp))
-                        .border(1.dp, EduconnectBlue.copy(alpha = 0.4f), RoundedCornerShape(20.dp))
-                        .padding(horizontal = 12.dp, vertical = 4.dp),
+                        .clip(RoundedCornerShape(50))
+                        .background(EduAzulOscuroClaro)
+                        .padding(start = 12.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
+                    Icon(Icons.Rounded.CalendarMonth, contentDescription = null, tint = EduAzulOscuro, modifier = Modifier.size(16.dp))
                     Text(
-                        text = buildString {
-                            append("Filtro: ")
-                            if (fechaDesde.isNotEmpty()) append(labelDesde)
-                            if (fechaDesde.isNotEmpty() && fechaHasta.isNotEmpty()) append(" — ")
-                            if (fechaHasta.isNotEmpty()) append(labelHasta)
-                        },
-                        fontFamily = Roboto, fontWeight = FontWeight.Medium,
-                        fontSize = 12.sp, color = TextBlue
+                        textoFiltro, fontFamily = Nunito, fontWeight = FontWeight.ExtraBold,
+                        fontSize = 13.sp, color = EduAzulOscuro
                     )
                     Icon(
-                        imageVector = Icons.Outlined.Close,
-                        contentDescription = "Limpiar filtro",
-                        tint = TextBlue,
+                        Icons.Rounded.Close,
+                        contentDescription = "Quitar filtro",
+                        tint = EduAzulOscuro,
                         modifier = Modifier
-                            .size(16.dp)
+                            .clip(RoundedCornerShape(50))
                             .clickable {
                                 fechaDesde = ""; fechaHasta = ""
                                 labelDesde = "Desde"; labelHasta = "Hasta"
                             }
+                            .padding(4.dp)
+                            .size(16.dp)
                     )
                 }
             }
 
-            // LISTA SCROLLEABLE
+            // LISTA
             if (historialFiltrado.isEmpty()) {
-                Box(
-                    modifier = Modifier.fillMaxWidth().weight(1f),
-                    contentAlignment = Alignment.Center
-                ) {
+                TarjetaEdu {
                     Column(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Image(
-                            painter = painterResource(id = R.drawable.ic_no_records),
-                            contentDescription = null,
-                            modifier = Modifier.size(48.dp)
-                        )
+                        IconoCirculoEdu(Icons.Rounded.EventBusy, TonoEdu.GRIS, tamano = 56.dp)
                         Text(
-                            text = if (filtroActivo)
-                                "No hay registros en el rango seleccionado."
-                            else
-                                "No hay registros de asistencia aún.",
-                            fontFamily = Roboto, fontSize = 14.sp,
-                            color = TextSecondary
+                            if (filtroActivo) "No hay registros en el rango seleccionado."
+                            else "Aún no hay registros de asistencia para esta clase.",
+                            fontFamily = Nunito, fontWeight = FontWeight.SemiBold, fontSize = 14.5.sp,
+                            color = EduTextoSecundario, textAlign = TextAlign.Center
                         )
                     }
                 }
             } else {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                        .verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    historialFiltrado.forEach { item ->
-                        HistorialCard(
-                            item = item,
-                            onClick = { onVerDetalle(item) }
-                        )
-                    }
-                    Spacer(Modifier.height(8.dp))
+                historialFiltrado.forEach { item ->
+                    TarjetaRegistroHistorial(item = item, onClick = { onVerDetalle(item) })
                 }
             }
         }
@@ -383,12 +269,12 @@ fun HistorialAsistenciaScreen(
         )
     }
 
-    // BOTTOM SHEET FILTRO
+    // HOJA INFERIOR: FILTRO POR FECHA
     if (mostrarFiltro) {
         ModalBottomSheet(
             onDismissRequest = { mostrarFiltro = false },
             sheetState = sheetState,
-            containerColor = BackgroundWhite
+            containerColor = Color.White
         ) {
             FiltroFechaSheet(
                 labelDesde = labelDesde,
@@ -409,6 +295,31 @@ fun HistorialAsistenciaScreen(
                 }
             )
         }
+    }
+}
+
+// Botón "Filtrar" junto al título de la lista: azul oscuro sólido cuando hay un filtro activo
+@Composable
+private fun BotonFiltro(activo: Boolean, onClick: () -> Unit) {
+    val forma = RoundedCornerShape(50)
+    Row(
+        modifier = Modifier
+            .clip(forma)
+            .background(if (activo) EduAzulOscuro else Color.White)
+            .border(1.5.dp, if (activo) EduAzulOscuro else EduBorde, forma)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(5.dp)
+    ) {
+        Icon(
+            Icons.Rounded.FilterAlt, contentDescription = null,
+            tint = if (activo) Color.White else EduEtiqueta, modifier = Modifier.size(16.dp)
+        )
+        Text(
+            "Filtrar", fontFamily = Nunito, fontWeight = FontWeight.Black, fontSize = 13.sp,
+            color = if (activo) Color.White else EduEtiqueta
+        )
     }
 }
 
@@ -450,187 +361,150 @@ private fun FiltroFechaSheet(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 24.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+            .padding(horizontal = 24.dp)
+            .padding(bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        Text(
-            text = "Filtrar por fecha",
-            fontFamily = Roboto, fontWeight = FontWeight.Bold,
-            fontSize = 18.sp, color = TextBlue
-        )
-
-        // Campo DESDE
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(text = "DESDE", fontFamily = Roboto, fontWeight = FontWeight.SemiBold,
-                fontSize = 13.sp, color = TextSecondary)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(BackgroundWhite, RoundedCornerShape(10.dp))
-                    .border(1.5.dp, BorderBlue, RoundedCornerShape(10.dp))
-                    .clickable { openDesde() }
-                    .padding(horizontal = 14.dp, vertical = 14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = if (lDesde.isEmpty()) "Seleccionar fecha" else lDesde,
-                    fontFamily = Roboto, fontSize = 15.sp,
-                    color = if (lDesde.isEmpty()) TextSecondary else TextBlue
-                )
-                Icon(imageVector = Icons.Outlined.CalendarMonth, contentDescription = null,
-                    tint = EduconnectBlue, modifier = Modifier.size(20.dp))
-            }
-        }
-
-        // Campo HASTA
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(text = "HASTA", fontFamily = Roboto, fontWeight = FontWeight.SemiBold,
-                fontSize = 13.sp, color = TextSecondary)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(BackgroundWhite, RoundedCornerShape(10.dp))
-                    .border(1.5.dp, BorderBlue, RoundedCornerShape(10.dp))
-                    .clickable { openHasta() }
-                    .padding(horizontal = 14.dp, vertical = 14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = if (lHasta.isEmpty()) "Seleccionar fecha" else lHasta,
-                    fontFamily = Roboto, fontSize = 15.sp,
-                    color = if (lHasta.isEmpty()) TextSecondary else TextBlue
-                )
-                Icon(imageVector = Icons.Outlined.CalendarMonth, contentDescription = null,
-                    tint = EduconnectBlue, modifier = Modifier.size(20.dp))
-            }
-        }
-
-        // Botones Limpiar / Aplicar
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            OutlinedButton(
-                onClick = onLimpiar,
-                modifier = Modifier.weight(1f).height(48.dp),
-                shape = RoundedCornerShape(24.dp),
-                border = BorderStroke(1.5.dp, EduconnectBlue)
-            ) {
-                Text(text = "Limpiar", fontFamily = Roboto, fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp, color = EduconnectBlue)
+            IconoCirculoEdu(Icons.Rounded.CalendarMonth, TonoEdu.AZUL)
+            Column {
+                Text(
+                    "Filtrar por fecha", fontFamily = Nunito, fontWeight = FontWeight.Black,
+                    fontSize = 20.sp, color = EduTexto
+                )
+                Text(
+                    "Si eliges una sola fecha, se muestra ese día.",
+                    fontFamily = Nunito, fontWeight = FontWeight.SemiBold, fontSize = 13.5.sp,
+                    color = EduTextoSecundario
+                )
             }
-            Button(
+        }
+
+        CampoFecha(etiqueta = "Desde", valor = lDesde, onClick = { openDesde() })
+        CampoFecha(etiqueta = "Hasta", valor = lHasta, onClick = { openHasta() })
+
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            BotonSecundarioEdu(
+                texto = "Limpiar",
+                onClick = onLimpiar,
+                modifier = Modifier.weight(1f)
+            )
+            BotonPrincipalEdu(
+                texto = "Aplicar",
+                tipo = TipoBotonEdu.AVANZAR,
+                icono = Icons.Rounded.Check,
+                modifier = Modifier.weight(1f),
                 onClick = {
                     onAplicar(
                         tempDesde, tempHasta,
                         if (lDesde.isEmpty()) "Desde" else lDesde,
                         if (lHasta.isEmpty()) "Hasta" else lHasta
                     )
-                },
-                modifier = Modifier.weight(1f).height(48.dp),
-                shape = RoundedCornerShape(24.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = EduconnectBlue)
-            ) {
-                Text(text = "Aplicar", fontFamily = Roboto, fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp, color = TextWhite)
-            }
+                }
+            )
         }
-
-        Spacer(Modifier.height(16.dp))
     }
 }
 
+// Campo de fecha (abre el calendario al tocarlo), con el mismo estilo de los campos de texto
 @Composable
-private fun ResumenChip(
-    valor: String,
-    etiqueta: String,
-    colorValor: Color,
-    modifier: Modifier = Modifier
-) {
+private fun CampoFecha(etiqueta: String, valor: String, onClick: () -> Unit) {
+    val forma = RoundedCornerShape(16.dp)
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(
+            etiqueta, fontFamily = Nunito, fontWeight = FontWeight.ExtraBold,
+            fontSize = 14.sp, color = EduEtiqueta
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(forma)
+                .background(EduCampo)
+                .border(1.5.dp, EduBorde, forma)
+                .clickable(onClick = onClick)
+                .padding(horizontal = 14.dp, vertical = 15.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Icon(Icons.Rounded.CalendarMonth, contentDescription = null, tint = EduTextoSecundario, modifier = Modifier.size(20.dp))
+            Text(
+                if (valor.isEmpty()) "Seleccionar fecha" else valor,
+                modifier = Modifier.weight(1f),
+                fontFamily = Nunito,
+                fontWeight = if (valor.isEmpty()) FontWeight.SemiBold else FontWeight.Bold,
+                fontSize = 15.sp,
+                color = if (valor.isEmpty()) EduTextoSecundario else EduTexto
+            )
+        }
+    }
+}
+
+// Contador con texto (permite "85%")
+@Composable
+private fun ContadorHistorial(valor: String, etiqueta: String, tono: TonoEdu, modifier: Modifier) {
+    val c = coloresDeTono(tono)
     Column(
         modifier = modifier
-            .background(BackgroundWhite, RoundedCornerShape(10.dp))
-            .border(1.dp, BorderBlue, RoundedCornerShape(10.dp))
-            .padding(vertical = 10.dp, horizontal = 8.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(2.dp)
+            .background(c.fondo, RoundedCornerShape(18.dp))
+            .padding(vertical = 10.dp, horizontal = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text(text = valor, fontFamily = Roboto, fontWeight = FontWeight.Bold,
-            fontSize = 20.sp, color = colorValor)
-        Text(text = etiqueta, fontFamily = Roboto, fontWeight = FontWeight.Bold,
-            fontSize = 11.sp, color = TextSecondary, letterSpacing = 0.5.sp)
+        Text(valor, fontFamily = Nunito, fontWeight = FontWeight.Black, fontSize = 21.sp, color = c.texto, maxLines = 1)
+        Text(
+            etiqueta, fontFamily = Nunito, fontWeight = FontWeight.ExtraBold, fontSize = 12.sp,
+            color = c.texto, maxLines = 1, overflow = TextOverflow.Ellipsis
+        )
     }
 }
 
+// Tarjeta de un día del historial: fecha, hora y chips Asistió / Tardanza / Faltó
 @Composable
-private fun HistorialCard(
-    item: HistorialItem,
-    onClick: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(BackgroundWhite, RoundedCornerShape(12.dp))
-            .border(1.5.dp, BorderBlue, RoundedCornerShape(12.dp))
-            .clickable { onClick() }
-            .padding(horizontal = 14.dp, vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .size(44.dp)
-                .background(Color(0xFFFFF5ED), RoundedCornerShape(12.dp)),
-            contentAlignment = Alignment.Center
+private fun TarjetaRegistroHistorial(item: HistorialItem, onClick: () -> Unit) {
+    TarjetaEdu(onClick = onClick, relleno = PaddingValues(horizontal = 14.dp, vertical = 12.dp)) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Image(painter = painterResource(id = R.drawable.agenda_blue),
-                contentDescription = null, modifier = Modifier.size(35.dp))
-        }
-
-        Column(modifier = Modifier.weight(1f)) {
-            Text(text = item.curso, fontFamily = Roboto, fontWeight = FontWeight.Bold,
-                fontSize = 16.sp, color = TextBlue,
-                maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(text = "${item.grado} — Sec. ${item.seccion}",
-                fontFamily = Roboto, fontWeight = FontWeight.Bold,
-                fontSize = 14.sp, color = TextSecondary)
-            Text(text = item.fechaDisplay, fontFamily = Roboto, fontWeight = FontWeight.Medium,
-                fontSize = 13.sp, color = TextBlue)
-        }
-
-        Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(text = item.hora, fontFamily = Roboto, fontWeight = FontWeight.Normal,
-                fontSize = 13.sp, color = TextSecondary)
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                Box(modifier = Modifier
-                    .background(BgVerde, RoundedCornerShape(20.dp))
-                    .padding(horizontal = 8.dp, vertical = 2.dp)) {
-                    Text(text = "✓ ${item.presentes}", fontFamily = Roboto,
-                        fontWeight = FontWeight.Bold, fontSize = 13.sp, color = BorderGreen)
+            IconoCirculoEdu(Icons.Rounded.Event, TonoEdu.AZUL)
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Text(
+                    item.fechaDisplay, fontFamily = Nunito, fontWeight = FontWeight.Black,
+                    fontSize = 15.sp, color = EduTexto, maxLines = 1, overflow = TextOverflow.Ellipsis
+                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Icon(Icons.Rounded.Schedule, contentDescription = null, tint = EduTextoSecundario, modifier = Modifier.size(14.dp))
+                    Text(
+                        "${item.hora} · ${item.total} alumnos", fontFamily = Nunito, fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp, color = EduTextoSecundario
+                    )
                 }
-                if (item.tardanzas > 0) {
-                    Box(modifier = Modifier
-                        .background(AsistentTardanza, RoundedCornerShape(20.dp))
-                        .padding(horizontal = 8.dp, vertical = 2.dp)) {
-                        Text(text = "⚠ ${item.tardanzas}", fontFamily = Roboto,
-                            fontWeight = FontWeight.Bold, fontSize = 13.sp, color = AccentOrange)
-                    }
-                }
-                Box(modifier = Modifier
-                    .background(BgRojo, RoundedCornerShape(20.dp))
-                    .padding(horizontal = 8.dp, vertical = 2.dp)) {
-                    Text(text = "✗ ${item.ausentes}", fontFamily = Roboto,
-                        fontWeight = FontWeight.Bold, fontSize = 13.sp, color = RojoFalta)
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    ChipEdu("${item.presentes} A", TonoEdu.VERDE)
+                    if (item.tardanzas > 0) ChipEdu("${item.tardanzas} T", TonoEdu.AMARILLO)
+                    ChipEdu("${item.ausentes} F", TonoEdu.CORAL)
                 }
             }
-            Text(text = "›", fontFamily = Roboto, fontSize = 22.sp, color = TextSecondary)
+            Icon(
+                Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = "Ver detalle",
+                tint = EduTextoSecundario, modifier = Modifier.size(26.dp)
+            )
         }
     }
 }
 
-@Preview(showBackground = true)
+@Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
 fun HistorialAsistenciaPreview() {
     EduConnectAppTheme {

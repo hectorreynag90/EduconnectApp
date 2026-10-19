@@ -1,56 +1,84 @@
-package com.educonnectapp.ui.screens
+package com.educonnectapp.ui.screens.docente.asistencia
 
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CheckboxDefaults
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.LockClock
+import androidx.compose.material.icons.rounded.Save
+import androidx.compose.material.icons.rounded.Sync
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
-import com.educonnectapp.R
+import com.educonnectapp.ui.components.BarraProgresoEdu
+import com.educonnectapp.ui.components.BotonPrincipalEdu
+import com.educonnectapp.ui.components.BotonSecundarioEdu
+import com.educonnectapp.ui.components.CabeceraEdu
+import com.educonnectapp.ui.components.ColorModulo
+import com.educonnectapp.ui.components.ContadorEdu
+import com.educonnectapp.ui.components.PopupConfirmacionEdu
+import com.educonnectapp.ui.components.PopupProcesandoEdu
+import com.educonnectapp.ui.components.TarjetaEdu
+import com.educonnectapp.ui.components.TipoBotonEdu
+import com.educonnectapp.ui.components.TonoEdu
+import com.educonnectapp.ui.components.coloresDeTono
 import com.educonnectapp.ui.screens.docente.inicio.BottomNavBarDocente
-import com.educonnectapp.ui.theme.*
+import com.educonnectapp.ui.theme.EduAmarillo
+import com.educonnectapp.ui.theme.EduAzulOscuroClaro
+import com.educonnectapp.ui.theme.EduBorde
+import com.educonnectapp.ui.theme.EduConnectAppTheme
+import com.educonnectapp.ui.theme.EduCoral
+import com.educonnectapp.ui.theme.EduEtiqueta
+import com.educonnectapp.ui.theme.EduFondo
+import com.educonnectapp.ui.theme.EduTeal
+import com.educonnectapp.ui.theme.EduTealClaro
+import com.educonnectapp.ui.theme.EduTealOscuro
+import com.educonnectapp.ui.theme.EduTexto
+import com.educonnectapp.ui.theme.EduTextoSecundario
+import com.educonnectapp.ui.theme.Nunito
 import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
-
-private val AsistenciaVerde      = Color(0xFF26C281)
-private val FaltaRojo            = Color(0xFFE53935)
-private val TardanzaAmarillo     = Color(0xFFF59E0B)
-private val BorderVerdePresente  = Color(0xFF26C281)
-private val BorderRojoFalta      = Color(0xFFE53935)
-private val BorderAmarilloTard   = Color(0xFFF59E0B)
 
 // Horas que el docente tiene para editar la asistencia desde este módulo (desde que la registró)
 private const val HORAS_EDICION = 12
@@ -72,10 +100,11 @@ private fun siguienteEstadoAsistencia(estado: String): String = when (estado) {
     else -> "A"
 }
 
-private fun colorEstadoAsistencia(estado: String): Color? = when (estado) {
-    "A" -> AsistenciaVerde
-    "T" -> TardanzaAmarillo
-    "F" -> FaltaRojo
+// Tono de cada estado: A = turquesa, T = amarillo, F = granate
+private fun tonoEstado(estado: String): TonoEdu? = when (estado) {
+    "A" -> TonoEdu.VERDE
+    "T" -> TonoEdu.AMARILLO
+    "F" -> TonoEdu.CORAL
     else -> null
 }
 
@@ -103,6 +132,11 @@ private fun limiteEdicion(registro: Date?, fecha: String): Date? {
     return if (finDelDia != null && finDelDia.before(masDoce)) finDelDia else masDoce
 }
 
+// =====================================================================
+// REGISTRO DE ASISTENCIA (rediseño 2026)
+// Cabecera fija azul oscuro · contadores A/T/F · lista con un botón por alumno · botones fijos abajo
+// =====================================================================
+
 @Composable
 fun RegistroAsistenciaScreen(
     docenteId: String,
@@ -127,20 +161,20 @@ fun RegistroAsistenciaScreen(
 ) {
     // Fecha de la clase: la de la hoja del servidor (si aún no llega, la de hoy en Perú)
     val fechaHoy = fechaHoja.ifBlank { formatoPeru("yyyy-MM-dd").format(Date()) }
-    val fechaDisplay = remember(fechaHoy) {
+    val fechaCorta = remember(fechaHoy) {
         try {
-            formatoPeru("EEEE dd 'de' MMMM yyyy").format(formatoPeru("yyyy-MM-dd").parse(fechaHoy)!!)
+            formatoPeru("EEEE d 'de' MMMM").format(formatoPeru("yyyy-MM-dd").parse(fechaHoy)!!)
                 .replaceFirstChar { it.uppercase() }
         } catch (e: Exception) { fechaHoy }
     }
-    // Fecha y hora del aviso, con el mismo formato en ambas filas: "Sáb 03/10/2026 · 07:12 p. m."
+    // Fecha y hora del aviso: "Lun 19/10/2026 · 08:05 a. m."
     val formatoFechaHora = remember { formatoPeru("EEE dd/MM/yyyy · hh:mm a") }
     fun fechaHoraTexto(d: Date) = formatoFechaHora.format(d).replaceFirstChar { it.uppercase() }
 
     val estadoAsistencia = remember { mutableStateMapOf<Long, String>() }
     val context = LocalContext.current
 
-    // Diálogos: confirmación -> guardando
+    // Popups: confirmación -> guardando
     var mostrarDialogConfirmacion by remember { mutableStateOf(false) }
     var mostrarDialogCargando by remember { mutableStateOf(false) }
 
@@ -220,7 +254,6 @@ fun RegistroAsistenciaScreen(
     val tardanzas  = snapshotEstados.values.count { it == "T" }
     val marcados   = presentes + ausentes + tardanzas
     val progreso   = if (totalAlumnos > 0) marcados.toFloat() / totalAlumnos else 0f
-    val porcentaje = (progreso * 100).toInt()
 
     val todosListos     = listaAlumnos.all { (snapshotEstados[it.id] ?: "").isNotEmpty() }
     val botonHabilitado = if (hayAsistenciaPrevia) huboCambios else todosListos
@@ -228,202 +261,76 @@ fun RegistroAsistenciaScreen(
     val hayAlgunMarcado  = snapshotEstados.values.any { it == "A" || it == "F" || it == "T" }
     val todosPresentes   = listaAlumnos.isNotEmpty() && listaAlumnos.all { snapshotEstados[it.id] == "A" }
 
-    // ── DIALOG PASO 1: Confirmación ──────────────────────────────────────────
-    if (mostrarDialogConfirmacion) {
-        AlertDialog(
-            onDismissRequest = { mostrarDialogConfirmacion = false },
-            title = {
-                Text(
-                    text = if (hayAsistenciaPrevia) "¿Confirmar cambios?" else "¿Confirmar registro?",
-                    fontFamily = Roboto,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 18.sp,
-                    color = TextBlue,
-                    textAlign = TextAlign.Center
-                )
-            },
-            text = {
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text(
-                        text = "Revisa el resumen antes de guardar:",
-                        fontFamily = Roboto,
-                        fontSize = 14.sp,
-                        color = TextSecondary,
-                        textAlign = TextAlign.Center
-                    )
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        ConteoResumen(presentes, "Presentes", AsistenciaVerde, Modifier.weight(1f))
-                        ConteoResumen(tardanzas, "Tardanzas", TardanzaAmarillo, Modifier.weight(1f))
-                        ConteoResumen(ausentes, "Ausentes", FaltaRojo, Modifier.weight(1f))
-                    }
-                    Text(
-                        text = "Total: $totalAlumnos alumnos",
-                        fontFamily = Roboto,
-                        fontSize = 13.sp,
-                        color = TextSecondary
-                    )
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { mostrarDialogConfirmacion = false }) {
-                    Text(
-                        text = "Corregir",
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.Bold,
-                        color = TextSecondary
-                    )
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        mostrarDialogConfirmacion = false
-                        mostrarDialogCargando = true
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = AccentOrange),
-                    shape = RoundedCornerShape(20.dp)
-                ) {
-                    Text(
-                        text = "Confirmar",
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.Bold,
-                        color = TextWhite
-                    )
-                }
-            },
-            containerColor = Color.White,
-            shape = RoundedCornerShape(16.dp)
-        )
+    fun alternarTodosPresentes() {
+        if (todosPresentes) {
+            if (hayAsistenciaPrevia) restaurarPrevia() else estadoAsistencia.clear()
+        } else {
+            listaAlumnos.forEach { estadoAsistencia[it.id] = "A" }
+        }
     }
 
-    // ── DIALOG PASO 2: Cargando ──────────────────────────────────────────────
-    if (mostrarDialogCargando) {
-        Dialog(
-            onDismissRequest = { /* no se puede cerrar mientras carga */ },
-            properties = DialogProperties(dismissOnBackPress = false, dismissOnClickOutside = false)
-        ) {
-            Box(
-                modifier = Modifier
-                    .background(Color.White, RoundedCornerShape(16.dp))
-                    .padding(horizontal = 32.dp, vertical = 28.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(52.dp),
-                        color = EduconnectBlue,
-                        strokeWidth = 4.dp
-                    )
-                    Text(
-                        text = "Guardando el registro...",
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp,
-                        color = TextBlue,
-                        textAlign = TextAlign.Center
-                    )
-                }
+    // ── POPUP 1: Confirmación ────────────────────────────────────────────
+    if (mostrarDialogConfirmacion) {
+        PopupConfirmacionEdu(
+            titulo = if (hayAsistenciaPrevia) "¿Confirmar cambios?" else "¿Confirmar registro?",
+            mensaje = "Revisa el resumen antes de guardar. Los padres recibirán un aviso.",
+            textoConfirmar = if (hayAsistenciaPrevia) "Actualizar" else "Guardar",
+            colorConfirmar = if (hayAsistenciaPrevia) TipoBotonEdu.ACTUALIZAR.fondo else TipoBotonEdu.GUARDAR.fondo,
+            onCancelar = { mostrarDialogConfirmacion = false },
+            onConfirmar = {
+                mostrarDialogConfirmacion = false
+                mostrarDialogCargando = true
             }
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                ContadorEdu(presentes, "Asistió", TonoEdu.VERDE, Modifier.weight(1f))
+                ContadorEdu(tardanzas, "Tardanza", TonoEdu.AMARILLO, Modifier.weight(1f))
+                ContadorEdu(ausentes, "Faltó", TonoEdu.CORAL, Modifier.weight(1f))
+            }
+            Text(
+                "Total: $totalAlumnos alumnos", fontFamily = Nunito, fontWeight = FontWeight.Bold,
+                fontSize = 13.5.sp, color = EduTextoSecundario
+            )
         }
+    }
+
+    // ── POPUP 2: Guardando ───────────────────────────────────────────────
+    if (mostrarDialogCargando) {
+        PopupProcesandoEdu(
+            titulo = if (hayAsistenciaPrevia) "Actualizando asistencia..." else "Guardando asistencia...",
+            mensaje = "Estamos avisando a los padres."
+        )
     }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(BackgroundLight)
+            .background(EduFondo)
     ) {
-        // ── HEADER AZUL ──────────────────────────────────────────────────────
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(EduconnectBlue)
-                .padding(horizontal = 20.dp, vertical = 16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Row(
-                modifier = Modifier.weight(1f),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                IconButton(
-                    onClick = { if (editando) cancelarEdicion() else onBack() },
-                    modifier = Modifier.size(32.dp).offset(x = (-5).dp)
-                ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.arrowleft_white),
-                        contentDescription = "Volver",
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-                Column {
-                    Text(
-                        text = if (editando) "Editar Asistencia" else "Registro de Asistencia",
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.Bold, fontSize = 20.sp, color = TextWhite
-                    )
-                    Text(
-                        text = curso, fontFamily = Roboto,
-                        fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = TextWhite
-                    )
-                    Text(
-                        text = "$grado - Sec. $seccion", fontFamily = Roboto,
-                        fontWeight = FontWeight.Normal, fontSize = 15.sp, color = TextWhite
-                    )
-                    Text(
-                        text = fechaDisplay, fontFamily = Roboto,
-                        fontWeight = FontWeight.Normal, fontSize = 14.sp,
-                        color = TextWhite.copy(alpha = 0.85f)
-                    )
-                }
-            }
-            IconButton(onClick = onNotificaciones) {
-                Image(
-                    painter = painterResource(id = R.drawable.notification_white),
-                    contentDescription = "Notificaciones",
-                    modifier = Modifier.size(35.dp)
-                )
-            }
-        }
+        // ── CABECERA FIJA ────────────────────────────────────────────────
+        CabeceraEdu(
+            titulo = if (editando) "Editar asistencia" else curso,
+            subtitulo = if (editando) "$curso · $grado $seccion" else "$grado $seccion · $fechaCorta",
+            onVolver = { if (editando) cancelarEdicion() else onBack() },
+            colorFondo = ColorModulo.Asistencia
+        )
 
-        // ── CONTENIDO ────────────────────────────────────────────────────────
+        // ── CONTENIDO ────────────────────────────────────────────────────
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
-                .padding(horizontal = 16.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+                .padding(start = 16.dp, end = 16.dp, top = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-
-            // ENCABEZADO: título + contador
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "LISTA DE ALUMNOS", fontFamily = Roboto,
-                    fontWeight = FontWeight.Bold, fontSize = 17.sp, color = TextBlue
-                )
-                Box(
-                    modifier = Modifier
-                        .background(EduconnectBlue, RoundedCornerShape(20.dp))
-                        .padding(horizontal = 12.dp, vertical = 4.dp)
-                ) {
-                    Text(
-                        text = "$marcados/$totalAlumnos", fontFamily = Roboto,
-                        fontWeight = FontWeight.Bold, fontSize = 14.sp, color = TextWhite
-                    )
-                }
+            // CONTADORES
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ContadorEdu(presentes, "Asistió", TonoEdu.VERDE, Modifier.weight(1f))
+                ContadorEdu(tardanzas, "Tardanza", TonoEdu.AMARILLO, Modifier.weight(1f))
+                ContadorEdu(ausentes, "Faltó", TonoEdu.CORAL, Modifier.weight(1f))
             }
 
             // AVISO si ya se registró: fecha y hora del registro y hasta cuándo se puede editar
@@ -432,190 +339,142 @@ fun RegistroAsistenciaScreen(
                 val titulo = when {
                     editando -> "Editando asistencia"
                     bloqueada -> "Asistencia registrada · edición cerrada"
-                    else -> "¡Asistencia registrada!"
+                    else -> "Asistencia registrada"
                 }
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(
-                            if (bloqueada) BackgroundWhite else BackgroundStatusOrangeLight,
-                            RoundedCornerShape(8.dp)
+                            when {
+                                editando -> coloresDeTono(TonoEdu.AMARILLO).fondo
+                                bloqueada -> EduAzulOscuroClaro
+                                else -> EduTealClaro
+                            },
+                            RoundedCornerShape(16.dp)
                         )
-                        .border(1.dp, if (bloqueada) BorderLight else BorderOrange, RoundedCornerShape(8.dp))
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Image(
-                        painter = painterResource(id = if (bloqueada) R.drawable.clock_darkgray else R.drawable.checklist_orange),
-                        contentDescription = null,
-                        modifier = Modifier.size(30.dp)
-                    )
-                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Text(
-                            text = titulo,
-                            fontFamily = Roboto, fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = if (bloqueada) TextBlue else TextOrange
+                    Box(
+                        modifier = Modifier.size(40.dp).background(Color.White, CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = when {
+                                editando -> Icons.Rounded.Edit
+                                bloqueada -> Icons.Rounded.LockClock
+                                else -> Icons.Rounded.Lock
+                            },
+                            contentDescription = null,
+                            tint = when {
+                                editando -> coloresDeTono(TonoEdu.AMARILLO).texto
+                                bloqueada -> EduTextoSecundario
+                                else -> EduTealOscuro
+                            },
+                            modifier = Modifier.size(22.dp)
                         )
-                        registro?.let { FilaAviso("Registrada:", fechaHoraTexto(it), TextBlue) }
-                        limite?.let {
-                            FilaAviso(
-                                "Editable hasta:",
-                                fechaHoraTexto(it),
-                                if (bloqueada) TextSecondary else TextOrange
-                            )
-                        }
+                    }
+                    Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                        Text(
+                            titulo, fontFamily = Nunito, fontWeight = FontWeight.Black, fontSize = 15.sp,
+                            color = EduTexto
+                        )
+                        registro?.let { FilaAviso("Registrada:", fechaHoraTexto(it)) }
+                        limite?.let { FilaAviso("Editable hasta:", fechaHoraTexto(it)) }
                         if (bloqueada) {
                             Text(
-                                text = "Para corregirla usa el Historial de asistencias.",
-                                fontFamily = Roboto, fontSize = 13.sp,
-                                color = TextSecondary
+                                "Para corregirla usa el Historial de asistencias.",
+                                fontFamily = Nunito, fontWeight = FontWeight.SemiBold, fontSize = 13.sp,
+                                color = EduTextoSecundario
                             )
                         }
                     }
                 }
             }
 
-            // ACCIONES RÁPIDAS (solo si se puede editar)
-            if (editable) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // Marcar todos presentes
-                    Row(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clickable {
-                                if (todosPresentes) {
-                                    if (hayAsistenciaPrevia) restaurarPrevia() else estadoAsistencia.clear()
-                                } else {
-                                    listaAlumnos.forEach { estadoAsistencia[it.id] = "A" }
-                                }
-                            },
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(1.dp)
-                    ) {
-                        Checkbox(
-                            checked = todosPresentes,
-                            onCheckedChange = {
-                                if (todosPresentes) {
-                                    if (hayAsistenciaPrevia) restaurarPrevia() else estadoAsistencia.clear()
-                                } else listaAlumnos.forEach { estadoAsistencia[it.id] = "A" }
-                            },
-                            colors = CheckboxDefaults.colors(
-                                checkedColor = AsistenciaVerde,
-                                uncheckedColor = BorderBlue
-                            )
-                        )
-                        Text(
-                            text = "Presentes",
-                            fontFamily = Roboto,
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 15.sp,
-                            color = if (todosPresentes) AsistenciaVerde else TextBlue
-                        )
+            // LEYENDA + ACCIONES RÁPIDAS
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "Toca: A → T → F", modifier = Modifier.weight(1f),
+                    fontFamily = Nunito, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = EduTextoSecundario
+                )
+                if (editable) {
+                    if (!hayAsistenciaPrevia && hayAlgunMarcado) {
+                        AccionTexto("Limpiar", EduCoral) { estadoAsistencia.clear() }
+                        Spacer(modifier = Modifier.width(6.dp))
                     }
-
-                    // Limpiar (solo en un registro nuevo; al editar no se puede dejar alumnos sin estado)
-                    if (!hayAsistenciaPrevia) {
-                        Row(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clickable(enabled = hayAlgunMarcado) { estadoAsistencia.clear() },
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(1.dp)
-                        ) {
-                            Checkbox(
-                                checked = false,
-                                onCheckedChange = { estadoAsistencia.clear() },
-                                enabled = hayAlgunMarcado,
-                                colors = CheckboxDefaults.colors(
-                                    uncheckedColor = if (hayAlgunMarcado) FaltaRojo else BorderLight
-                                )
-                            )
-                            Text(
-                                text = "Limpiar",
-                                fontFamily = Roboto,
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 15.sp,
-                                color = if (hayAlgunMarcado) FaltaRojo else TextSecondary
-                            )
-                        }
-                    } else {
-                        Spacer(modifier = Modifier.weight(1f))
+                    AccionTexto(if (todosPresentes) "Deshacer" else "Todos asistieron", EduTealOscuro) {
+                        alternarTodosPresentes()
                     }
                 }
             }
 
-            // LISTA SCROLLEABLE
+            // LISTA DE ALUMNOS (desplazable)
             if (cargando && listaAlumnos.isEmpty()) {
                 Box(
                     modifier = Modifier.fillMaxWidth().weight(1f),
                     contentAlignment = Alignment.Center
                 ) {
-                    CircularProgressIndicator(color = EduconnectBlue)
+                    CircularProgressIndicator(color = EduTeal)
                 }
             } else {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f)
-                        .verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                        .verticalScroll(rememberScrollState())
                 ) {
-                    listaAlumnos.forEachIndexed { index, alumno ->
-                        val estado = estadoAsistencia[alumno.id] ?: ""
-                        FilaAsistencia(
-                            numero = index + 1,
-                            alumno = alumno,
-                            estado = estado,
-                            editable = editable,
-                            onCambiar = { estadoAsistencia[alumno.id] = siguienteEstadoAsistencia(estado) }
-                        )
+                    TarjetaEdu(relleno = PaddingValues(horizontal = 12.dp, vertical = 4.dp)) {
+                        listaAlumnos.forEachIndexed { index, alumno ->
+                            val estado = estadoAsistencia[alumno.id] ?: ""
+                            FilaAsistencia(
+                                numero = index + 1,
+                                alumno = alumno,
+                                estado = estado,
+                                editable = editable,
+                                ultima = index == listaAlumnos.lastIndex,
+                                onCambiar = { estadoAsistencia[alumno.id] = siguienteEstadoAsistencia(estado) }
+                            )
+                        }
                     }
+                    Spacer(modifier = Modifier.height(8.dp))
                 }
             }
+        }
 
-            Spacer(modifier = Modifier.height(4.dp))
-
-            // PROGRESO
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Progreso de asistencia", fontFamily = Roboto,
-                    fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = TextBlue
-                )
-                Text(
-                    text = "$porcentaje%", fontFamily = Roboto,
-                    fontWeight = FontWeight.Bold, fontSize = 15.sp, color = TextBlue
-                )
-            }
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(13.dp)
-                    .background(BorderLight, RoundedCornerShape(10.dp))
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth(progreso)
-                        .height(13.dp)
-                        .background(EduconnectBlue, RoundedCornerShape(10.dp))
-                )
+        // ── ZONA FIJA INFERIOR: progreso y botones ───────────────────────
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(EduFondo)
+                .padding(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            if (editable && !hayAsistenciaPrevia) {
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        "Marcados", modifier = Modifier.weight(1f), fontFamily = Nunito,
+                        fontWeight = FontWeight.Bold, fontSize = 13.5.sp, color = EduTextoSecundario
+                    )
+                    Text(
+                        "$marcados/$totalAlumnos", fontFamily = Nunito, fontWeight = FontWeight.Black,
+                        fontSize = 13.5.sp, color = EduTexto
+                    )
+                }
+                BarraProgresoEdu(progreso = progreso, color = if (todosListos) EduTeal else EduAmarillo)
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // BOTONES
             when {
                 // 1) Registro nuevo
-                !hayAsistenciaPrevia -> Button(
+                !hayAsistenciaPrevia -> BotonPrincipalEdu(
+                    texto = "Guardar y notificar",
+                    tipo = TipoBotonEdu.GUARDAR,
+                    icono = Icons.Rounded.Save,
+                    habilitado = botonHabilitado && !cargando,
                     onClick = {
                         val sinMarcar = listaAlumnos.count { (estadoAsistencia[it.id] ?: "").isEmpty() }
                         if (sinMarcar > 0) {
@@ -623,93 +482,46 @@ fun RegistroAsistenciaScreen(
                         } else {
                             mostrarDialogConfirmacion = true
                         }
-                    },
-                    modifier = Modifier.fillMaxWidth().height(54.dp),
-                    shape = RoundedCornerShape(28.dp),
-                    enabled = botonHabilitado && !cargando,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (botonHabilitado) AccentOrange else BorderLight
-                    )
-                ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.save_white),
-                        contentDescription = null,
-                        modifier = Modifier.size(30.dp)
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Text(
-                        text = "Guardar y notificar",
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 20.sp,
-                        color = if (botonHabilitado) TextWhite else TextSecondary
-                    )
-                }
+                    }
+                )
 
                 // 2) Editando: Cancelar + Actualizar
                 editando -> Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    OutlinedButton(
+                    BotonSecundarioEdu(
+                        texto = "Cancelar",
                         onClick = { cancelarEdicion() },
-                        modifier = Modifier.weight(1f).height(54.dp),
-                        shape = RoundedCornerShape(28.dp)
-                    ) {
-                        Text(
-                            text = "Cancelar",
-                            fontFamily = Roboto,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 17.sp,
-                            color = EduconnectBlue
-                        )
-                    }
-                    Button(
+                        modifier = Modifier.weight(1f)
+                    )
+                    BotonPrincipalEdu(
+                        texto = "Actualizar",
+                        tipo = TipoBotonEdu.ACTUALIZAR,
+                        icono = Icons.Rounded.Sync,
+                        habilitado = botonHabilitado,
+                        modifier = Modifier.weight(1.4f),
                         onClick = {
                             if (!dentroDelPlazo) {
                                 Toast.makeText(context, "Terminó el plazo de edición ($HORAS_EDICION h)", Toast.LENGTH_SHORT).show()
                             } else {
                                 mostrarDialogConfirmacion = true
                             }
-                        },
-                        enabled = botonHabilitado,
-                        modifier = Modifier.weight(1.5f).height(54.dp),
-                        shape = RoundedCornerShape(28.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (botonHabilitado) AccentOrange else BorderLight
-                        )
-                    ) {
-                        Text(
-                            text = "Actualizar",
-                            fontFamily = Roboto,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 18.sp,
-                            color = if (botonHabilitado) TextWhite else TextSecondary
-                        )
-                    }
-                }
-
-                // 3) Registrada y dentro del plazo: botón Editar asistencia
-                dentroDelPlazo -> Button(
-                    onClick = { editando = true },
-                    modifier = Modifier.fillMaxWidth().height(54.dp),
-                    shape = RoundedCornerShape(28.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = EduconnectBlue)
-                ) {
-                    Text(
-                        text = "Editar asistencia",
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 20.sp,
-                        color = TextWhite
+                        }
                     )
                 }
 
-                // 4) Registrada y fuera del plazo: sin botón (solo lectura)
+                // 3) Registrada y dentro del plazo: Editar asistencia
+                dentroDelPlazo -> BotonPrincipalEdu(
+                    texto = "Editar asistencia",
+                    tipo = TipoBotonEdu.ACTUALIZAR,
+                    icono = Icons.Rounded.Edit,
+                    onClick = { editando = true }
+                )
+
+                // 4) Registrada y fuera del plazo: solo lectura
                 else -> {}
             }
-
-            Spacer(modifier = Modifier.height(8.dp))
         }
 
         BottomNavBarDocente(
@@ -722,151 +534,118 @@ fun RegistroAsistenciaScreen(
     }
 }
 
-// Conteo del popup de confirmación: solo número y texto, sin cuadro
+// Acción de texto pequeña ("Todos asistieron", "Limpiar")
 @Composable
-private fun ConteoResumen(valor: Int, texto: String, color: Color, modifier: Modifier) {
-    Column(
-        modifier = modifier,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(
-            text = "$valor",
-            fontFamily = Roboto,
-            fontWeight = FontWeight.Bold,
-            fontSize = 28.sp,
-            color = color
-        )
-        Text(
-            text = texto,
-            fontFamily = Roboto,
-            fontWeight = FontWeight.SemiBold,
-            fontSize = 13.sp,
-            color = color
-        )
-    }
+private fun AccionTexto(texto: String, color: Color, onClick: () -> Unit) {
+    Text(
+        texto,
+        modifier = Modifier
+            .clip(RoundedCornerShape(10.dp))
+            .background(color.copy(alpha = 0.10f))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+        fontFamily = Nunito, fontWeight = FontWeight.Black, fontSize = 13.sp, color = color
+    )
 }
 
 // Fila "Etiqueta:  valor" del aviso; la etiqueta tiene ancho fijo para que ambas filas queden alineadas
 @Composable
-private fun FilaAviso(etiqueta: String, valor: String, colorValor: Color) {
+private fun FilaAviso(etiqueta: String, valor: String) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(
-            text = etiqueta,
-            fontFamily = Roboto,
-            fontWeight = FontWeight.SemiBold,
-            fontSize = 14.sp,
-            color = TextSecondary,
-            modifier = Modifier.width(112.dp)
+            etiqueta, modifier = Modifier.width(104.dp),
+            fontFamily = Nunito, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = EduTextoSecundario
         )
-        Text(
-            text = valor,
-            fontFamily = Roboto,
-            fontWeight = FontWeight.Bold,
-            fontSize = 14.sp,
-            color = colorValor
-        )
+        Text(valor, fontFamily = Nunito, fontWeight = FontWeight.Black, fontSize = 13.sp, color = EduEtiqueta)
     }
 }
 
-// Fila de un alumno: ícono + nombre completo + un solo botón de estado (A / T / F)
+// Fila de un alumno: iniciales en círculo + nombre + un solo botón de estado (A / T / F)
 @Composable
 private fun FilaAsistencia(
     numero: Int,
     alumno: AlumnoItem,
     estado: String,
     editable: Boolean,
+    ultima: Boolean,
     onCambiar: () -> Unit
 ) {
-    val filaBorder = when (estado) {
-        "A" -> BorderVerdePresente
-        "F" -> BorderRojoFalta
-        "T" -> BorderAmarilloTard
-        else -> BorderBlue
-    }
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(BackgroundWhite, RoundedCornerShape(10.dp))
-            .border(1.5.dp, filaBorder.copy(alpha = if (editable) 1f else 0.6f), RoundedCornerShape(10.dp))
-            .padding(horizontal = 14.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Image(
-            painter = painterResource(
-                id = when (estado) {
-                    "A"  -> R.drawable.user_blue_check
-                    "F"  -> R.drawable.user_blue_cross
-                    "T"  -> R.drawable.user_alert
-                    else -> R.drawable.user_grey
-                }
-            ),
-            contentDescription = when (estado) {
-                "A"  -> "Presente"
-                "F"  -> "Falta"
-                "T"  -> "Tardanza"
-                else -> "Sin marcar"
-            },
-            modifier = Modifier.size(25.dp)
-        )
-
-        Spacer(modifier = Modifier.width(10.dp))
-
-        Text(
-            text = "$numero. ${nombreAlumno(alumno.apellidos, alumno.nombres)}".uppercase(),
-            fontFamily = Roboto,
-            fontWeight = FontWeight.SemiBold,
-            fontSize = 13.sp,
-            color = TextBlue,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f)
-        )
-
-        Spacer(modifier = Modifier.width(8.dp))
-
-        BotonEstadoAsistencia(estado = estado, editable = editable, onClick = onCambiar)
+    val nombre = nombreAlumno(alumno.apellidos, alumno.nombres)
+    val iniciales = nombre.replace(",", " ").split(" ").filter { it.isNotBlank() }.take(2)
+        .mapNotNull { it.firstOrNull()?.uppercaseChar() }.joinToString("")
+    val tono = tonoEstado(estado)
+    Column {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(enabled = editable) { onCambiar() }
+                .padding(vertical = 9.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(38.dp)
+                    .background(tono?.let { coloresDeTono(it).fondo } ?: EduAzulOscuroClaro, CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    iniciales, fontFamily = Nunito, fontWeight = FontWeight.Black, fontSize = 13.sp,
+                    color = tono?.let { coloresDeTono(it).texto } ?: EduTextoSecundario
+                )
+            }
+            Spacer(modifier = Modifier.width(10.dp))
+            Text(
+                text = "$numero. $nombre",
+                fontFamily = Nunito, fontWeight = FontWeight.Bold, fontSize = 14.5.sp, color = EduTexto,
+                maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            BotonEstadoAsistencia(estado = estado, editable = editable, onClick = onCambiar)
+        }
+        if (!ultima) Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(EduFondo))
     }
 }
 
-// Un solo botón que cambia de estado con cada toque. Muestra solo la letra con el color del estado.
-// Bloqueado: mismo color, pero más suave y sin respuesta al toque.
+// Un solo botón que cambia de estado con cada toque. Muestra la letra con el color del estado.
+// Bloqueado: tono suave y sin respuesta al toque.
 @Composable
 private fun BotonEstadoAsistencia(estado: String, editable: Boolean, onClick: () -> Unit) {
-    val color = colorEstadoAsistencia(estado)
+    val tono = tonoEstado(estado)
+    val c = tono?.let { coloresDeTono(it) }
+    val forma = RoundedCornerShape(12.dp)
     val fondo = when {
-        color == null -> BackgroundWhite
-        editable -> color
-        else -> color.copy(alpha = 0.15f)
+        c == null -> Color.White
+        editable -> c.solido
+        else -> c.fondo
+    }
+    val colorLetra = when {
+        c == null -> EduTextoSecundario
+        !editable -> c.texto
+        estado == "T" -> EduTexto          // texto oscuro sobre amarillo
+        else -> Color.White
     }
     Box(
         modifier = Modifier
-            .size(width = 52.dp, height = 38.dp)
-            .clip(RoundedCornerShape(8.dp))
+            .size(width = 52.dp, height = 40.dp)
+            .clip(forma)
             .background(fondo)
-            .border(1.5.dp, color ?: BorderLight, RoundedCornerShape(8.dp))
+            .border(1.5.dp, if (c == null) EduBorde else Color.Transparent, forma)
             .clickable(enabled = editable) { onClick() },
         contentAlignment = Alignment.Center
     ) {
         Text(
             text = if (estado.isEmpty()) "–" else estado,
-            fontFamily = Roboto,
-            fontWeight = FontWeight.Bold,
-            fontSize = 17.sp,
-            color = when {
-                color == null -> TextSecondary
-                editable -> TextWhite
-                else -> color
-            }
+            fontFamily = Nunito, fontWeight = FontWeight.Black, fontSize = 17.sp, color = colorLetra
         )
     }
 }
 
-@Preview(showBackground = true)
+@Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
 fun RegistroAsistenciaPreview() {
     EduConnectAppTheme {
         RegistroAsistenciaScreen(
-            docenteId = "uuid-docente",
+            docenteId = "1",
             gradoId = 1L,
             seccionId = 1L,
             cursoId = 1L,
@@ -880,7 +659,7 @@ fun RegistroAsistenciaPreview() {
             ),
             asistenciaPrevia = mapOf(1L to "A", 2L to "F", 3L to "T"),
             horaRegistro = "08:05:00",
-            fechaHoja = "2026-10-03"
+            fechaHoja = "2026-10-19"
         )
     }
 }

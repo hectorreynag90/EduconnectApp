@@ -1,33 +1,41 @@
-package com.educonnectapp.ui.screens
+package com.educonnectapp.ui.screens.docente.asistencia
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowForward
+import androidx.compose.material.icons.rounded.CalendarToday
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.FactCheck
+import androidx.compose.material.icons.rounded.Groups
+import androidx.compose.material.icons.rounded.History
+import androidx.compose.material.icons.rounded.MenuBook
+import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.Schedule
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -35,28 +43,32 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.educonnectapp.R
-import com.educonnectapp.ui.theme.AccentOrange
-import com.educonnectapp.ui.theme.BackgroundLight
-import com.educonnectapp.ui.theme.BackgroundWhite
-import com.educonnectapp.ui.theme.BorderBlue
-import com.educonnectapp.ui.theme.BorderLight
-import com.educonnectapp.ui.theme.DividerColor
+import com.educonnectapp.ui.components.BotonIconoCabeceraEdu
+import com.educonnectapp.ui.components.BotonPrincipalEdu
+import com.educonnectapp.ui.components.BotonSecundarioEdu
+import com.educonnectapp.ui.components.CabeceraEdu
+import com.educonnectapp.ui.components.ChipEdu
+import com.educonnectapp.ui.components.ColorModulo
+import com.educonnectapp.ui.components.ContadorEdu
+import com.educonnectapp.ui.components.TarjetaEdu
+import com.educonnectapp.ui.components.TipoBotonEdu
+import com.educonnectapp.ui.components.TituloSeccionEdu
+import com.educonnectapp.ui.components.TonoEdu
 import com.educonnectapp.ui.theme.EduConnectAppTheme
-import com.educonnectapp.ui.theme.EduconnectBlue
-import com.educonnectapp.ui.theme.EduconnectBlueMedium
+import com.educonnectapp.ui.theme.EduEtiqueta
+import com.educonnectapp.ui.theme.EduFondo
+import com.educonnectapp.ui.theme.EduTeal
+import com.educonnectapp.ui.theme.EduTealClaro
+import com.educonnectapp.ui.theme.EduTealOscuro
+import com.educonnectapp.ui.theme.EduTexto
+import com.educonnectapp.ui.theme.EduTextoSecundario
+import com.educonnectapp.ui.theme.Nunito
 import com.educonnectapp.ui.theme.Roboto
-import com.educonnectapp.ui.theme.StatusGreen
-import com.educonnectapp.ui.theme.TextBlue
-import com.educonnectapp.ui.theme.TextPrimary
 import com.educonnectapp.ui.theme.TextSecondary
-import com.educonnectapp.ui.theme.TextWhite
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
-
-private val ConfirmRed       = Color(0xFFE53935)
-private val TardanzaAmarillo = Color(0xFFFF4625)
 
 // Alumno cuya asistencia se cambió al actualizar (estados "A", "T" o "F")
 data class CambioAsistenciaItem(
@@ -65,12 +77,24 @@ data class CambioAsistenciaItem(
     val estadoNuevo: String
 )
 
-private fun colorLetraAsistencia(estado: String): Color = when (estado) {
-    "A" -> Color(0xFF26C281)
-    "T" -> Color(0xFFF59E0B)
-    "F" -> ConfirmRed
-    else -> TextSecondary
+private fun tonoLetra(estado: String): TonoEdu = when (estado) {
+    "A" -> TonoEdu.VERDE
+    "T" -> TonoEdu.AMARILLO
+    "F" -> TonoEdu.CORAL
+    else -> TonoEdu.GRIS
 }
+
+private fun textoEstado(estado: String): String = when (estado) {
+    "A" -> "Asistió"
+    "T" -> "Tardanza"
+    "F" -> "Faltó"
+    else -> "–"
+}
+
+// =====================================================================
+// CONFIRMACIÓN DE ASISTENCIA (rediseño 2026)
+// Check turquesa · padres notificados · datos del registro · contadores · cambios (si se actualizó)
+// =====================================================================
 
 @Composable
 fun ConfirmacionAsistenciaScreen(
@@ -95,319 +119,162 @@ fun ConfirmacionAsistenciaScreen(
     // Fecha y hora de Perú (aunque el celular tenga otra zona horaria)
     val zonaPeru = remember { TimeZone.getTimeZone("America/Lima") }
     val fechaDisplay = remember(fecha) {
-        val formato = SimpleDateFormat("EEEE, dd 'de' MMMM yyyy", Locale("es", "PE")).apply { timeZone = zonaPeru }
+        val formato = SimpleDateFormat("EEEE d 'de' MMMM yyyy", Locale("es", "PE")).apply { timeZone = zonaPeru }
         val dia = try {
             SimpleDateFormat("yyyy-MM-dd", Locale.US).apply { timeZone = zonaPeru }.parse(fecha)
         } catch (e: Exception) { null } ?: Date()
         formato.format(dia).replaceFirstChar { it.uppercase() }
     }
-
     val horaDisplay = remember {
-        SimpleDateFormat("hh:mma", Locale.getDefault()).apply { timeZone = zonaPeru }.format(Date())
+        SimpleDateFormat("hh:mm a", Locale("es", "PE")).apply { timeZone = zonaPeru }.format(Date())
     }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(BackgroundLight)
+            .background(EduFondo)
     ) {
-
-        //HEADER AZUL
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(EduconnectBlue)
-                .padding(horizontal = 20.dp, vertical = 16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                Image(
-                    painter = painterResource(id = R.drawable.logo_educonnect),
-                    contentDescription = "Logo",
-                    modifier = Modifier.size(46.dp)
-                )
-                Column {
-                    Text(
-                        text = "EduConnect",
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 22.sp,
-                        color = TextWhite
-                    )
-                    Text(
-                        text = "\"Mensaje Confirmación\"",
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.Normal,
-                        fontSize = 16.sp,
-                        color = TextWhite.copy(alpha = 0.85f)
-                    )
-                }
-            }
-            // BOTÓN X
-            Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .background(EduconnectBlueMedium, CircleShape)
-                    .clickable { onClose() },
-                contentAlignment = Alignment.Center
-            ) {
-                Image(
-                    painter = painterResource(id = R.drawable.close_white),
-                    contentDescription = "Cerrar",
-                    modifier = Modifier.size(26.dp)
+        // CABECERA FIJA con X para cerrar
+        CabeceraEdu(
+            titulo = if (esActualizacion) "Asistencia actualizada" else "Asistencia registrada",
+            subtitulo = "$curso · $grado $seccion",
+            colorFondo = ColorModulo.Asistencia,
+            acciones = {
+                BotonIconoCabeceraEdu(
+                    icono = Icons.Rounded.Close,
+                    descripcion = "Cerrar",
+                    onClick = onClose,
+                    colorCabecera = ColorModulo.Asistencia
                 )
             }
-        }
+        )
 
-        //CONTENIDO
+        // CONTENIDO
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 24.dp, vertical = 28.dp),
+                .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-
-            // ÍCONO CHECK VERDE
+            // CHECK TURQUESA CON HALO
             Box(
-                modifier = Modifier
-                    .size(80.dp),
+                modifier = Modifier.padding(top = 6.dp).size(96.dp).background(EduTealClaro, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
-                Image(
-                    painter = painterResource(id = R.drawable.checkcircle_green),
-                    contentDescription = null,
-                    modifier = Modifier.size(85.dp)
-                )
+                Box(
+                    modifier = Modifier.size(72.dp).background(EduTeal, CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Rounded.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(42.dp))
+                }
             }
-
-            // TÍTULO
             Text(
-                text = if (esActualizacion) "¡Asistencia Actualizada!" else "¡Asistencia Registrada!",
-                fontFamily = Roboto,
-                fontWeight = FontWeight.Bold,
-                fontSize = 21.sp,
-                color = ConfirmGreen,
-                textAlign = TextAlign.Center
+                if (esActualizacion) "¡Asistencia actualizada!" else "¡Asistencia registrada!",
+                fontFamily = Nunito, fontWeight = FontWeight.Black, fontSize = 23.sp,
+                color = EduTealOscuro, textAlign = TextAlign.Center
             )
-
-            // SUBTÍTULO
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Image(
-                    painter = painterResource(id = R.drawable.users_darkgray),
-                    contentDescription = null,
-                    modifier = Modifier.size(22.dp)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ChipEdu(
+                    "$totalNotificados " + (if (totalNotificados == 1) "padre notificado" else "padres notificados"),
+                    TonoEdu.VERDE, icono = Icons.Rounded.Groups
                 )
-                Text(
-                    text = "$totalNotificados " + (if (totalNotificados == 1) "padre notificado" else "padres notificados") + " -",
-                    fontFamily = Roboto,
-                    fontWeight = FontWeight.Medium,
-                    fontSize = 15.sp,
-                    color = TextSecondary
-                )
-                Image(
-                    painter = painterResource(id = R.drawable.clock_darkgray),
-                    contentDescription = null,
-                    modifier = Modifier.size(22.dp)
-                )
-                Text(
-                    text = horaDisplay,
-                    fontFamily = Roboto,
-                    fontWeight = FontWeight.Medium,
-                    fontSize = 14.sp,
-                    color = TextSecondary
-                )
+                ChipEdu(horaDisplay, TonoEdu.GRIS, icono = Icons.Rounded.Schedule)
             }
 
-            //DATOS DE REGISTRO
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(BackgroundWhite, RoundedCornerShape(14.dp))
-                    .border(1.dp, BorderBlue, RoundedCornerShape(14.dp))
-                    .padding(horizontal = 18.dp, vertical = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Text(
-                    text = "DATOS DE REGISTRO",
-                    fontFamily = Roboto,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp,
-                    color = TextBlue,
-                )
+            // DATOS DEL REGISTRO
+            TarjetaEdu(relleno = PaddingValues(16.dp)) {
+                TituloSeccionEdu("Datos del registro")
+                Column(
+                    modifier = Modifier.padding(top = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    FilaDato(Icons.Rounded.CalendarToday, "Fecha", fechaDisplay)
+                    FilaDato(Icons.Rounded.Person, "Docente", docenteNombre)
+                    FilaDato(Icons.Rounded.MenuBook, "Curso", curso)
+                    FilaDato(Icons.Rounded.Groups, "Grado y sección", "$grado $seccion")
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 14.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    ContadorEdu(totalPresentes, "Asistió", TonoEdu.VERDE, Modifier.weight(1f))
+                    ContadorEdu(totalTardanzas, "Tardanza", TonoEdu.AMARILLO, Modifier.weight(1f))
+                    ContadorEdu(totalAusentes, "Faltó", TonoEdu.CORAL, Modifier.weight(1f))
+                }
+            }
 
-                HorizontalDivider(
-                    modifier = Modifier.padding(vertical = 4.dp),
-                    thickness = 4.dp,
-                    color = DividerColor
-                )
-
-                FilaRegistro(
-                    iconRes = R.drawable.agenda_darkgray,
-                    label = "Fecha:",
-                    valor = fechaDisplay,
-                    colorValor = EduconnectBlue
-                )
-                FilaRegistro(
-                    iconRes = R.drawable.teacher_darkgray,
-                    label = "Docente:",
-                    valor = docenteNombre,
-                    colorValor = EduconnectBlue
-                )
-                FilaRegistro(
-                    iconRes = R.drawable.task_darkgray,
-                    label = "Curso:",
-                    valor = curso,
-                    colorValor = EduconnectBlue
-                )
-                FilaRegistro(
-                    iconRes = R.drawable.level_darkgray,
-                    label = "Grado y Sección:",
-                    valor = "$grado - $seccion",
-                    colorValor = TextPrimary
-                )
-
-                HorizontalDivider(
-                    modifier = Modifier.padding(vertical = 4.dp),
-                    thickness = 2.dp,
-                    color = DividerColor
-                )
-
-                FilaRegistro(
-                    iconRes = R.drawable.check_green,
-                    label = "Presentes",
-                    valor = "$totalPresentes",
-                    colorValor = StatusGreen
-                )
-                FilaRegistro(
-                    iconRes = R.drawable.clock_tardanza,
-                    label = "Tardanzas",
-                    valor = "$totalTardanzas",
-                    colorValor = TardanzaAmarillo
-                )
-                FilaRegistro(
-                    iconRes = R.drawable.close_red,
-                    label = "Ausentes",
-                    valor = "$totalAusentes",
-                    colorValor = ConfirmRed
-                )
-                FilaRegistro(
-                    iconRes = R.drawable.users_darkgray,
-                    label = "Notificados",
-                    valor = "$totalNotificados " + if (totalNotificados == 1) "padre" else "padres",
-                    colorValor = TextPrimary
-                )
-
-                // ALUMNOS ACTUALIZADOS (solo en actualización): estado anterior → nuevo
-                if (esActualizacion && cambios.isNotEmpty()) {
-                    HorizontalDivider(
-                        modifier = Modifier.padding(vertical = 4.dp),
-                        thickness = 2.dp,
-                        color = DividerColor
-                    )
-                    Text(
-                        text = "ALUMNOS ACTUALIZADOS",
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp,
-                        color = TextBlue,
-                        letterSpacing = 1.sp
-                    )
-                    cambios.forEach { c ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = c.alumno,
-                                fontFamily = Roboto,
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 14.sp,
-                                color = TextPrimary,
-                                modifier = Modifier.weight(1f)
-                            )
-                            Text(
-                                text = c.estadoAnterior,
-                                fontFamily = Roboto,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 15.sp,
-                                color = colorLetraAsistencia(c.estadoAnterior)
-                            )
-                            Text(
-                                text = "  →  ",
-                                fontFamily = Roboto,
-                                fontSize = 15.sp,
-                                color = TextSecondary
-                            )
-                            Text(
-                                text = c.estadoNuevo,
-                                fontFamily = Roboto,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 15.sp,
-                                color = colorLetraAsistencia(c.estadoNuevo)
-                            )
+            // ALUMNOS ACTUALIZADOS (solo en actualización): estado anterior → nuevo
+            if (esActualizacion && cambios.isNotEmpty()) {
+                TarjetaEdu(relleno = PaddingValues(16.dp)) {
+                    TituloSeccionEdu("Alumnos actualizados")
+                    Column(
+                        modifier = Modifier.padding(top = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        cambios.forEach { c ->
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text(
+                                    c.alumno, fontFamily = Nunito, fontWeight = FontWeight.Black,
+                                    fontSize = 14.5.sp, color = EduTexto
+                                )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    ChipEdu(textoEstado(c.estadoAnterior), tonoLetra(c.estadoAnterior))
+                                    Icon(
+                                        Icons.AutoMirrored.Rounded.ArrowForward, contentDescription = "cambia a",
+                                        tint = EduTextoSecundario, modifier = Modifier.size(16.dp)
+                                    )
+                                    ChipEdu(textoEstado(c.estadoNuevo), tonoLetra(c.estadoNuevo), solido = true)
+                                }
+                            }
                         }
                     }
                 }
             }
+        }
 
-            //BOTÓN NUEVA ASISTENCIA
-            Button(
-                onClick = onNuevaAsistencia,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(45.dp),
-                shape = RoundedCornerShape(28.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = AccentOrange)
-            ) {
-                Image(
-                    painter = painterResource(id = R.drawable.gotoassistance_white),
-                    contentDescription = null,
-                    modifier = Modifier.size(30.dp)
-                )
-                Spacer(modifier = Modifier.width(5.dp))
-                Text(
-                    text = "Nueva Asistencia",
-                    fontFamily = Roboto,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 18.sp,
-                    color = TextWhite
-                )
-            }
-
-            //LINK VER HISTORIAL
-            Row(
-                modifier = Modifier.clickable { onVerHistorial() },
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Image(
-                    painter = painterResource(id = R.drawable.eye_blue),
-                    contentDescription = null,
-                    modifier = Modifier.size(26.dp)
-                )
-                Text(
-                    text = "Ver Historial Asistencias",
-                    fontFamily = Roboto,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 16.sp,
-                    color = TextBlue
-                )
-            }
+        // BOTONES FIJOS ABAJO
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(EduFondo)
+                .navigationBarsPadding()
+                .padding(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            BotonPrincipalEdu(
+                texto = "Tomar otra asistencia",
+                tipo = TipoBotonEdu.AVANZAR,
+                icono = Icons.Rounded.FactCheck,
+                onClick = onNuevaAsistencia
+            )
+            BotonSecundarioEdu(texto = "Ver historial", icono = Icons.Rounded.History, onClick = onVerHistorial)
         }
     }
 }
 
-//FILA DE DATO
+// Fila de dato con ícono: "Fecha        Lunes 19 de octubre 2026"
+@Composable
+private fun FilaDato(icono: ImageVector, etiqueta: String, valor: String) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(icono, contentDescription = null, tint = EduTextoSecundario, modifier = Modifier.size(20.dp))
+        Text(
+            etiqueta, modifier = Modifier.padding(start = 8.dp).width(118.dp),
+            fontFamily = Nunito, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = EduTextoSecundario
+        )
+        Text(
+            valor, modifier = Modifier.weight(1f), textAlign = TextAlign.End,
+            fontFamily = Nunito, fontWeight = FontWeight.Black, fontSize = 14.sp, color = EduEtiqueta
+        )
+    }
+}
+
+// FILA DE DATO (diseño anterior). Se conserva porque la usan otras pantallas de confirmación.
 @Composable
 fun FilaRegistro(
     iconRes: Int,
@@ -449,22 +316,23 @@ fun FilaRegistro(
     }
 }
 
-
-@Preview(showBackground = true)
+@Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
 fun ConfirmacionAsistenciaPreview() {
     EduConnectAppTheme {
         ConfirmacionAsistenciaScreen(
-            docenteNombre = "Eduardo Carranza",
-            curso = "Matemáticas",
-            grado = "2do",
+            docenteNombre = "Hector Alexander Reyna Gomez",
+            curso = "Ciencia y Tecnología",
+            grado = "1er Grado",
             seccion = "A",
-            totalPresentes = 25,
-            totalAusentes = 3,
-            totalTardanzas = 2,
-            onNuevaAsistencia = {},
-            onVerHistorial = {},
-            onClose = {}
+            totalPresentes = 21,
+            totalAusentes = 2,
+            totalTardanzas = 1,
+            esActualizacion = true,
+            cambios = listOf(
+                CambioAsistenciaItem("Sanchez Vega, Pedro", "F", "T"),
+                CambioAsistenciaItem("Mendoza Cruz, Diego", "A", "F")
+            )
         )
     }
 }

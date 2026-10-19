@@ -1,454 +1,182 @@
 package com.educonnectapp.ui.screens.docente.asistencia
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.IconButton
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.material.icons.rounded.History
+import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Notifications
+import androidx.compose.material.icons.rounded.School
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.educonnectapp.R
+import com.educonnectapp.ui.components.BotonIconoCabeceraEdu
+import com.educonnectapp.ui.components.CabeceraEdu
+import com.educonnectapp.ui.components.ChipEdu
+import com.educonnectapp.ui.components.ColorModulo
+import com.educonnectapp.ui.components.IconoCirculoEdu
+import com.educonnectapp.ui.components.TarjetaEdu
+import com.educonnectapp.ui.components.TituloSeccionEdu
+import com.educonnectapp.ui.components.TonoEdu
 import com.educonnectapp.ui.screens.docente.inicio.BottomNavBarDocente
-import com.educonnectapp.ui.theme.AccentOrange
-import com.educonnectapp.ui.theme.TextOrange
-import com.educonnectapp.ui.theme.BackgroundLight
-import com.educonnectapp.ui.theme.BackgroundWhite
-import com.educonnectapp.ui.theme.BorderLight
 import com.educonnectapp.ui.theme.EduConnectAppTheme
-import com.educonnectapp.ui.theme.EduconnectBlue
-import com.educonnectapp.ui.theme.Roboto
-import com.educonnectapp.ui.theme.TextBlue
-import com.educonnectapp.ui.theme.TextSecondary
-import com.educonnectapp.ui.theme.TextWhite
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import com.educonnectapp.ui.theme.EduEtiqueta
+import com.educonnectapp.ui.theme.EduFondo
+import com.educonnectapp.ui.theme.EduTeal
+import com.educonnectapp.ui.theme.EduTealClaro
+import com.educonnectapp.ui.theme.EduTealOscuro
+import com.educonnectapp.ui.theme.EduTexto
+import com.educonnectapp.ui.theme.EduTextoSecundario
+import com.educonnectapp.ui.theme.Nunito
+
+/**
+ * Una clase del docente (grado · sección · curso) en el historial.
+ * ultimoRegistro: texto ya formateado ("Hoy · 08:05 a. m.", "vie 16 oct"),
+ *   "" = la clase aún no tiene registros, null = todavía se está consultando.
+ */
+data class ClaseHistorialItem(
+    val gradoId: Long,
+    val grado: String,
+    val seccionId: Long,
+    val seccion: String,
+    val cursoId: Long,
+    val curso: String,
+    val cantidadAlumnos: Int,
+    val ultimoRegistro: String? = null,
+    val ultimoEsHoy: Boolean = false
+)
+
+// =====================================================================
+// HISTORIAL DE ASISTENCIA · elegir clase (rediseño 2026)
+// Cabecera fija azul oscuro · clases agrupadas por grado · fecha del último registro
+// Un toque en la clase abre su historial (sin elegir grado → sección → curso)
+// =====================================================================
 
 @Composable
 fun SeleccionarSeccionHistorialScreen(
-    docenteId: String,
-    listaGrados: List<GradoItem> = emptyList(),
-    listaSecciones: List<SeccionItem> = emptyList(),
-    listaCursos: List<CursoItem> = emptyList(),
-    cantidadAlumnos: Int = 0,
-    onGradoSeleccionado: (GradoItem) -> Unit = {},
-    onSeccionSeleccionada: (SeccionItem) -> Unit = {},
+    clases: List<ClaseHistorialItem> = emptyList(),
+    cargandoClases: Boolean = false,
+    onElegirClase: (ClaseHistorialItem) -> Unit = {},
     onBack: () -> Unit = {},
     onHomeDocente: () -> Unit = {},
     onAlumnos: () -> Unit = {},
     onAvisos: () -> Unit = {},
     onPerfilDocente: () -> Unit = {},
-    onNotificaciones: () -> Unit = {},
-    onContinuar: (gradoId: Long, seccionId: Long, cursoId: Long, grado: String, seccion: String, curso: String) -> Unit = { _, _, _, _, _, _ -> }
+    onNotificaciones: () -> Unit = {}
 ) {
-    val fechaActual = remember {
-        SimpleDateFormat("EEEE, dd 'de' MMMM yyyy", Locale("es", "PE"))
-            .format(Date()).replaceFirstChar { it.uppercase() }
-    }
-
-    var gradoSeleccionado by remember { mutableStateOf<GradoItem?>(null) }
-    var seccionSeleccionada by remember { mutableStateOf<SeccionItem?>(null) }
-    var cursoSeleccionado by remember { mutableStateOf<CursoItem?>(null) }
-    var mostrarDialogSinAlumnos by remember { mutableStateOf(false) }
-
-    // El botón se activa solo cuando los tres están seleccionados
-    val habilitado = gradoSeleccionado != null && seccionSeleccionada != null && cursoSeleccionado != null
+    // Agrupadas por grado (en el orden de los grados) y, dentro, por curso y sección
+    val porGrado = clases
+        .sortedWith(compareBy({ it.gradoId }, { it.curso }, { it.seccion }))
+        .groupBy { it.grado }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(BackgroundLight)
+            .background(EduFondo)
     ) {
-        // HEADER AZUL
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(EduconnectBlue)
-                .padding(horizontal = 20.dp, vertical = 20.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Row(
-                modifier = Modifier.weight(1f).padding(end = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Column {
-                    IconButton(
-                        onClick = onBack,
-                        modifier = Modifier.size(32.dp).offset(x = (-5).dp)
-                    ) {
-                        Image(
-                            painter = painterResource(id = R.drawable.arrowleft_white),
-                            contentDescription = "Back",
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                }
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "Historial de Asistencia",
-                        fontFamily = Roboto, fontWeight = FontWeight.Bold,
-                        fontSize = 22.sp, color = TextWhite
-                    )
-                    Text(
-                        text = "Elige grado, sección y curso",
-                        fontFamily = Roboto, fontWeight = FontWeight.Normal,
-                        fontSize = 16.sp, color = TextWhite
-                    )
-                    Text(
-                        text = fechaActual,
-                        fontFamily = Roboto, fontWeight = FontWeight.Normal,
-                        fontSize = 14.sp, color = TextWhite
-                    )
-                }
+        // CABECERA FIJA
+        CabeceraEdu(
+            titulo = "Historial",
+            subtitulo = "Elige la clase para ver sus registros",
+            onVolver = onBack,
+            colorFondo = ColorModulo.Asistencia,
+            acciones = {
+                BotonIconoCabeceraEdu(
+                    icono = Icons.Rounded.Notifications,
+                    descripcion = "Notificaciones",
+                    onClick = onNotificaciones,
+                    colorCabecera = ColorModulo.Asistencia
+                )
             }
-            Column {
-                IconButton(onClick = onNotificaciones) {
-                    Image(
-                        painter = painterResource(id = R.drawable.notification_white),
-                        contentDescription = "Notificaciones",
-                        modifier = Modifier.size(35.dp)
-                    )
-                }
-            }
-        }
+        )
 
-        Spacer(modifier = Modifier.height(8.dp))
-
-        // ZONA SCROLLEABLE
+        // CONTENIDO DESPLAZABLE
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            // SELECTOR GRADO
-            Text(
-                text = "SELECCIONE GRADO",
-                fontFamily = Roboto, fontWeight = FontWeight.Bold,
-                fontSize = 15.sp, color = TextBlue
-            )
-            if (listaGrados.isEmpty()) {
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.ic_no_records),
-                        contentDescription = null,
-                        modifier = Modifier.size(36.dp)
-                    )
-                    Text(
-                        text = "No se tiene grado registrado",
-                        fontFamily = Roboto, fontSize = 13.sp,
-                        color = Color(0xFFB0BEC5)
-                    )
-                }
-            } else {
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    listaGrados.forEach { grado ->
-                        val seleccionado = grado.id == gradoSeleccionado?.id
-                        Box(
-                            modifier = Modifier
-                                .background(
-                                    if (seleccionado) EduconnectBlue else BackgroundWhite,
-                                    RoundedCornerShape(30.dp)
-                                )
-                                .border(
-                                    1.5.dp,
-                                    if (seleccionado) EduconnectBlue else BorderLight,
-                                    RoundedCornerShape(30.dp)
-                                )
-                                .clickable {
-                                    gradoSeleccionado = grado
-                                    seccionSeleccionada = null
-                                    cursoSeleccionado = null
-                                    onGradoSeleccionado(grado)
-                                }
-                                .padding(horizontal = 16.dp, vertical = 4.dp)
-                        ) {
-                            Text(
-                                text = grado.nombre,
-                                fontFamily = Roboto,
-                                fontWeight = if (seleccionado) FontWeight.Bold else FontWeight.Normal,
-                                fontSize = 15.sp,
-                                color = if (seleccionado) TextWhite else TextSecondary
-                            )
-                        }
-                    }
-                }
-            }
-
-            // SELECTOR SECCIÓN
-            Text(
-                text = "SELECCIONE SECCIÓN",
-                fontFamily = Roboto, fontWeight = FontWeight.Bold,
-                fontSize = 15.sp, color = TextBlue
-            )
-            if (gradoSeleccionado != null && listaSecciones.isEmpty()) {
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.ic_no_records),
-                        contentDescription = null,
-                        modifier = Modifier.size(36.dp)
-                    )
-                    Text(
-                        text = "No se tiene sección registrada",
-                        fontFamily = Roboto, fontSize = 13.sp,
-                        color = Color(0xFFB0BEC5)
-                    )
-                }
-            } else {
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    listaSecciones.forEach { seccion ->
-                        val seleccionada = seccion.id == seccionSeleccionada?.id
-                        Box(
-                            modifier = Modifier
-                                .size(38.dp)
-                                .background(
-                                    if (seleccionada) EduconnectBlue else BackgroundWhite,
-                                    RoundedCornerShape(22.dp)
-                                )
-                                .border(
-                                    1.5.dp,
-                                    if (seleccionada) EduconnectBlue else BorderLight,
-                                    RoundedCornerShape(22.dp)
-                                )
-                                .clickable {
-                                    seccionSeleccionada = seccion
-                                    cursoSeleccionado = null
-                                    onSeccionSeleccionada(seccion)
-                                },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = seccion.nombre,
-                                fontFamily = Roboto,
-                                fontWeight = if (seleccionada) FontWeight.Bold else FontWeight.Normal,
-                                fontSize = 18.sp,
-                                color = if (seleccionada) TextWhite else TextSecondary
-                            )
-                        }
-                    }
-                }
-            }
-
-            // SELECTOR CURSO
-            Text(
-                text = "SELECCIONE CURSO",
-                fontFamily = Roboto, fontWeight = FontWeight.Bold,
-                fontSize = 15.sp, color = TextBlue
-            )
-            if (seccionSeleccionada != null && listaCursos.isEmpty()) {
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.ic_no_records),
-                        contentDescription = null,
-                        modifier = Modifier.size(36.dp)
-                    )
-                    Text(
-                        text = "No se tiene curso registrado",
-                        fontFamily = Roboto, fontSize = 13.sp,
-                        color = Color(0xFFB0BEC5)
-                    )
-                }
-            } else {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listaCursos.forEach { curso ->
-                        val seleccionado = curso.id == cursoSeleccionado?.id
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(
-                                    if (seleccionado) EduconnectBlue.copy(alpha = 0.08f) else BackgroundWhite,
-                                    RoundedCornerShape(10.dp)
-                                )
-                                .border(
-                                    if (seleccionado) 1.5.dp else 1.dp,
-                                    if (seleccionado) EduconnectBlue else BorderLight,
-                                    RoundedCornerShape(10.dp)
-                                )
-                                .clickable { cursoSeleccionado = curso }
-                                .padding(horizontal = 16.dp, vertical = 14.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = curso.nombre,
-                                fontFamily = Roboto,
-                                fontWeight = if (seleccionado) FontWeight.Bold else FontWeight.Normal,
-                                fontSize = 18.sp,
-                                color = if (seleccionado) EduconnectBlue else TextSecondary
-                            )
-                            if (seleccionado) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(24.dp)
-                                        .background(EduconnectBlue, RoundedCornerShape(12.dp)),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = "✓", fontSize = 16.sp,
-                                        color = TextWhite, fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // ZONA FIJA INFERIOR
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(BackgroundLight)
-                .padding(horizontal = 20.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(EduconnectBlue.copy(alpha = 0.08f), RoundedCornerShape(12.dp))
-                    .border(1.5.dp, AccentOrange, RoundedCornerShape(12.dp))
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Image(
-                    painter = painterResource(id = R.drawable.students_blue),
-                    contentDescription = null,
-                    modifier = Modifier.size(36.dp)
-                )
-                Column {
-                    Text(
-                        text = "${gradoSeleccionado?.nombre?.replace(" Grado", "") ?: ""} Sec. ${seccionSeleccionada?.nombre ?: ""} - ${cursoSeleccionado?.nombre ?: ""}",
-                        fontFamily = Roboto, fontWeight = FontWeight.Bold,
-                        fontSize = 18.sp, color = AccentOrange
-                    )
-                    Text(
-                        text = "$cantidadAlumnos Alumnos",
-                        fontFamily = Roboto, fontWeight = FontWeight.Bold,
-                        fontSize = 17.sp, color = TextBlue
-                    )
-                }
-            }
-
-            if (mostrarDialogSinAlumnos) {
-                AlertDialog(
-                    onDismissRequest = { mostrarDialogSinAlumnos = false },
-                    icon = {
-                        Image(
-                            painter = painterResource(id = R.drawable.students_blue),
-                            contentDescription = null,
-                            modifier = Modifier.size(40.dp)
-                        )
-                    },
-                    title = {
+            when {
+                cargandoClases && clases.isEmpty() -> TarjetaEdu {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        CircularProgressIndicator(color = EduTeal, strokeWidth = 3.dp, modifier = Modifier.size(24.dp))
                         Text(
-                            text = "Sin alumnos registrados",
-                            fontFamily = Roboto, fontWeight = FontWeight.Bold,
-                            fontSize = 18.sp, color = TextOrange
+                            "Cargando tus clases...", fontFamily = Nunito, fontWeight = FontWeight.Bold,
+                            fontSize = 15.sp, color = EduTextoSecundario
                         )
-                    },
-                    text = {
+                    }
+                }
+                clases.isEmpty() -> TarjetaEdu {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        IconoCirculoEdu(Icons.Rounded.School, TonoEdu.GRIS)
                         Text(
-                            text = "No se encontraron alumnos registrados para el grado, sección y curso seleccionado.",
-                            fontFamily = Roboto, fontWeight = FontWeight.Normal,
-                            fontSize = 15.sp, color = TextSecondary
+                            "Aún no tienes clases asignadas. Agrégalas desde tu perfil.",
+                            modifier = Modifier.weight(1f),
+                            fontFamily = Nunito, fontWeight = FontWeight.SemiBold, fontSize = 14.sp,
+                            color = EduTextoSecundario
                         )
-                    },
-                    confirmButton = {
-                        TextButton(onClick = { mostrarDialogSinAlumnos = false }) {
-                            Text(
-                                text = "Entendido",
-                                fontFamily = Roboto, fontWeight = FontWeight.Bold,
-                                color = EduconnectBlue
-                            )
+                    }
+                }
+                else -> {
+                    porGrado.entries.forEachIndexed { i, (grado, lista) ->
+                        if (i > 0) Spacer(modifier = Modifier.height(4.dp))
+                        TituloSeccionEdu(grado) {
+                            ChipEdu(if (lista.size == 1) "1 clase" else "${lista.size} clases", TonoEdu.AZUL)
                         }
-                    },
-                    containerColor = Color.White,
-                    shape = RoundedCornerShape(16.dp)
-                )
-            }
-
-            // BOTÓN — deshabilitado hasta que se seleccionen los tres
-            Button(
-                onClick = {
-                    val g = gradoSeleccionado
-                    val s = seccionSeleccionada
-                    val c = cursoSeleccionado
-                    if (g != null && s != null && c != null) {
-                        if (cantidadAlumnos == 0) {
-                            mostrarDialogSinAlumnos = true
-                        } else {
-                            onContinuar(g.id, s.id, c.id, g.nombre, s.nombre, c.nombre)
+                        lista.forEach { clase ->
+                            TarjetaClaseHistorial(clase = clase, onClick = { onElegirClase(clase) })
                         }
                     }
-                },
-                enabled = habilitado,
-                modifier = Modifier.fillMaxWidth().height(52.dp),
-                shape = RoundedCornerShape(28.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = EduconnectBlue,
-                    disabledContainerColor = Color(0xFFB0BEC5)  // gris cuando deshabilitado
-                )
-            ) {
-                Image(
-                    painter = painterResource(id = R.drawable.eye_white),
-                    contentDescription = null,
-                    modifier = Modifier.size(26.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "Ver Asistencias",
-                    fontFamily = Roboto, fontWeight = FontWeight.Bold,
-                    fontSize = 22.sp, color = TextWhite
-                )
+
+                    // AVISO
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 4.dp)
+                            .background(EduTealClaro, RoundedCornerShape(16.dp))
+                            .padding(horizontal = 14.dp, vertical = 12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Icon(Icons.Rounded.Info, contentDescription = null, tint = EduTealOscuro, modifier = Modifier.size(22.dp))
+                        Text(
+                            "Toca una clase para ver todos los días en que tomaste asistencia, " +
+                                    "filtrar por fecha y corregir un registro.",
+                            modifier = Modifier.weight(1f),
+                            fontFamily = Nunito, fontWeight = FontWeight.SemiBold, fontSize = 13.5.sp,
+                            lineHeight = 18.sp, color = EduEtiqueta
+                        )
+                    }
+                }
             }
         }
 
@@ -457,30 +185,59 @@ fun SeleccionarSeccionHistorialScreen(
             onAlumnos = onAlumnos,
             onAvisos = onAvisos,
             onPerfil = onPerfilDocente,
-            itemActivo = "Inicio"
+            itemActivo = "Alumnos"
         )
     }
 }
 
-@Preview(showBackground = true)
+// Tarjeta de una clase: ícono de historial, curso, sección · alumnos y chip con el último registro
+@Composable
+private fun TarjetaClaseHistorial(clase: ClaseHistorialItem, onClick: () -> Unit) {
+    TarjetaEdu(onClick = onClick, relleno = PaddingValues(horizontal = 14.dp, vertical = 13.dp)) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            IconoCirculoEdu(Icons.Rounded.History, TonoEdu.AZUL, tamano = 46.dp)
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                Text(
+                    clase.curso, fontFamily = Nunito, fontWeight = FontWeight.Black, fontSize = 16.sp,
+                    color = EduTexto, maxLines = 1, overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    "Sección ${clase.seccion} · ${clase.cantidadAlumnos} alumnos",
+                    fontFamily = Nunito, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = EduTextoSecundario
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                when {
+                    clase.ultimoRegistro == null -> ChipEdu("Cargando...", TonoEdu.GRIS)
+                    clase.ultimoRegistro.isEmpty() -> ChipEdu("Aún sin registros", TonoEdu.GRIS)
+                    clase.ultimoEsHoy -> ChipEdu("Último: ${clase.ultimoRegistro}", TonoEdu.VERDE)
+                    else -> ChipEdu("Último: ${clase.ultimoRegistro}", TonoEdu.AZUL)
+                }
+            }
+            Icon(
+                Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = "Ver historial",
+                tint = EduTextoSecundario, modifier = Modifier.size(26.dp)
+            )
+        }
+    }
+}
+
+@Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
 fun SeleccionarSeccionHistorialPreview() {
     EduConnectAppTheme {
         SeleccionarSeccionHistorialScreen(
-            docenteId = "uuid-docente",
-            listaGrados = listOf(
-                GradoItem(1, "1er Grado"),
-                GradoItem(2, "2do Grado")
-            ),
-            listaSecciones = listOf(
-                SeccionItem(1, "A"),
-                SeccionItem(2, "B")
-            ),
-            listaCursos = listOf(
-                CursoItem(1, "Matemáticas"),
-                CursoItem(2, "Comunicación")
-            ),
-            cantidadAlumnos = 10,
+            clases = listOf(
+                ClaseHistorialItem(1, "1er Grado", 1, "A", 1, "Ciencia y Tecnología", 5, "Hoy · 08:05 a. m.", true),
+                ClaseHistorialItem(2, "2do Grado", 7, "A", 1, "Ciencia y Tecnología", 5, "vie 16 oct"),
+                ClaseHistorialItem(2, "2do Grado", 8, "B", 2, "Matemáticas", 24, "jue 15 oct"),
+                ClaseHistorialItem(3, "3er Grado", 9, "A", 3, "Religión", 18, "")
+            )
         )
     }
 }
