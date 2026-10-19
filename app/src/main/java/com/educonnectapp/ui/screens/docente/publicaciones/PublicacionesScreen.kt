@@ -1,30 +1,86 @@
-package com.educonnectapp.ui.screens
+package com.educonnectapp.ui.screens.docente.publicaciones
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.IconButton
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.Assignment
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.material.icons.rounded.Notifications
+import androidx.compose.material.icons.rounded.School
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.educonnectapp.R
+import com.educonnectapp.ui.components.BotonCrearEdu
+import com.educonnectapp.ui.components.BotonIconoCabeceraEdu
+import com.educonnectapp.ui.components.CabeceraEdu
+import com.educonnectapp.ui.components.ChipCabeceraEdu
+import com.educonnectapp.ui.components.ChipEdu
+import com.educonnectapp.ui.components.ColorModulo
+import com.educonnectapp.ui.components.ContadorEdu
+import com.educonnectapp.ui.components.IconoCirculoEdu
+import com.educonnectapp.ui.components.TarjetaEdu
+import com.educonnectapp.ui.components.TituloSeccionEdu
+import com.educonnectapp.ui.components.TonoEdu
 import com.educonnectapp.ui.screens.docente.inicio.BottomNavBarDocente
-import com.educonnectapp.ui.theme.*
-import java.text.SimpleDateFormat
-import java.util.*
+import com.educonnectapp.ui.theme.EduConnectAppTheme
+import com.educonnectapp.ui.theme.EduFondo
+import com.educonnectapp.ui.theme.EduTeal
+import com.educonnectapp.ui.theme.EduTexto
+import com.educonnectapp.ui.theme.EduTextoSecundario
+import com.educonnectapp.ui.theme.Nunito
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
+/**
+ * Una clase del docente (grado · sección · curso) en Publicaciones.
+ * proximaFecha: "yyyy-MM-dd" de la próxima entrega/evaluación vigente ("" si no hay).
+ */
+data class ClasePublicacionItem(
+    val gradoId: Long,
+    val grado: String,
+    val seccionId: Long,
+    val seccion: String,
+    val cursoId: Long,
+    val curso: String,
+    val totalAlumnos: Int,
+    val tareas: Int = 0,
+    val evaluaciones: Int = 0,
+    val proximaFecha: String = ""
+)
+
+// =====================================================================
+// PUBLICACIONES · inicio del módulo (rediseño 2026)
+// Cabecera fija amarilla · resumen · mis clases por grado · "+ Crear" (Tarea / Aviso de evaluación)
+// =====================================================================
+
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun PublicacionesScreen(
     totalTareas: Int = 0,
@@ -39,288 +95,122 @@ fun PublicacionesScreen(
     onNotificaciones: () -> Unit = {},
     onNuevaTarea: () -> Unit = {},
     onNuevaEvaluacion: () -> Unit = {},
-    onHistorial: () -> Unit = {}
+    onHistorial: () -> Unit = {},          // ya no se usa (se conserva por compatibilidad)
+    // ----- Rediseño 2026 -----
+    clases: List<ClasePublicacionItem> = emptyList(),
+    cargandoClases: Boolean = false,
+    onElegirClase: (ClasePublicacionItem) -> Unit = {}
 ) {
-    val fechaActual = remember {
-        SimpleDateFormat("EEEE, dd 'de' MMMM yyyy", Locale("es", "PE"))
-            .format(Date()).replaceFirstChar { it.uppercase() }
+    var mostrarCrear by remember { mutableStateOf(false) }
+    val fechaHoy = remember {
+        "Hoy · " + LocalDate.now().format(DateTimeFormatter.ofPattern("EEEE d 'de' MMMM", Locale("es", "PE")))
+    }
+    val porGrado = clases
+        .sortedWith(compareBy({ it.gradoId }, { it.curso }, { it.seccion }))
+        .groupBy { it.grado }
+
+    if (mostrarCrear) {
+        HojaCrearPublicacion(
+            onTarea = onNuevaTarea,
+            onEvaluacion = onNuevaEvaluacion,
+            onCerrar = { mostrarCrear = false }
+        )
     }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(BackgroundLight)
+            .background(EduFondo)
     ) {
-        // HEADER
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(EduconnectBlue)
-                .padding(horizontal = 20.dp, vertical = 20.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.weight(1f)
-            ) {
-                IconButton(
-                    onClick = onBack,
-                    modifier = Modifier.size(35.dp).offset(x = (-5).dp)
-                ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.arrowleft_white),
-                        contentDescription = "Volver",
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-                Column {
-                    Text(
-                        text = "Publicaciones",
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 22.sp,
-                        color = TextWhite
-                    )
-                    Text(
-                        text = "Tareas y evaluaciones",
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp,
-                        color = TextWhite.copy(alpha = 0.8f)
-                    )
-                    Text(
-                        text = fechaActual,
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.Normal,
-                        fontSize = 15.sp,
-                        color = TextWhite.copy(alpha = 0.7f)
-                    )
-                }
-            }
-            IconButton(onClick = onNotificaciones) {
-                Image(
-                    painter = painterResource(id = R.drawable.notification_white),
-                    contentDescription = "Notificaciones",
-                    modifier = Modifier.size(35.dp)
+        // CABECERA FIJA
+        CabeceraEdu(
+            titulo = "Publicaciones",
+            subtitulo = "Tareas y evaluaciones de tus clases",
+            onVolver = onBack,
+            colorFondo = ColorModulo.Publicaciones,
+            acciones = {
+                BotonIconoCabeceraEdu(
+                    icono = Icons.Rounded.Notifications,
+                    descripcion = "Notificaciones",
+                    onClick = onNotificaciones,
+                    colorCabecera = ColorModulo.Publicaciones
+                )
+            },
+            contenidoInferior = {
+                ChipCabeceraEdu(
+                    fechaHoy, modifier = Modifier.padding(top = 14.dp),
+                    colorCabecera = ColorModulo.Publicaciones
                 )
             }
-        }
+        )
 
-        Spacer(modifier = Modifier.height(10.dp))
-
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Text(
-                text = "¿QUÉ DESEAS HACER AHORA?",
-                fontFamily = Roboto,
-                fontWeight = FontWeight.Bold,
-                fontSize = 18.sp,
-                color = TextBlue
-            )
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            // TARJETA PUBLICAR TAREA
-            Row(
+        Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .background(BackgroundWhite, RoundedCornerShape(20.dp))
-                    .border(1.5.dp, BorderBlue, RoundedCornerShape(20.dp))
-                    .clickable { onNuevaTarea() }
-                    .padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 90.dp),   // espacio para "+ Crear"
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(82.dp)
-                        .background(EduconnectBlueMedium, RoundedCornerShape(18.dp)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.task_white),
-                        contentDescription = null,
-                        modifier = Modifier.size(62.dp)
-                    )
+                // RESUMEN
+                TituloSeccionEdu("Resumen")
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ContadorEdu(totalTareas, "Tareas", TonoEdu.AZUL, Modifier.weight(1f))
+                    ContadorEdu(totalEvaluaciones, "Evaluaciones", TonoEdu.AMARILLO, Modifier.weight(1f))
+                    ContadorEdu(venceHoy, "Vence hoy", TonoEdu.CORAL, Modifier.weight(1f))
                 }
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "Publicar Tarea",
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 20.sp,
-                        color = TextBlue
-                    )
-                    Text(
-                        text = "Nueva tarea a los alumnos",
-                        fontFamily = Roboto,
-                        fontSize = 17.sp,
-                        color = TextPrimary
-                    )
-                }
-                Image(
-                    painter = painterResource(id = R.drawable.next_gray),
-                    contentDescription = null,
-                    modifier = Modifier.size(30.dp)
-                )
-            }
 
-            // TARJETA PUBLICAR EVALUACIÓN (aviso)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(BackgroundWhite, RoundedCornerShape(20.dp))
-                    .border(1.5.dp, BorderBlue, RoundedCornerShape(20.dp))
-                    .clickable { onNuevaEvaluacion() }
-                    .padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(82.dp)
-                        .background(EduconnectBlue, RoundedCornerShape(18.dp)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.exam_white),
-                        contentDescription = null,
-                        modifier = Modifier.size(62.dp)
-                    )
-                }
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "Publicar Evaluación",
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 20.sp,
-                        color = TextBlue
-                    )
-                    Text(
-                        text = "Aviso de fecha y temario",
-                        fontFamily = Roboto,
-                        fontSize = 17.sp,
-                        color = TextPrimary
-                    )
-                }
-                Image(
-                    painter = painterResource(id = R.drawable.next_gray),
-                    contentDescription = null,
-                    modifier = Modifier.size(30.dp)
-                )
-            }
-
-            // TARJETA HISTORIAL
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(BackgroundWhite, RoundedCornerShape(20.dp))
-                    .border(1.5.dp, StatusGreen, RoundedCornerShape(20.dp))
-                    .clickable { onHistorial() }
-                    .padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(82.dp)
-                        .background(StatusGreen, RoundedCornerShape(18.dp)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.clock_white),
-                        contentDescription = null,
-                        modifier = Modifier.size(62.dp)
-                    )
-                }
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "Historial Publicaciones",
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 20.sp,
-                        color = TextBlue
-                    )
-                    Text(
-                        text = "Ver publicaciones",
-                        fontFamily = Roboto,
-                        fontSize = 17.sp,
-                        color = TextPrimary
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Box(
-                        modifier = Modifier
-                            .background(StatusGreen.copy(alpha = 0.12f), RoundedCornerShape(20.dp))
-                            .padding(horizontal = 10.dp, vertical = 3.dp)
-                    ) {
-                        Text(
-                            text = "${totalTareas + totalEvaluaciones} publicaciones",
-                            fontFamily = Roboto,
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 15.sp,
-                            color = StatusGreen
-                        )
+                // MIS CLASES
+                Spacer(modifier = Modifier.height(4.dp))
+                TituloSeccionEdu("Mis clases")
+                when {
+                    cargandoClases && clases.isEmpty() -> TarjetaEdu {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            CircularProgressIndicator(color = EduTeal, strokeWidth = 3.dp, modifier = Modifier.size(24.dp))
+                            Text(
+                                "Cargando tus clases...", fontFamily = Nunito, fontWeight = FontWeight.Bold,
+                                fontSize = 15.sp, color = EduTextoSecundario
+                            )
+                        }
                     }
-                }
-                Image(
-                    painter = painterResource(id = R.drawable.next_gray),
-                    contentDescription = null,
-                    modifier = Modifier.size(30.dp)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(5.dp))
-
-            // RESUMEN
-            Text(
-                text = "RESUMEN",
-                fontFamily = Roboto,
-                fontWeight = FontWeight.Bold,
-                fontSize = 16.sp,
-                color = TextBlue
-            )
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                listOf(
-                    Triple("$totalTareas", "Tareas", EduconnectBlue),
-                    Triple("$totalEvaluaciones", "Evaluaciones", EduconnectBlue),
-                    Triple("$venceHoy", "Vence hoy", StatusErrorRed)
-                ).forEach { (valor, etiqueta, color) ->
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .background(BackgroundWhite, RoundedCornerShape(14.dp))
-                            .border(1.dp, BorderBlue, RoundedCornerShape(14.dp))
-                            .padding(vertical = 16.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
+                    clases.isEmpty() -> TarjetaEdu {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            IconoCirculoEdu(Icons.Rounded.School, TonoEdu.GRIS)
+                            Text(
+                                "Aún no tienes clases asignadas. Agrégalas desde tu perfil.",
+                                modifier = Modifier.weight(1f),
+                                fontFamily = Nunito, fontWeight = FontWeight.SemiBold, fontSize = 14.sp,
+                                color = EduTextoSecundario
+                            )
+                        }
+                    }
+                    else -> porGrado.forEach { (grado, lista) ->
                         Text(
-                            text = valor,
-                            fontFamily = Roboto,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 28.sp,
-                            color = color
+                            grado.uppercase(),
+                            modifier = Modifier.padding(start = 2.dp, top = 2.dp),
+                            fontFamily = Nunito, fontWeight = FontWeight.Black, fontSize = 12.5.sp,
+                            letterSpacing = 0.6.sp, color = EduTextoSecundario.copy(alpha = 0.8f)
                         )
-                        Text(
-                            text = etiqueta,
-                            fontFamily = Roboto,
-                            fontSize = 16.sp,
-                            color = TextPrimary
-                        )
+                        lista.forEach { clase ->
+                            TarjetaClasePublicacion(clase = clase, onClick = { onElegirClase(clase) })
+                        }
                     }
                 }
             }
+
+            // BOTÓN FLOTANTE "+ Crear"
+            BotonCrearEdu(
+                onClick = { mostrarCrear = true },
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 16.dp, bottom = 16.dp)
+            )
         }
 
         BottomNavBarDocente(
@@ -333,7 +223,61 @@ fun PublicacionesScreen(
     }
 }
 
-@Preview(showBackground = true)
+// Tarjeta de una clase: curso, sección · alumnos, cantidad de tareas/evaluaciones y próxima fecha
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun TarjetaClasePublicacion(clase: ClasePublicacionItem, onClick: () -> Unit) {
+    val hoy = hoyPub()
+    TarjetaEdu(onClick = onClick, relleno = PaddingValues(horizontal = 14.dp, vertical = 13.dp)) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            IconoCirculoEdu(Icons.AutoMirrored.Rounded.Assignment, TonoEdu.AMARILLO, tamano = 46.dp)
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                Text(
+                    clase.curso, fontFamily = Nunito, fontWeight = FontWeight.Black, fontSize = 16.sp,
+                    color = EduTexto, maxLines = 1, overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    "Sección ${clase.seccion} · ${clase.totalAlumnos} alumnos",
+                    fontFamily = Nunito, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = EduTextoSecundario
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    if (clase.tareas == 0 && clase.evaluaciones == 0) {
+                        ChipEdu("Sin publicaciones", TonoEdu.GRIS)
+                    }
+                    if (clase.tareas > 0) {
+                        ChipEdu(if (clase.tareas == 1) "1 tarea" else "${clase.tareas} tareas", TonoEdu.AZUL)
+                    }
+                    if (clase.evaluaciones > 0) {
+                        ChipEdu(
+                            if (clase.evaluaciones == 1) "1 evaluación" else "${clase.evaluaciones} evaluaciones",
+                            TonoEdu.AMARILLO
+                        )
+                    }
+                    if (clase.proximaFecha.isNotBlank()) {
+                        if (clase.proximaFecha == hoy) ChipEdu("Vence hoy", TonoEdu.CORAL)
+                        else ChipEdu("Próxima: ${fechaCortaPub(clase.proximaFecha)}", TonoEdu.VERDE)
+                    }
+                }
+            }
+            Icon(
+                Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = "Ver publicaciones",
+                tint = EduTextoSecundario, modifier = Modifier.size(26.dp)
+            )
+        }
+    }
+}
+
+@Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
 fun PublicacionesPreview() {
     EduConnectAppTheme {
@@ -341,7 +285,11 @@ fun PublicacionesPreview() {
             totalTareas = 3,
             totalEvaluaciones = 2,
             venceHoy = 1,
-            totalPublicacionesHoy = 2,
+            clases = listOf(
+                ClasePublicacionItem(1, "1er Grado", 1, "A", 1, "Ciencia y Tecnología", 5, 2, 1, hoyPub()),
+                ClasePublicacionItem(2, "2do Grado", 7, "A", 1, "Ciencia y Tecnología", 5, 1, 0, "2026-10-23"),
+                ClasePublicacionItem(2, "2do Grado", 8, "B", 2, "Matemáticas", 24)
+            )
         )
     }
 }

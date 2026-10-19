@@ -1,45 +1,89 @@
 package com.educonnectapp.ui.screens.docente.publicaciones
 
-import android.app.DatePickerDialog
 import android.net.Uri
 import android.provider.OpenableColumns
-import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.automirrored.rounded.Send
+import androidx.compose.material.icons.rounded.AttachFile
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Description
+import androidx.compose.material.icons.rounded.Image
+import androidx.compose.material.icons.rounded.Notifications
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.educonnectapp.R
+import com.educonnectapp.ui.components.BotonIconoCabeceraEdu
+import com.educonnectapp.ui.components.BotonPrincipalEdu
+import com.educonnectapp.ui.components.CabeceraEdu
+import com.educonnectapp.ui.components.ChipEdu
+import com.educonnectapp.ui.components.ColorModulo
+import com.educonnectapp.ui.components.IconoCirculoEdu
+import com.educonnectapp.ui.components.PopupConfirmacionEdu
+import com.educonnectapp.ui.components.PopupProcesandoEdu
+import com.educonnectapp.ui.components.TipoBotonEdu
+import com.educonnectapp.ui.components.TonoEdu
 import com.educonnectapp.ui.screens.docente.comunicados.SeccionDestinatario
 import com.educonnectapp.ui.screens.docente.inicio.BottomNavBarDocente
-import com.educonnectapp.ui.theme.*
+import com.educonnectapp.ui.theme.EduAzulOscuroClaro
+import com.educonnectapp.ui.theme.EduConnectAppTheme
+import com.educonnectapp.ui.theme.EduCoral
+import com.educonnectapp.ui.theme.EduCoralClaro
+import com.educonnectapp.ui.theme.EduEtiqueta
+import com.educonnectapp.ui.theme.EduFondo
+import com.educonnectapp.ui.theme.EduTeal
+import com.educonnectapp.ui.theme.EduTexto
+import com.educonnectapp.ui.theme.EduTextoSecundario
+import com.educonnectapp.ui.theme.Nunito
 import java.text.SimpleDateFormat
-import java.util.*
+import java.util.Date
+import java.util.Locale
 
 // Límite del adjunto (el mismo que valida el backend)
 private const val MAXIMO_ADJUNTO_BYTES = 10L * 1024 * 1024   // 10 MB
 
+// =====================================================================
+// NUEVA TAREA (rediseño 2026)
+// Cabecera fija amarilla · Para · título · descripción · fecha límite · adjunto
+// "Publicar tarea" → confirmación → "Publicando..." (mientras MainActivity publica)
+// =====================================================================
+
 @Composable
 fun NuevaTareaScreen(
     listaDestinatarios: List<SeccionDestinatario> = emptyList(),
-    cursoNombre: String = "",
+    cursoNombre: String = "",          // ya no se usa (se conserva por compatibilidad)
     onBack: () -> Unit = {},
     onHomeDocente: () -> Unit = {},
     onAlumnos: () -> Unit = {},
@@ -54,61 +98,37 @@ fun NuevaTareaScreen(
         fechaEntrega: String,
         fechaPublicacion: String,
         hora: String
-    ) -> Unit = { _, _, _, _, _, _, _ -> }
+    ) -> Unit = { _, _, _, _, _, _, _ -> },
+    // ----- Rediseño 2026 -----
+    destinatarioInicial: SeccionDestinatario? = null,   // clase ya elegida
+    publicando: Boolean = false                         // muestra "Publicando..."
 ) {
     val context = LocalContext.current
-    val fechaActual = remember {
-        SimpleDateFormat("EEEE, dd 'de' MMMM yyyy", Locale("es", "PE"))
-            .format(Date()).replaceFirstChar { it.uppercase() }
-    }
-
-    // Si solo hay un destinatario (el curso elegido en la pantalla anterior), ya viene seleccionado
-    var destinatarioSeleccionado by remember { mutableStateOf<SeccionDestinatario?>(listaDestinatarios.singleOrNull()) }
-    var dropdownExpanded by remember { mutableStateOf(false) }
+    var destinatario by remember { mutableStateOf(destinatarioInicial ?: listaDestinatarios.singleOrNull()) }
     var titulo by remember { mutableStateOf("") }
     var descripcion by remember { mutableStateOf("") }
+    var fechaEntrega by remember { mutableStateOf("") }
     var archivoUri by remember { mutableStateOf<Uri?>(null) }
     var nombreArchivo by remember { mutableStateOf("") }
-    // Datos del archivo rechazado por tamaño: si no es null, se muestra la alerta
+    var tamanoArchivo by remember { mutableStateOf<Long?>(null) }
     var archivoRechazado by remember { mutableStateOf<Pair<String, Long>?>(null) }
-    var mostrarDatePicker by remember { mutableStateOf(false) }
-    var fechaEntrega by remember { mutableStateOf("") }
-    var fechaEntregaDisplay by remember { mutableStateOf("Seleccionar fecha límite") }
+    var mostrarClases by remember { mutableStateOf(false) }
+    var mostrarConfirmar by remember { mutableStateOf(false) }
 
-    if (mostrarDatePicker) {
-        val calendario = Calendar.getInstance()
-        DatePickerDialog(
-            context,
-            { _, anio, mes, dia ->
-                fechaEntrega = String.format("%04d-%02d-%02d", anio, mes + 1, dia)
-                val cal = Calendar.getInstance()
-                cal.set(anio, mes, dia)
-                fechaEntregaDisplay = SimpleDateFormat("EEEE, dd 'de' MMMM yyyy", Locale("es", "PE"))
-                    .format(cal.time).replaceFirstChar { it.uppercase() }
-                mostrarDatePicker = false
-            },
-            calendario.get(Calendar.YEAR),
-            calendario.get(Calendar.MONTH),
-            calendario.get(Calendar.DAY_OF_MONTH)
-        ).also {
-            it.datePicker.minDate = System.currentTimeMillis()
-            // Si se cancela, no volver a abrir el calendario en la siguiente recomposición
-            it.setOnDismissListener { mostrarDatePicker = false }
-            it.show()
-        }
+    // Si la clase inicial llega después (la lista se carga al entrar), se toma
+    LaunchedEffect(destinatarioInicial) {
+        if (destinatario == null && destinatarioInicial != null) destinatario = destinatarioInicial
     }
 
     val archivoLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
         uri?.let {
-            // Nombre visible (ej. "practica.pdf") y tamaño en bytes, sin leer el archivo completo
+            // Nombre visible y tamaño en bytes, sin leer el archivo completo
             var nombre: String? = null
             var tamano: Long? = null
             context.contentResolver.query(
-                it,
-                arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE),
-                null, null, null
+                it, arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE), null, null, null
             )?.use { c ->
                 if (c.moveToFirst()) {
                     nombre = c.getString(0)
@@ -118,403 +138,176 @@ fun NuevaTareaScreen(
             val nombreFinal = nombre ?: it.lastPathSegment ?: "archivo"
             val tamanoFinal = tamano
             if (tamanoFinal != null && tamanoFinal > MAXIMO_ADJUNTO_BYTES) {
-                archivoRechazado = nombreFinal to tamanoFinal   // no se adjunta: se avisa con la alerta
+                archivoRechazado = nombreFinal to tamanoFinal   // no se adjunta: se avisa
             } else {
                 archivoUri = it
                 nombreArchivo = nombreFinal
+                tamanoArchivo = tamanoFinal
             }
         }
     }
 
-    // ALERTA: ARCHIVO DEMASIADO GRANDE
+    val completo = destinatario != null && titulo.isNotBlank() && descripcion.isNotBlank() && fechaEntrega.isNotBlank()
+
+    // ── POPUPS ──────────────────────────────────────────────────────────────
     archivoRechazado?.let { (nombre, tamano) ->
-        AlertDialog(
-            onDismissRequest = { archivoRechazado = null },
-            icon = {
-                Image(
-                    painter = painterResource(id = R.drawable.paperclip_lightgray),
-                    contentDescription = null,
-                    modifier = Modifier.size(36.dp)
-                )
-            },
-            title = {
-                Text(
-                    text = "Archivo demasiado grande",
-                    fontFamily = Roboto,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 20.sp,
-                    color = TextBlue
-                )
-            },
-            text = {
-                Text(
-                    text = "\"$nombre\" pesa ${String.format(Locale.US, "%.1f", tamano / (1024.0 * 1024.0))} MB.\n\n" +
-                            "El tamaño máximo permitido es 10 MB. Elige un archivo más liviano o comprímelo antes de adjuntarlo.",
-                    fontFamily = Roboto,
-                    fontSize = 16.sp,
-                    color = TextPrimary
-                )
-            },
-            confirmButton = {
-                Button(
-                    onClick = { archivoRechazado = null; archivoLauncher.launch("*/*") },
-                    shape = RoundedCornerShape(20.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = EduconnectBlue)
-                ) {
-                    Text(
-                        text = "Elegir otro",
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.SemiBold,
-                        color = TextWhite
-                    )
+        PopupConfirmacionEdu(
+            titulo = "Archivo demasiado grande",
+            mensaje = "\"$nombre\" pesa ${tamanoLegiblePub(tamano)}. El tamaño máximo permitido es 10 MB. " +
+                    "Elige un archivo más liviano o comprímelo antes de adjuntarlo.",
+            textoConfirmar = "Elegir otro",
+            colorConfirmar = TipoBotonEdu.AVANZAR.fondo,
+            icono = Icons.Rounded.AttachFile,
+            onCancelar = { archivoRechazado = null },
+            onConfirmar = { archivoRechazado = null; archivoLauncher.launch("*/*") }
+        )
+    }
+
+    if (mostrarConfirmar) {
+        val dest = destinatario
+        PopupConfirmacionEdu(
+            titulo = "¿Publicar tarea?",
+            mensaje = "Los padres recibirán una notificación al instante.",
+            textoConfirmar = "Publicar",
+            colorConfirmar = TipoBotonEdu.AVANZAR.fondo,
+            icono = Icons.AutoMirrored.Rounded.Send,
+            onCancelar = { mostrarConfirmar = false },
+            onConfirmar = {
+                mostrarConfirmar = false
+                if (dest != null && completo) {
+                    val fechaPub = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+                    val hora = SimpleDateFormat("hh:mm a", Locale.getDefault()).format(Date())
+                    onPublicar(titulo.trim(), descripcion.trim(), archivoUri?.toString() ?: "", dest, fechaEntrega, fechaPub, hora)
                 }
-            },
-            dismissButton = {
-                TextButton(onClick = { archivoRechazado = null }) {
-                    Text(
-                        text = "Entendido",
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.SemiBold,
-                        color = EduconnectBlue
-                    )
-                }
-            },
-            containerColor = BackgroundWhite,
-            shape = RoundedCornerShape(16.dp)
+            }
+        ) {
+            if (dest != null) {
+                ResumenPublicacion(
+                    titulo = titulo.trim(),
+                    clase = "${dest.gradoNombre} ${dest.seccionNombre} · ${dest.cursoNombre}",
+                    fecha = "Entrega: ${fechaLargaPub(fechaEntrega)}",
+                    alumnos = dest.totalPadres,
+                    conAdjunto = nombreArchivo.isNotEmpty()
+                )
+            }
+        }
+    }
+
+    if (publicando) {
+        PopupProcesandoEdu(
+            titulo = if (nombreArchivo.isNotEmpty()) "Subiendo adjunto y publicando..." else "Publicando tarea..."
+        )
+    }
+
+    if (mostrarClases) {
+        HojaElegirClasePub(
+            clases = listaDestinatarios,
+            seleccionada = destinatario,
+            onElegir = { destinatario = it; mostrarClases = false },
+            onCerrar = { mostrarClases = false }
         )
     }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(BackgroundLight)
+            .background(EduFondo)
     ) {
-        // HEADER
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(EduconnectBlue)
-                .padding(horizontal = 20.dp, vertical = 20.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.weight(1f)
-            ) {
-                IconButton(
-                    onClick = onBack,
-                    modifier = Modifier.size(32.dp).offset(x = (-5).dp)
-                ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.arrowleft_white),
-                        contentDescription = "Volver",
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-                Column {
-                    Text(
-                        text = "Nueva tarea",
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 22.sp,
-                        color = TextWhite
-                    )
-                    Text(
-                        text = "Curso: $cursoNombre",
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.Normal,
-                        fontSize = 16.sp,
-                        color = TextWhite.copy(alpha = 0.8f)
-                    )
-                    Text(
-                        text = fechaActual,
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.Normal,
-                        fontSize = 15.sp,
-                        color = TextWhite.copy(alpha = 0.7f)
-                    )
-                }
-            }
-            IconButton(onClick = onNotificaciones) {
-                Image(
-                    painter = painterResource(id = R.drawable.notification_white),
-                    contentDescription = "Notificaciones",
-                    modifier = Modifier.size(35.dp)
+        // CABECERA FIJA
+        CabeceraEdu(
+            titulo = "Nueva tarea",
+            subtitulo = "Los padres reciben un aviso al publicar",
+            onVolver = onBack,
+            colorFondo = ColorModulo.Publicaciones,
+            acciones = {
+                BotonIconoCabeceraEdu(
+                    icono = Icons.Rounded.Notifications,
+                    descripcion = "Notificaciones",
+                    onClick = onNotificaciones,
+                    colorCabecera = ColorModulo.Publicaciones
                 )
             }
-        }
+        )
 
-        // FORMULARIO
+        // FORMULARIO DESPLAZABLE
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 20.dp),
+                .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            // DESTINATARIOS
-            Text(
-                text = "DESTINATARIOS",
-                fontFamily = Roboto,
-                fontWeight = FontWeight.Bold,
-                fontSize = 16.sp,
-                color = TextBlue
+            CampoParaPub(destino = destinatario, onClick = { mostrarClases = true })
+            CampoTextoPub(
+                valor = titulo, onValorCambia = { titulo = it },
+                etiqueta = "Título", placeholder = "Ej: Ejercicios cap. 5 · Fracciones"
             )
-            Box(modifier = Modifier.fillMaxWidth()) {
-                OutlinedTextField(
-                    value = destinatarioSeleccionado?.let {
-                        "${it.gradoNombre} Sec. ${it.seccionNombre} - ${it.totalPadres} alumnos"
-                    } ?: "",
-                    onValueChange = {},
-                    readOnly = true,
-                    placeholder = {
-                        Text(text = "Seleccione sección", color = TextSecondary, fontSize = 16.sp, fontFamily = Roboto)
-                    },
-                    leadingIcon = {
-                        Image(
-                            painter = painterResource(id = R.drawable.users_darkgray),
-                            contentDescription = null,
-                            modifier = Modifier.size(26.dp)
-                        )
-                    },
-                    trailingIcon = {
-                        IconButton(onClick = { dropdownExpanded = true }) {
-                            Icon(Icons.Filled.KeyboardArrowDown, contentDescription = null, tint = EduconnectBlue)
-                        }
-                    },
-                    shape = RoundedCornerShape(10.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = TextBlue,
-                        unfocusedBorderColor = BorderMedium,
-                        focusedTextColor = TextBlue,
-                        unfocusedTextColor = TextPrimary,
-                        focusedContainerColor = BackgroundWhite,
-                        unfocusedContainerColor = BackgroundWhite
-                    ),
-                    modifier = Modifier.fillMaxWidth().height(54.dp)
-                )
-                Box(modifier = Modifier.matchParentSize().padding(end = 48.dp).clickable { dropdownExpanded = true })
-                DropdownMenu(expanded = dropdownExpanded, onDismissRequest = { dropdownExpanded = false }) {
-                    listaDestinatarios.forEach { dest ->
-                        DropdownMenuItem(
-                            text = {
-                                Text(
-                                    text = "${dest.gradoNombre} Sec. ${dest.seccionNombre} - ${dest.totalPadres} alumnos",
-                                    fontFamily = Roboto,
-                                    fontSize = 14.sp,
-                                    color = TextBlue
-                                )
-                            },
-                            onClick = { destinatarioSeleccionado = dest; dropdownExpanded = false }
-                        )
-                    }
-                }
-            }
-
-            // TÍTULO
-            Text(
-                text = "TÍTULO DE LA TAREA",
-                fontFamily = Roboto,
-                fontWeight = FontWeight.Bold,
-                fontSize = 16.sp,
-                color = TextBlue
+            CampoTextoPub(
+                valor = descripcion, onValorCambia = { descripcion = it },
+                etiqueta = "Descripción", placeholder = "Qué deben hacer y cómo entregarlo...", lineas = 3
             )
-            OutlinedTextField(
-                value = titulo,
-                onValueChange = { titulo = it },
-                placeholder = { Text(text = "Ingrese el título", color = TextSecondary, fontSize = 16.sp) },
-                shape = RoundedCornerShape(10.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = EduconnectBlue,
-                    unfocusedBorderColor = BorderMedium,
-                    focusedTextColor = TextPrimary,
-                    unfocusedTextColor = TextPrimary,
-                    focusedContainerColor = BackgroundWhite,
-                    unfocusedContainerColor = BackgroundWhite
-                ),
-                modifier = Modifier.fillMaxWidth().height(54.dp),
-                singleLine = true
-            )
-
-            // DESCRIPCIÓN
-            Text(
-                text = "DESCRIPCIÓN",
-                fontFamily = Roboto,
-                fontWeight = FontWeight.Bold,
-                fontSize = 16.sp,
-                color = TextBlue
-            )
-            OutlinedTextField(
-                value = descripcion,
-                onValueChange = { descripcion = it },
-                placeholder = { Text(text = "Describa la tarea...", color = TextSecondary, fontSize = 16.sp) },
-                shape = RoundedCornerShape(10.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = EduconnectBlue,
-                    unfocusedBorderColor = BorderMedium,
-                    focusedTextColor = TextPrimary,
-                    unfocusedTextColor = TextPrimary,
-                    focusedContainerColor = BackgroundWhite,
-                    unfocusedContainerColor = BackgroundWhite
-                ),
-                modifier = Modifier.fillMaxWidth().height(80.dp),
-                maxLines = 6
-            )
-
-            // FECHA LÍMITE
-            Text(
-                text = "FECHA LÍMITE",
-                fontFamily = Roboto,
-                fontWeight = FontWeight.Bold,
-                fontSize = 16.sp,
-                color = TextBlue
-            )
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(BackgroundWhite, RoundedCornerShape(10.dp))
-                    .border(1.dp, BorderMedium, RoundedCornerShape(10.dp))
-                    .clickable { mostrarDatePicker = true }
-                    .padding(horizontal = 14.dp, vertical = 14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.agenda_blue),
-                        contentDescription = null,
-                        modifier = Modifier.size(22.dp)
-                    )
-                    Text(
-                        text = fechaEntregaDisplay,
-                        fontFamily = Roboto,
-                        fontSize = 15.sp,
-                        color = if (fechaEntrega.isEmpty()) TextSecondary else TextBlue,
-                        fontWeight = if (fechaEntrega.isEmpty()) FontWeight.Normal else FontWeight.SemiBold
-                    )
-                }
-                Image(
-                    painter = painterResource(id = R.drawable.chevrondown_gray),
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
+            CampoFechaPub(etiqueta = "Fecha límite", fecha = fechaEntrega, onFecha = { fechaEntrega = it })
 
             // ADJUNTO
-            Text(
-                text = "ADJUNTO",
-                fontFamily = Roboto,
-                fontWeight = FontWeight.Bold,
-                fontSize = 16.sp,
-                color = TextBlue
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                EtiquetaCampoPub("Adjunto (opcional · máx. 10 MB)")
+                if (nombreArchivo.isNotEmpty()) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(Color.White, RoundedCornerShape(16.dp))
+                            .border(2.dp, EduTeal, RoundedCornerShape(16.dp))
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        IconoCirculoEdu(Icons.Rounded.Description, TonoEdu.AZUL, tamano = 38.dp)
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                nombreArchivo, fontFamily = Nunito, fontWeight = FontWeight.Black, fontSize = 14.5.sp,
+                                color = EduTexto, maxLines = 1, overflow = TextOverflow.Ellipsis
+                            )
+                            if (tamanoArchivo != null) {
+                                Text(
+                                    tamanoLegiblePub(tamanoArchivo), fontFamily = Nunito, fontWeight = FontWeight.Bold,
+                                    fontSize = 12.5.sp, color = EduTextoSecundario
+                                )
+                            }
+                        }
+                        Box(
+                            modifier = Modifier
+                                .size(34.dp)
+                                .clip(RoundedCornerShape(11.dp))
+                                .background(EduCoralClaro)
+                                .clickable { archivoUri = null; nombreArchivo = ""; tamanoArchivo = null },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Rounded.Close, contentDescription = "Quitar adjunto", tint = EduCoral, modifier = Modifier.size(18.dp))
+                        }
+                    }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    BotonAdjuntarPub(Icons.Rounded.AttachFile, "Archivo", Modifier.weight(1f)) { archivoLauncher.launch("*/*") }
+                    BotonAdjuntarPub(Icons.Rounded.Image, "Foto", Modifier.weight(1f)) { archivoLauncher.launch("image/*") }
+                }
+            }
+        }
+
+        // BOTÓN FIJO
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(EduFondo)
+                .padding(horizontal = 16.dp, vertical = 12.dp)
+        ) {
+            BotonPrincipalEdu(
+                texto = "Publicar tarea",
+                tipo = TipoBotonEdu.AVANZAR,
+                icono = Icons.AutoMirrored.Rounded.Send,
+                habilitado = completo && !publicando,
+                onClick = { if (completo) mostrarConfirmar = true }
             )
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(BackgroundWhite, RoundedCornerShape(10.dp))
-                    .border(1.dp, BorderBlue, RoundedCornerShape(10.dp))
-                    .padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.paperclip_lightgray),
-                        contentDescription = null,
-                        modifier = Modifier.size(22.dp)
-                    )
-                    Text(
-                        text = if (nombreArchivo.isNotEmpty()) nombreArchivo else "Añadir archivo",
-                        fontFamily = Roboto,
-                        fontSize = 15.sp,
-                        color = if (nombreArchivo.isNotEmpty()) EduconnectBlue else TextSecondary
-                    )
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(32.dp)) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        modifier = Modifier.clickable { archivoLauncher.launch("*/*") }
-                    ) {
-                        Image(
-                            painter = painterResource(id = R.drawable.document_blue),
-                            contentDescription = null,
-                            modifier = Modifier.size(24.dp)
-                        )
-                        Text(
-                            text = "Archivos",
-                            fontFamily = Roboto,
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 16.sp,
-                            color = EduconnectBlue
-                        )
-                    }
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        modifier = Modifier.clickable { archivoLauncher.launch("image/*") }
-                    ) {
-                        Image(
-                            painter = painterResource(id = R.drawable.camera_blue),
-                            contentDescription = null,
-                            modifier = Modifier.size(24.dp)
-                        )
-                        Text(
-                            text = "Fotos",
-                            fontFamily = Roboto,
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 16.sp,
-                            color = EduconnectBlue
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(2.dp))
-
-            // BOTÓN PUBLICAR
-            Button(
-                onClick = {
-                    val dest = destinatarioSeleccionado
-                    if (dest == null || titulo.isBlank() || descripcion.isBlank() || fechaEntrega.isBlank()) {
-                        Toast.makeText(
-                            context, "Completa sección, título, descripción y fecha límite", Toast.LENGTH_SHORT
-                        ).show()
-                        return@Button
-                    }
-                    val fechaPub = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
-                    val hora = SimpleDateFormat("hh:mm a", Locale.getDefault()).format(Date())
-                    onPublicar(titulo, descripcion, archivoUri?.toString() ?: "", dest, fechaEntrega, fechaPub, hora)
-                },
-                modifier = Modifier.fillMaxWidth().height(54.dp),
-                shape = RoundedCornerShape(28.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = EduconnectBlue)
-            ) {
-                Image(
-                    painter = painterResource(id = R.drawable.sendstatement_white),
-                    contentDescription = null,
-                    modifier = Modifier.size(30.dp)
-                )
-                Spacer(modifier = Modifier.width(10.dp))
-                Text(
-                    text = "Publicar tarea",
-                    fontFamily = Roboto,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 22.sp,
-                    color = TextWhite
-                )
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
         }
 
         BottomNavBarDocente(
@@ -527,15 +320,56 @@ fun NuevaTareaScreen(
     }
 }
 
-@Preview(showBackground = true)
+// Resumen dentro de la confirmación (título, clase, fecha y chips)
+@Composable
+internal fun ResumenPublicacion(titulo: String, clase: String, fecha: String, alumnos: Int, conAdjunto: Boolean) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(EduFondo, RoundedCornerShape(18.dp))
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Text(titulo, fontFamily = Nunito, fontWeight = FontWeight.Black, fontSize = 15.sp, color = EduTexto, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Text(clase, fontFamily = Nunito, fontWeight = FontWeight.Bold, fontSize = 13.5.sp, color = EduTextoSecundario)
+        Text(fecha, fontFamily = Nunito, fontWeight = FontWeight.Bold, fontSize = 13.5.sp, color = EduEtiqueta)
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            ChipEdu("$alumnos alumnos", TonoEdu.VERDE)
+            if (conAdjunto) ChipEdu("1 adjunto", TonoEdu.AZUL)
+        }
+    }
+}
+
+// Botón para adjuntar (Archivo / Foto)
+@Composable
+private fun BotonAdjuntarPub(icono: ImageVector, texto: String, modifier: Modifier, onClick: () -> Unit) {
+    val forma = RoundedCornerShape(14.dp)
+    Row(
+        modifier = modifier
+            .clip(forma)
+            .background(Color.White)
+            .border(1.5.dp, EduAzulOscuroClaro, forma)
+            .clickable(onClick = onClick)
+            .padding(vertical = 11.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(icono, contentDescription = null, tint = EduEtiqueta, modifier = Modifier.size(19.dp))
+        Spacer(modifier = Modifier.size(7.dp))
+        Text(texto, fontFamily = Nunito, fontWeight = FontWeight.Black, fontSize = 14.sp, color = EduEtiqueta)
+    }
+}
+
+@Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
 fun NuevaTareaPreview() {
     EduConnectAppTheme {
         NuevaTareaScreen(
             listaDestinatarios = listOf(
-                SeccionDestinatario(1L, 1L, 1L, "2do", "A", "Matemáticas", 28),
-                SeccionDestinatario(2L, 2L, 1L, "3er", "B", "Matemáticas", 30)
+                SeccionDestinatario(1L, 1L, 1L, "1er Grado", "A", "Ciencia y Tecnología", 5),
+                SeccionDestinatario(2L, 2L, 1L, "2do Grado", "B", "Matemáticas", 24)
             ),
+            destinatarioInicial = SeccionDestinatario(1L, 1L, 1L, "1er Grado", "A", "Ciencia y Tecnología", 5)
         )
     }
 }

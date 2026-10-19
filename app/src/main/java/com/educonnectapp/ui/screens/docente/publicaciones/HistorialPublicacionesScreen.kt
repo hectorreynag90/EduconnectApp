@@ -1,32 +1,67 @@
-package com.educonnectapp.ui.screens
+package com.educonnectapp.ui.screens.docente.publicaciones
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.Assignment
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.material.icons.rounded.Notifications
+import androidx.compose.material.icons.rounded.Quiz
+import androidx.compose.material.icons.rounded.SearchOff
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.IconButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.educonnectapp.R
+import com.educonnectapp.ui.components.BarraProgresoEdu
+import com.educonnectapp.ui.components.BotonCrearEdu
+import com.educonnectapp.ui.components.BotonIconoCabeceraEdu
+import com.educonnectapp.ui.components.CabeceraEdu
+import com.educonnectapp.ui.components.ChipCabeceraEdu
+import com.educonnectapp.ui.components.ChipEdu
+import com.educonnectapp.ui.components.ColorModulo
+import com.educonnectapp.ui.components.IconoCirculoEdu
+import com.educonnectapp.ui.components.TarjetaEdu
+import com.educonnectapp.ui.components.TonoEdu
 import com.educonnectapp.ui.screens.docente.inicio.BottomNavBarDocente
-import com.educonnectapp.ui.theme.*
-import java.text.SimpleDateFormat
-import java.util.*
+import com.educonnectapp.ui.theme.EduAmarillo
+import com.educonnectapp.ui.theme.EduBorde
+import com.educonnectapp.ui.theme.EduConnectAppTheme
+import com.educonnectapp.ui.theme.EduEtiqueta
+import com.educonnectapp.ui.theme.EduFondo
+import com.educonnectapp.ui.theme.EduTeal
+import com.educonnectapp.ui.theme.EduTealOscuro
+import com.educonnectapp.ui.theme.EduTexto
+import com.educonnectapp.ui.theme.EduTextoSecundario
+import com.educonnectapp.ui.theme.Nunito
 
 data class PublicacionHistorialItem(
     val id: Long,
@@ -43,6 +78,11 @@ data class PublicacionHistorialItem(
     val estado: String = "ACTIVA"  // "ACTIVA" | "CERRADA" | "ANULADA"
 )
 
+// =====================================================================
+// PUBLICACIONES DE UNA CLASE (rediseño 2026)
+// Cabecera fija amarilla · pestañas Todas / Tareas / Evaluaciones · tarjetas con entregas y lecturas
+// =====================================================================
+
 @Composable
 fun HistorialPublicacionesScreen(
     publicaciones: List<PublicacionHistorialItem> = emptyList(),
@@ -53,152 +93,111 @@ fun HistorialPublicacionesScreen(
     onAvisos: () -> Unit = {},
     onPerfilDocente: () -> Unit = {},
     onNotificaciones: () -> Unit = {},
-    onVerDetalle: (PublicacionHistorialItem) -> Unit = {}
+    onVerDetalle: (PublicacionHistorialItem) -> Unit = {},
+    // ----- Rediseño 2026 -----
+    titulo: String = "Publicaciones",      // el curso de la clase
+    subtitulo: String = "",                // "Publicaciones · 1er Grado A"
+    onNuevaTarea: () -> Unit = {},
+    onNuevaEvaluacion: () -> Unit = {}
 ) {
     var tabSeleccionado by remember { mutableStateOf("Todas") }
+    var mostrarCrear by remember { mutableStateOf(false) }
 
-    val fechaActual = remember {
-        SimpleDateFormat("EEEE, dd 'de' MMMM yyyy", Locale("es", "PE"))
-            .format(Date()).replaceFirstChar { it.uppercase() }
+    val tareas = publicaciones.filter { it.tipo != "Evaluación" }
+    val evaluaciones = publicaciones.filter { it.tipo == "Evaluación" }
+    val lista = when (tabSeleccionado) {
+        "Tareas" -> tareas
+        "Evaluaciones" -> evaluaciones
+        else -> publicaciones
     }
 
-    val filtradas = publicaciones.filter {
-        when (tabSeleccionado) {
-            "Tareas" -> it.tipo == "Tarea"
-            "Evaluaciones" -> it.tipo == "Evaluación"
-            else -> true
-        }
+    if (mostrarCrear) {
+        HojaCrearPublicacion(onTarea = onNuevaTarea, onEvaluacion = onNuevaEvaluacion, onCerrar = { mostrarCrear = false })
     }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(BackgroundLight)
+            .background(EduFondo)
     ) {
-        // HEADER
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(EduconnectBlue)
-                .padding(horizontal = 20.dp, vertical = 20.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.weight(1f)
-            ) {
-                IconButton(
-                    onClick = onBack,
-                    modifier = Modifier.size(35.dp).offset(x = (-5).dp)
-                ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.arrowleft_white),
-                        contentDescription = "Volver",
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-                Column {
-                    Text(
-                        text = "Historial Publicaciones",
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 22.sp,
-                        color = TextWhite
-                    )
-                    Text(
-                        text = "${publicaciones.size} publicaciones",
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp,
-                        color = TextWhite.copy(alpha = 0.85f)
-                    )
-                    Text(
-                        text = fechaActual,
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.Normal,
-                        fontSize = 15.sp,
-                        color = TextWhite.copy(alpha = 0.7f)
-                    )
-                }
-            }
-            IconButton(onClick = onNotificaciones) {
-                Image(
-                    painter = painterResource(id = R.drawable.notification_white),
-                    contentDescription = "Notificaciones",
-                    modifier = Modifier.size(35.dp)
+        // CABECERA FIJA
+        CabeceraEdu(
+            titulo = titulo,
+            subtitulo = subtitulo.ifBlank { null },
+            onVolver = onBack,
+            colorFondo = ColorModulo.Publicaciones,
+            acciones = {
+                BotonIconoCabeceraEdu(
+                    icono = Icons.Rounded.Notifications,
+                    descripcion = "Notificaciones",
+                    onClick = onNotificaciones,
+                    colorCabecera = ColorModulo.Publicaciones
+                )
+            },
+            contenidoInferior = {
+                ChipCabeceraEdu(
+                    if (publicaciones.size == 1) "1 publicación" else "${publicaciones.size} publicaciones",
+                    modifier = Modifier.padding(top = 14.dp),
+                    colorCabecera = ColorModulo.Publicaciones
                 )
             }
-        }
+        )
 
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f)
-                .padding(horizontal = 20.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            // TABS
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center
+        Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 90.dp),   // espacio para "+ Crear"
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                listOf("Todas", "Tareas", "Evaluaciones").forEachIndexed { index, tab ->
-                    val activo = tabSeleccionado == tab
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(if (activo) EduconnectBlue else Color.White)
-                            .border(1.5.dp, if (activo) EduconnectBlue else BorderBlue, RoundedCornerShape(20.dp))
-                            .clickable { tabSeleccionado = tab }
-                            .padding(horizontal = 22.dp, vertical = 8.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = tab,
-                            fontFamily = Roboto,
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 16.sp,
-                            color = if (activo) TextWhite else TextPrimary
-                        )
-                    }
-                    if (index < 2) Spacer(modifier = Modifier.width(8.dp))
+                // PESTAÑAS
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    PestanaPub("Todas (${publicaciones.size})", tabSeleccionado == "Todas") { tabSeleccionado = "Todas" }
+                    PestanaPub("Tareas (${tareas.size})", tabSeleccionado == "Tareas") { tabSeleccionado = "Tareas" }
+                    PestanaPub("Evaluaciones (${evaluaciones.size})", tabSeleccionado == "Evaluaciones") { tabSeleccionado = "Evaluaciones" }
                 }
-            }
 
-            when {
-                cargando && publicaciones.isEmpty() -> {
-                    Box(modifier = Modifier.fillMaxWidth().padding(top = 40.dp), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = EduconnectBlue)
-                    }
-                }
-                filtradas.isEmpty() -> {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(BackgroundWhite, RoundedCornerShape(16.dp))
-                            .border(1.dp, BorderBlue, RoundedCornerShape(16.dp))
-                            .padding(32.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            text = "No hay publicaciones",
-                            fontFamily = Roboto,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 16.sp,
-                            color = TextPrimary
-                        )
-                    }
-                }
-                else -> {
-                    LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        items(filtradas, key = { it.id }) { item ->
-                            PublicacionHistorialCard(item = item, onClick = { onVerDetalle(item) })
+                when {
+                    cargando && publicaciones.isEmpty() -> TarjetaEdu {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            CircularProgressIndicator(color = EduTeal, strokeWidth = 3.dp, modifier = Modifier.size(24.dp))
+                            Text(
+                                "Cargando publicaciones...", fontFamily = Nunito, fontWeight = FontWeight.Bold,
+                                fontSize = 15.sp, color = EduTextoSecundario
+                            )
                         }
                     }
+                    lista.isEmpty() -> TarjetaEdu {
+                        Column(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            IconoCirculoEdu(Icons.Rounded.SearchOff, TonoEdu.GRIS, tamano = 56.dp)
+                            Text(
+                                if (publicaciones.isEmpty()) "Aún no publicaste tareas ni evaluaciones en esta clase."
+                                else "No hay publicaciones de este tipo.",
+                                fontFamily = Nunito, fontWeight = FontWeight.SemiBold, fontSize = 14.5.sp,
+                                color = EduTextoSecundario, textAlign = TextAlign.Center
+                            )
+                        }
+                    }
+                    else -> lista.forEach { item ->
+                        PublicacionHistorialCard(item = item, onClick = { onVerDetalle(item) })
+                    }
                 }
             }
+
+            BotonCrearEdu(
+                onClick = { mostrarCrear = true },
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 16.dp, bottom = 16.dp)
+            )
         }
 
         BottomNavBarDocente(
@@ -211,133 +210,104 @@ fun HistorialPublicacionesScreen(
     }
 }
 
-// "2026-10-08" -> "Jue 08 oct"
-private fun fechaCortaHistorial(fecha: String): String = try {
-    val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-    SimpleDateFormat("EEE dd MMM", Locale("es", "PE"))
-        .format(sdf.parse(fecha)!!).replaceFirstChar { it.uppercase() }
-} catch (e: Exception) { fecha }
+// Pestaña tipo pastilla: amarilla (texto oscuro) cuando está activa
+@Composable
+private fun PestanaPub(texto: String, activa: Boolean, onClick: () -> Unit) {
+    val forma = RoundedCornerShape(50)
+    Text(
+        texto,
+        modifier = Modifier
+            .clip(forma)
+            .background(if (activa) EduAmarillo else Color.White)
+            .border(1.5.dp, if (activa) EduAmarillo else EduBorde, forma)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 13.dp, vertical = 7.dp),
+        fontFamily = Nunito, fontWeight = FontWeight.Black, fontSize = 13.5.sp,
+        color = if (activa) EduTexto else EduEtiqueta, maxLines = 1
+    )
+}
 
+// Tarjeta de una publicación: tipo, título, fecha y estado; entregas (tareas) y lecturas
 @Composable
 fun PublicacionHistorialCard(item: PublicacionHistorialItem, onClick: () -> Unit) {
     val esEvaluacion = item.tipo == "Evaluación"
-    val anulada = item.estado == "ANULADA"
-    val completo = item.totalAlumnos > 0 && item.calificados >= item.totalAlumnos
+    val hoy = hoyPub()
+    val progreso = if (item.totalAlumnos > 0) item.calificados.toFloat() / item.totalAlumnos else 0f
 
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(BackgroundWhite, RoundedCornerShape(16.dp))
-            .border(1.5.dp, if (anulada) BorderMedium else BorderBlue, RoundedCornerShape(16.dp))
-            .clickable { onClick() }
-            .padding(14.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
+    TarjetaEdu(onClick = onClick, relleno = PaddingValues(horizontal = 14.dp, vertical = 13.dp)) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Box(
-                modifier = Modifier
-                    .size(46.dp)
-                    .background(if (esEvaluacion) EduconnectBlue else EduconnectBlueMedium, RoundedCornerShape(12.dp)),
-                contentAlignment = Alignment.Center
-            ) {
-                Image(
-                    painter = painterResource(id = if (esEvaluacion) R.drawable.exam_white else R.drawable.task_white),
-                    contentDescription = null,
-                    modifier = Modifier.size(32.dp)
-                )
-            }
+            IconoCirculoEdu(
+                if (esEvaluacion) Icons.Rounded.Quiz else Icons.AutoMirrored.Rounded.Assignment,
+                if (esEvaluacion) TonoEdu.AMARILLO else TonoEdu.AZUL
+            )
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = item.titulo,
-                    fontFamily = Roboto,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 17.sp,
-                    color = if (anulada) TextSecondary else TextBlue,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
+                    item.titulo, fontFamily = Nunito, fontWeight = FontWeight.Black, fontSize = 15.5.sp,
+                    color = if (item.estado == "ANULADA") EduTextoSecundario else EduTexto,
+                    maxLines = 2, overflow = TextOverflow.Ellipsis
                 )
-                Text(
-                    text = "${item.cursoNombre} · ${item.gradoNombre} Sec. ${item.seccionNombre}",
-                    fontFamily = Roboto,
-                    fontWeight = FontWeight.Medium,
-                    fontSize = 14.sp,
-                    color = TextSecondary
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(
+                        (if (esEvaluacion) "Evaluación: " else "Entrega: ") +
+                                (if (item.fechaEntrega.isNotEmpty()) fechaCortaPub(item.fechaEntrega) else "—"),
+                        fontFamily = Nunito, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = EduTextoSecundario
+                    )
+                    when {
+                        item.estado == "ANULADA" -> ChipEdu("Anulada", TonoEdu.CORAL)
+                        item.estado == "CERRADA" -> ChipEdu("Cerrada", TonoEdu.GRIS)
+                        item.fechaEntrega == hoy -> ChipEdu(if (esEvaluacion) "Es hoy" else "Vence hoy", TonoEdu.CORAL)
+                        item.fechaEntrega.isNotEmpty() && item.fechaEntrega < hoy ->
+                            ChipEdu(if (esEvaluacion) "Pasó" else "Venció", TonoEdu.GRIS)
+                    }
+                }
             }
-            Image(
-                painter = painterResource(id = R.drawable.next_gray),
-                contentDescription = null,
-                modifier = Modifier.size(26.dp)
+            Icon(
+                Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = "Ver detalle",
+                tint = EduTextoSecundario, modifier = Modifier.size(24.dp)
             )
         }
-
+        Spacer(modifier = Modifier.height(8.dp))
         Row(
-            modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            // Fecha límite / de la evaluación
-            Text(
-                text = (if (esEvaluacion) "Evaluación: " else "Entrega: ") +
-                        (if (item.fechaEntrega.isNotEmpty()) fechaCortaHistorial(item.fechaEntrega) else "—"),
-                fontFamily = Roboto,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 14.sp,
-                color = TextOrange,
-                modifier = Modifier.weight(1f)
-            )
-            if (item.estado != "ACTIVA") {
-                ChipHistorial(
-                    texto = if (anulada) "Anulada" else "Cerrada",
-                    color = if (anulada) StatusErrorRed else TextSecondary
-                )
-            }
-        }
-
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            // Solo las tareas son entregables; las evaluaciones son avisos
             if (esEvaluacion) {
-                ChipHistorial(texto = "Aviso", color = TextSecondary)
+                ChipEdu("Aviso", TonoEdu.AMARILLO)
+                ChipEdu("${item.lecturas} lecturas", TonoEdu.AZUL)
             } else {
-                ChipHistorial(
-                    texto = "${item.calificados}/${item.totalAlumnos} registrados",
-                    color = if (completo) StatusGreen else AccentOrange
+                ChipEdu("Entregas ${item.calificados}/${item.totalAlumnos}", TonoEdu.VERDE)
+                ChipEdu("${item.lecturas} lecturas", TonoEdu.AZUL)
+                Spacer(modifier = Modifier.weight(1f))
+                Text(
+                    "${(progreso * 100).toInt()}%", fontFamily = Nunito, fontWeight = FontWeight.Black, fontSize = 14.sp,
+                    color = if (progreso >= 1f) EduTealOscuro else EduTexto
                 )
             }
-            ChipHistorial(texto = "${item.lecturas} lecturas", color = EduconnectBlue)
+        }
+        if (!esEvaluacion) {
+            Spacer(modifier = Modifier.height(8.dp))
+            BarraProgresoEdu(progreso = progreso, color = EduTeal)
         }
     }
 }
 
-@Composable
-private fun ChipHistorial(texto: String, color: Color) {
-    Box(
-        modifier = Modifier
-            .background(color.copy(alpha = 0.10f), RoundedCornerShape(20.dp))
-            .padding(horizontal = 10.dp, vertical = 3.dp)
-    ) {
-        Text(
-            text = texto,
-            fontFamily = Roboto,
-            fontWeight = FontWeight.SemiBold,
-            fontSize = 14.sp,
-            color = color
-        )
-    }
-}
-
-@Preview(showBackground = true)
+@Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
 fun HistorialPublicacionesPreview() {
     EduConnectAppTheme {
         HistorialPublicacionesScreen(
+            titulo = "Ciencia y Tecnología",
+            subtitulo = "Publicaciones · 1er Grado A",
             publicaciones = listOf(
-                PublicacionHistorialItem(1L, "Tarea", "Ejercicios Cap. 5 - Fracciones", "Matemáticas", "1er", "A", "2026-10-08", "2026-10-02", 28, 10, 20),
-                PublicacionHistorialItem(2L, "Evaluación", "Práctica calificada 2", "Comunicación", "1er", "A", "2026-10-07", "2026-10-02", 28, 28, 25),
-                PublicacionHistorialItem(3L, "Tarea", "Lectura Cap. 8", "Ciencias", "2do", "B", "2026-10-01", "2026-09-28", 30, 0, 5, "ANULADA")
+                PublicacionHistorialItem(1L, "Tarea", "Ejercicios cap. 5 · Fracciones", "Ciencia y Tecnología", "1er Grado", "A", hoyPub(), "2026-10-15", 5, 3, 4),
+                PublicacionHistorialItem(2L, "Evaluación", "Práctica calificada N° 2", "Ciencia y Tecnología", "1er Grado", "A", "2026-10-26", "2026-10-16", 5, 0, 4),
+                PublicacionHistorialItem(3L, "Tarea", "Lectura cap. 4", "Ciencia y Tecnología", "1er Grado", "A", "2026-10-09", "2026-10-02", 5, 5, 5, "CERRADA")
             )
         )
     }
