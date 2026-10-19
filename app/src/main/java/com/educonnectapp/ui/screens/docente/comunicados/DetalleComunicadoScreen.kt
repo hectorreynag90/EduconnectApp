@@ -1,28 +1,73 @@
 package com.educonnectapp.ui.screens.docente.comunicados
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.rounded.Send
+import androidx.compose.material.icons.rounded.Description
+import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Notifications
+import androidx.compose.material.icons.rounded.Visibility
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.educonnectapp.R
+import com.educonnectapp.ui.components.BarraProgresoEdu
+import com.educonnectapp.ui.components.BotonIconoCabeceraEdu
+import com.educonnectapp.ui.components.BotonPrincipalEdu
+import com.educonnectapp.ui.components.CabeceraEdu
+import com.educonnectapp.ui.components.ChipEdu
+import com.educonnectapp.ui.components.ColorModulo
+import com.educonnectapp.ui.components.TarjetaEdu
+import com.educonnectapp.ui.components.TipoBotonEdu
+import com.educonnectapp.ui.components.TonoEdu
+import com.educonnectapp.ui.components.coloresDeTono
 import com.educonnectapp.ui.screens.docente.inicio.BottomNavBarDocente
-import com.educonnectapp.ui.theme.*
+import com.educonnectapp.ui.theme.EduAmarilloClaro
+import com.educonnectapp.ui.theme.EduAmarilloOscuro
+import com.educonnectapp.ui.theme.EduAzulOscuro
+import com.educonnectapp.ui.theme.EduBorde
+import com.educonnectapp.ui.theme.EduCampo
+import com.educonnectapp.ui.theme.EduConnectAppTheme
+import com.educonnectapp.ui.theme.EduCoral
+import com.educonnectapp.ui.theme.EduEtiqueta
+import com.educonnectapp.ui.theme.EduFondo
+import com.educonnectapp.ui.theme.EduTeal
+import com.educonnectapp.ui.theme.EduTealOscuro
+import com.educonnectapp.ui.theme.EduTexto
+import com.educonnectapp.ui.theme.EduTextoSecundario
+import com.educonnectapp.ui.theme.Nunito
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -33,6 +78,32 @@ data class PadreLecturaItem(
     val nombreHijo: String,
     val leidoEn: String? = null  // null = no leyó
 )
+
+// "2026-10-19T09:52:00" -> "09:52 a. m."
+private fun horaLectura(leidoEn: String?): String {
+    if (leidoEn.isNullOrBlank()) return ""
+    for (patron in listOf("yyyy-MM-dd'T'HH:mm:ss", "yyyy-MM-dd HH:mm:ss")) {
+        try {
+            val d = SimpleDateFormat(patron, Locale.US).parse(leidoEn)
+            return SimpleDateFormat("hh:mm a", Locale("es", "PE")).format(d!!)
+        } catch (_: Exception) { }
+    }
+    return leidoEn
+}
+
+// "2026-10-19" -> "Hoy" / "14 oct"
+private fun fechaCortaDetalle(fecha: String): String = try {
+    if (fecha == SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())) "Hoy" else {
+        val d = SimpleDateFormat("yyyy-MM-dd", Locale.US).parse(fecha)
+        SimpleDateFormat("EEE d MMM", Locale("es", "PE")).format(d!!).replace(".", "")
+    }
+} catch (e: Exception) { fecha }
+
+// =====================================================================
+// DETALLE DE UN COMUNICADO (rediseño 2026)
+// Cabecera fija granate · asunto, mensaje y adjunto · lectura · pestañas Leyeron / Sin leer
+// "Reenviar a N sin leer" en la pestaña Sin leer
+// =====================================================================
 
 @Composable
 fun DetalleComunicadoScreen(
@@ -52,312 +123,187 @@ fun DetalleComunicadoScreen(
     onPerfilDocente: () -> Unit = {},
     onNotificaciones: () -> Unit = {},
     onReenviar: () -> Unit = {},
+    // ----- Rediseño 2026 -----
+    adjuntoNombre: String = "",          // "" = sin adjunto
+    onAbrirAdjunto: () -> Unit = {},
+    cargando: Boolean = false            // se están consultando las lecturas
 ) {
-    var tabSeleccionado by remember { mutableStateOf("Todos") }
+    var tabSeleccionado by remember { mutableStateOf("Leyeron") }
 
     val padresLeidos = padres.filter { it.leidoEn != null }
     val padresSinLeer = padres.filter { it.leidoEn == null }
+    val total = if (padres.isNotEmpty()) padres.size else totalNotificados
     val totalLeidos = padresLeidos.size
     val totalSinLeer = padresSinLeer.size
+    val progreso = if (total > 0) totalLeidos.toFloat() / total else 0f
+    val lista = if (tabSeleccionado == "Sin leer") padresSinLeer else padresLeidos
 
-    val progreso = if (totalNotificados > 0)
-        totalLeidos.toFloat() / totalNotificados.toFloat()
-    else 0f
-
-    val padresFiltrados = when (tabSeleccionado) {
-        "Sin Leer" -> padresSinLeer
-        else -> padresLeidos
+    val textoFecha = buildString {
+        if (fecha.isNotBlank()) append(fechaCortaDetalle(fecha))
+        if (hora.isNotBlank()) { if (isNotEmpty()) append(" · "); append(hora) }
     }
-
-    val fechaActual = remember {
-        SimpleDateFormat("EEEE, dd 'de' MMMM yyyy", Locale("es", "PE"))
-            .format(Date()).replaceFirstChar { it.uppercase() }
-    }
+    val claseTexto = listOf(cursoNombre, "$gradoNombre $seccionNombre".trim()).filter { it.isNotBlank() }.joinToString(" · ")
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(BackgroundLight)
+            .background(EduFondo)
     ) {
-        // HEADER
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(EduconnectBlue)
-                .padding(horizontal = 20.dp, vertical = 16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.weight(1f)
-            ) {
-                IconButton(
-                    onClick = onBack,
-                    modifier = Modifier.size(32.dp).offset(x = (-5).dp)
-                ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.arrowleft_white),
-                        contentDescription = "Volver",
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-                Column {
-                    Text(
-                        text = "Detalle Comunicado",
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 22.sp,
-                        color = TextWhite
-                    )
-                    Text(
-                        text = "Ver detalle",
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp,
-                        color = TextWhite.copy(alpha = 0.8f)
-                    )
-                    Text(
-                        text = fechaActual,
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.Normal,
-                        fontSize = 15.sp,
-                        color = TextWhite.copy(alpha = 0.7f)
-                    )
-                }
-            }
-            IconButton(onClick = onNotificaciones) {
-                Image(
-                    painter = painterResource(id = R.drawable.notification_white),
-                    contentDescription = "Notificaciones",
-                    modifier = Modifier.size(35.dp)
+        // CABECERA FIJA
+        CabeceraEdu(
+            titulo = "Detalle",
+            subtitulo = claseTexto.ifBlank { "Comunicado" },
+            onVolver = onBack,
+            colorFondo = ColorModulo.Comunicados,
+            acciones = {
+                BotonIconoCabeceraEdu(
+                    icono = Icons.Rounded.Notifications,
+                    descripcion = "Notificaciones",
+                    onClick = onNotificaciones,
+                    colorCabecera = ColorModulo.Comunicados
                 )
             }
-        }
+        )
 
-        LazyColumn(
+        // CONTENIDO DESPLAZABLE
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
-                .padding(horizontal = 20.dp, vertical = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            // CARD INFO COMUNICADO
-            item {
-                Column(
+            // COMUNICADO
+            TarjetaEdu(relleno = PaddingValues(horizontal = 16.dp, vertical = 14.dp)) {
+                Text(asunto, fontFamily = Nunito, fontWeight = FontWeight.Black, fontSize = 17.sp, color = EduTexto)
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    if (textoFecha.isNotBlank()) ChipEdu(textoFecha, TonoEdu.AZUL)
+                    ChipEdu(if (total == 1) "1 padre" else "$total padres", TonoEdu.AZUL)
+                }
+                if (mensaje.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        mensaje,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(EduCampo, RoundedCornerShape(14.dp))
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                        fontFamily = Nunito, fontWeight = FontWeight.SemiBold, fontSize = 14.sp,
+                        lineHeight = 19.sp, color = EduEtiqueta
+                    )
+                }
+                if (adjuntoNombre.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(14.dp))
+                            .border(1.5.dp, EduBorde, RoundedCornerShape(14.dp))
+                            .clickable(onClick = onAbrirAdjunto)
+                            .padding(horizontal = 10.dp, vertical = 9.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(Icons.Rounded.Description, contentDescription = null, tint = EduAzulOscuro, modifier = Modifier.size(20.dp))
+                        Text(
+                            adjuntoNombre, modifier = Modifier.weight(1f), fontFamily = Nunito, fontWeight = FontWeight.ExtraBold,
+                            fontSize = 14.sp, color = EduTexto, maxLines = 1, overflow = TextOverflow.Ellipsis
+                        )
+                        Icon(
+                            Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = "Abrir adjunto",
+                            tint = EduTextoSecundario, modifier = Modifier.size(22.dp)
+                        )
+                    }
+                }
+            }
+
+            // LECTURA
+            TarjetaEdu(relleno = PaddingValues(horizontal = 16.dp, vertical = 14.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        "Leído por $totalLeidos de $total padres", modifier = Modifier.weight(1f),
+                        fontFamily = Nunito, fontWeight = FontWeight.Black, fontSize = 15.sp, color = EduTexto
+                    )
+                    Text(
+                        "${(progreso * 100).toInt()}%", fontFamily = Nunito, fontWeight = FontWeight.Black,
+                        fontSize = 18.sp, color = EduTealOscuro
+                    )
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                BarraProgresoEdu(progreso = progreso, color = EduTeal)
+            }
+
+            // PESTAÑAS
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                PestanaDetalle("Leyeron ($totalLeidos)", tabSeleccionado == "Leyeron") { tabSeleccionado = "Leyeron" }
+                PestanaDetalle("Sin leer ($totalSinLeer)", tabSeleccionado == "Sin leer") { tabSeleccionado = "Sin leer" }
+            }
+
+            // LISTA DE PADRES
+            when {
+                cargando && padres.isEmpty() -> TarjetaEdu {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        CircularProgressIndicator(color = EduTeal, strokeWidth = 3.dp, modifier = Modifier.size(24.dp))
+                        Text(
+                            "Cargando lectura...", fontFamily = Nunito, fontWeight = FontWeight.Bold,
+                            fontSize = 15.sp, color = EduTextoSecundario
+                        )
+                    }
+                }
+                lista.isEmpty() -> TarjetaEdu {
+                    Text(
+                        if (tabSeleccionado == "Sin leer") "¡Todos los padres ya lo leyeron!"
+                        else "Aún ningún padre lo ha leído.",
+                        fontFamily = Nunito, fontWeight = FontWeight.SemiBold, fontSize = 14.5.sp,
+                        color = EduTextoSecundario
+                    )
+                }
+                else -> TarjetaEdu(relleno = PaddingValues(horizontal = 12.dp, vertical = 2.dp)) {
+                    lista.forEachIndexed { i, padre ->
+                        FilaPadreLectura(padre = padre, ultima = i == lista.lastIndex)
+                    }
+                }
+            }
+
+            // AVISO DE REENVÍO
+            if (tabSeleccionado == "Sin leer" && totalSinLeer > 0) {
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(BackgroundWhite, RoundedCornerShape(16.dp))
-                        .border(1.5.dp, BorderBlue, RoundedCornerShape(16.dp))
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    // Título
-                    Text(
-                        text = asunto,
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 18.sp,
-                        color = TextBlue
-                    )
-
-                    // Hora y sección
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Image(
-                                painter = painterResource(id = R.drawable.clock_blue),
-                                contentDescription = null,
-                                modifier = Modifier.size(22.dp)
-                            )
-                            Text(
-                                text = "$fecha $hora",
-                                fontFamily = Roboto,
-                                fontSize = 16.sp,
-                                color = TextPrimary
-                            )
-                        }
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Image(
-                                painter = painterResource(id = R.drawable.students_blue),
-                                contentDescription = null,
-                                modifier = Modifier.size(22.dp)
-                            )
-                            Text(
-                                text = "$gradoNombre Sec. $seccionNombre - $totalNotificados",
-                                fontFamily = Roboto,
-                                fontSize = 16.sp,
-                                color = TextPrimary
-                            )
-                        }
-                    }
-
-                    // Mensaje
-                    Text(
-                        text = mensaje,
-                        fontFamily = Roboto,
-                        fontSize = 15.sp,
-                        color = TextPrimary,
-                        maxLines = 3,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(BackgroundBlueLight, RoundedCornerShape(10.dp))
-                            .padding(10.dp)
-                    )
-
-                    // Progreso lectura
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Leido",
-                            fontFamily = Roboto,
-                            fontSize = 15.sp,
-                            color = TextSecondary
-                        )
-                        Text(
-                            text = "$totalLeidos / $totalNotificados",
-                            fontFamily = Roboto,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 15.sp,
-                            color = StatusGreen
-                        )
-                    }
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(8.dp)
-                            .background(BackgroundLight, RoundedCornerShape(4.dp))
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth(progreso)
-                                .height(8.dp)
-                                .background(StatusGreen, RoundedCornerShape(4.dp))
-                        )
-                    }
-                }
-            }
-
-            // TABS
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
+                        .background(EduAmarilloClaro, RoundedCornerShape(16.dp))
+                        .padding(horizontal = 14.dp, vertical = 12.dp),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    listOf(
-                        "Todos" to "Todos ($totalLeidos)",
-                        "Sin Leer" to "Sin Leer ($totalSinLeer)"
-                    ).forEach { (tab, label) ->
-                        val isActive = tabSeleccionado == tab
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(20.dp))
-                                .background(
-                                    if (isActive && tab == "Todos") EduconnectBlue
-                                    else Color.White
-                                )
-                                .border(
-                                    1.5.dp,
-                                    if (isActive && tab == "Sin Leer") StatusErrorRed
-                                    else if (isActive) EduconnectBlue
-                                    else BorderBlue,
-                                    RoundedCornerShape(20.dp)
-                                )
-                                .clickable { tabSeleccionado = tab }
-                                .padding(horizontal = 16.dp, vertical = 8.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = label,
-                                fontFamily = Roboto,
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 15.sp,
-                                color = when {
-                                    isActive && tab == "Sin Leer" -> StatusErrorRed
-                                    isActive -> TextWhite
-                                    else -> TextPrimary
-                                }
-                            )
-                        }
-                    }
+                    Icon(Icons.Rounded.Info, contentDescription = null, tint = EduAmarilloOscuro, modifier = Modifier.size(22.dp))
+                    Text(
+                        "Reenviar manda otra notificación solo a los padres que aún no lo leen.",
+                        modifier = Modifier.weight(1f),
+                        fontFamily = Nunito, fontWeight = FontWeight.SemiBold, fontSize = 13.sp,
+                        lineHeight = 18.sp, color = EduAmarilloOscuro
+                    )
                 }
-            }
-
-            // LISTA PADRES
-            items(padresFiltrados) { padre ->
-                PadreLecturaCard(padre = padre)
-            }
-
-            // VER MÁS
-            if (padresFiltrados.size > 3) {
-                item {
-                    Box(
-                        modifier = Modifier.fillMaxWidth(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "+ ${padresFiltrados.size - 3} más  ↓",
-                            fontFamily = Roboto,
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 14.sp,
-                            color = EduconnectBlue
-                        )
-                    }
-                }
-            }
-
-            item {
-                Spacer(modifier = Modifier.height(60.dp))
             }
         }
 
-        // BOTÓN REENVIAR
-        if (totalSinLeer > 0) {
-            Box(
+        // BOTÓN FIJO: REENVIAR (solo en la pestaña Sin leer)
+        if (tabSeleccionado == "Sin leer" && totalSinLeer > 0) {
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(BackgroundWhite)
-                    .padding(horizontal = 20.dp, vertical = 12.dp)
+                    .background(EduFondo)
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
             ) {
-                Button(
-                    onClick = onReenviar,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(52.dp),
-                    shape = RoundedCornerShape(14.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = AccentOrange)
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Image(
-                            painter = painterResource(id = R.drawable.sendstatement_white),
-                            contentDescription = null,
-                            modifier = Modifier.size(30.dp)
-                        )
-                        Text(
-                            text = "Reenviar a $totalSinLeer sin leer",
-                            fontFamily = Roboto,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 20.sp,
-                            color = TextWhite
-                        )
-                    }
-                }
+                BotonPrincipalEdu(
+                    texto = "Reenviar a $totalSinLeer sin leer",
+                    tipo = TipoBotonEdu.AVANZAR,
+                    icono = Icons.AutoMirrored.Rounded.Send,
+                    onClick = onReenviar
+                )
             }
         }
 
@@ -371,99 +317,80 @@ fun DetalleComunicadoScreen(
     }
 }
 
+// Pestaña tipo pastilla: granate sólido cuando está activa
 @Composable
-fun PadreLecturaCard(padre: PadreLecturaItem) {
-    val leyo = padre.leidoEn != null
-
-    // Formatear hora desde timestamp "2026-05-23T09:52:00"
-    val horaFormateada = remember(padre.leidoEn) {
-        if (padre.leidoEn == null) return@remember ""
-        try {
-            val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault())
-            val date = sdf.parse(padre.leidoEn)
-            SimpleDateFormat("hh:mm a", Locale("es", "PE")).format(date!!)
-        } catch (e: Exception) {
-            try {
-                val sdf2 = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
-                val date2 = sdf2.parse(padre.leidoEn)
-                SimpleDateFormat("hh:mm a", Locale("es", "PE")).format(date2!!)
-            } catch (e2: Exception) { padre.leidoEn }
-        }
-    }
-
-    Row(
+private fun PestanaDetalle(texto: String, activa: Boolean, onClick: () -> Unit) {
+    val forma = RoundedCornerShape(50)
+    Text(
+        texto,
         modifier = Modifier
-            .fillMaxWidth()
-            .background(BackgroundWhite, RoundedCornerShape(12.dp))
-            .border(1.5.dp, BorderOrange.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
-            .padding(horizontal = 14.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        // Punto indicador
-        Image(
-            painter = painterResource(
-                id = if (leyo) R.drawable.check_green_dark else R.drawable.close_red
-            ),
-            contentDescription = null,
-            modifier = Modifier.size(if (leyo) 22.dp else 10.dp)
-        )
+            .clip(forma)
+            .background(if (activa) EduCoral else Color.White)
+            .border(1.5.dp, if (activa) EduCoral else EduBorde, forma)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 7.dp),
+        fontFamily = Nunito, fontWeight = FontWeight.Black, fontSize = 13.5.sp,
+        color = if (activa) Color.White else EduEtiqueta
+    )
+}
 
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = padre.nombrePadre,
-                fontFamily = Roboto,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 17.sp,
-                color = TextBlue
-            )
-            Text(
-                text = "Padre de ${padre.nombreHijo}",
-                fontFamily = Roboto,
-                fontSize = 15.sp,
-                color = TextPrimary
-            )
-        }
-
-        if (leyo) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
+// Fila de un padre: iniciales, nombre, "Padre de …" y hora de lectura o "Sin leer"
+@Composable
+private fun FilaPadreLectura(padre: PadreLecturaItem, ultima: Boolean) {
+    val leyo = padre.leidoEn != null
+    val c = coloresDeTono(if (leyo) TonoEdu.VERDE else TonoEdu.CORAL)
+    val iniciales = padre.nombrePadre.split(" ").filter { it.isNotBlank() }.take(2)
+        .mapNotNull { it.firstOrNull()?.uppercaseChar() }.joinToString("")
+    Column {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier.size(38.dp).background(c.fondo, CircleShape),
+                contentAlignment = Alignment.Center
             ) {
-                Image(
-                    painter = painterResource(id = R.drawable.eye_green),
-                    contentDescription = null,
-                    modifier = Modifier.size(21.dp)
-                )
-                Text(
-                    text = horaFormateada,
-                    fontFamily = Roboto,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 16.sp,
-                    color = StatusGreen
-                )
+                Text(iniciales, fontFamily = Nunito, fontWeight = FontWeight.Black, fontSize = 13.sp, color = c.texto)
             }
+            Spacer(modifier = Modifier.width(10.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    padre.nombrePadre, fontFamily = Nunito, fontWeight = FontWeight.Black, fontSize = 14.5.sp,
+                    color = EduTexto, maxLines = 1, overflow = TextOverflow.Ellipsis
+                )
+                if (padre.nombreHijo.isNotBlank()) {
+                    Text(
+                        "Padre de ${padre.nombreHijo}", fontFamily = Nunito, fontWeight = FontWeight.Bold,
+                        fontSize = 12.5.sp, color = EduTextoSecundario, maxLines = 1, overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            if (leyo) ChipEdu(horaLectura(padre.leidoEn).ifBlank { "Leído" }, TonoEdu.VERDE, icono = Icons.Rounded.Visibility)
+            else ChipEdu("Sin leer", TonoEdu.CORAL)
         }
+        if (!ultima) Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(EduFondo))
     }
 }
 
-@Preview(showBackground = true)
+@Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
 fun DetalleComunicadoPreview() {
     EduConnectAppTheme {
         DetalleComunicadoScreen(
-            asunto = "Reunión de padres - Vie 23",
-            mensaje = "Estimados padres de familia, los invitamos a la reunión del viernes 23 de mayo a las 4:00pm en el aula de 2A...",
-            fecha = "Hoy",
-            hora = "9:45 AM",
-            gradoNombre = "2do",
+            asunto = "Reunión de padres · viernes 23",
+            mensaje = "Estimados padres de familia, los invitamos a la reunión del viernes 23 a las 4:00 p. m. en el aula de 1er Grado A.",
+            fecha = "2026-10-19",
+            hora = "10:24 a. m.",
+            gradoNombre = "1er Grado",
             seccionNombre = "A",
-            cursoNombre = "Matemáticas",
-            totalNotificados = 28,
+            cursoNombre = "Ciencia y Tecnología",
+            totalNotificados = 5,
+            adjuntoNombre = "agenda_reunion.pdf",
             padres = listOf(
-                PadreLecturaItem("1", "Luis Peres", "Carlos", "2026-05-23T09:52:00"),
-                PadreLecturaItem("2", "Carlos Castillo", "Maria", "2026-05-23T09:52:00"),
-                PadreLecturaItem("3", "Jesus Viera", "Cesar", "2026-05-23T09:52:00"),
+                PadreLecturaItem("1", "Luis Pérez", "Carlos", "2026-10-19T09:52:00"),
+                PadreLecturaItem("2", "Carla Castillo", "María", "2026-10-19T10:05:00"),
+                PadreLecturaItem("3", "Jesús Viera", "César", "2026-10-19T10:31:00"),
                 PadreLecturaItem("4", "Ana Torres", "Pedro", null),
                 PadreLecturaItem("5", "Rosa Medina", "Luis", null)
             ),

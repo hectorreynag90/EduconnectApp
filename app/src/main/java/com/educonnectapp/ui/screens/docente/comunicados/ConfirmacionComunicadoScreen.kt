@@ -1,12 +1,10 @@
-package com.educonnectapp.ui.screens
+package com.educonnectapp.ui.screens.docente.comunicados
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -17,43 +15,67 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.AttachFile
+import androidx.compose.material.icons.rounded.CalendarToday
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Groups
+import androidx.compose.material.icons.rounded.MenuBook
+import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.Visibility
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.educonnectapp.R
-import com.educonnectapp.ui.screens.docente.asistencia.FilaRegistro
-import com.educonnectapp.ui.theme.AccentOrange
-import com.educonnectapp.ui.theme.Background
-import com.educonnectapp.ui.theme.BackgroundLight
-import com.educonnectapp.ui.theme.BackgroundWhite
-import com.educonnectapp.ui.theme.BorderBlue
-import com.educonnectapp.ui.theme.DividerColor
+import com.educonnectapp.ui.components.BotonIconoCabeceraEdu
+import com.educonnectapp.ui.components.BotonPrincipalEdu
+import com.educonnectapp.ui.components.BotonSecundarioEdu
+import com.educonnectapp.ui.components.CabeceraEdu
+import com.educonnectapp.ui.components.ChipEdu
+import com.educonnectapp.ui.components.ColorModulo
+import com.educonnectapp.ui.components.TarjetaEdu
+import com.educonnectapp.ui.components.TipoBotonEdu
+import com.educonnectapp.ui.components.TonoEdu
+import com.educonnectapp.ui.theme.EduAzulOscuroClaro
 import com.educonnectapp.ui.theme.EduConnectAppTheme
-import com.educonnectapp.ui.theme.EduconnectBlue
-import com.educonnectapp.ui.theme.EduconnectBlueMedium
-import com.educonnectapp.ui.theme.Roboto
-import com.educonnectapp.ui.theme.TextBlue
-import com.educonnectapp.ui.theme.TextSecondary
-import com.educonnectapp.ui.theme.TextWhite
+import com.educonnectapp.ui.theme.EduFondo
+import com.educonnectapp.ui.theme.EduTeal
+import com.educonnectapp.ui.theme.EduTealClaro
+import com.educonnectapp.ui.theme.EduTealOscuro
+import com.educonnectapp.ui.theme.EduTexto
+import com.educonnectapp.ui.theme.EduTextoSecundario
+import com.educonnectapp.ui.theme.Nunito
 import java.text.SimpleDateFormat
-import java.util.Date
 import java.util.Locale
 
+// Verde de las pantallas anteriores. Ya no se usa aquí; se conserva por si otra
+// pantalla aún no rediseñada lo importa. Se elimina al terminar el rediseño.
 val ConfirmGreen = Color(0xFF00B050)
+
+// "2026-10-19" -> "Lunes 19 de octubre"
+private fun fechaConfirmacion(fecha: String): String = try {
+    val d = SimpleDateFormat("yyyy-MM-dd", Locale.US).parse(fecha.take(10))
+    SimpleDateFormat("EEEE d 'de' MMMM", Locale("es", "PE")).format(d!!).replaceFirstChar { it.uppercase() }
+} catch (e: Exception) { fecha }
+
+// =====================================================================
+// COMUNICADO ENVIADO (rediseño 2026)
+// Pantalla informativa: cabecera granate con X a la derecha (sin campana) ·
+// check turquesa · datos del envío · "Nuevo comunicado" / "Ver comunicados de la clase"
+// =====================================================================
 
 @Composable
 fun ConfirmacionComunicadoScreen(
@@ -65,271 +87,145 @@ fun ConfirmacionComunicadoScreen(
     hora: String,
     fecha: String,
     onNuevoComunicado: () -> Unit = {},
-    onVerHistorial: () -> Unit = {},
-    onClose: () -> Unit = {}
+    onVerHistorial: () -> Unit = {},     // "Ver comunicados de la clase"
+    onClose: () -> Unit = {},
+    // ----- Rediseño 2026 -----
+    adjunto: String = ""                 // nombre del archivo adjunto ("" = sin adjunto)
 ) {
-
-    val fechaDisplay = remember {
-        SimpleDateFormat("EEEE, dd 'de' MMMM yyyy", Locale("es", "PE"))
-            .format(Date())
-            .replaceFirstChar { it.uppercase() }
-    }
-
-    val horaDisplay = remember {
-        SimpleDateFormat("hh:mma", Locale.getDefault()).format(Date())
-    }
+    val fechaTexto = remember(fecha) { fechaConfirmacion(fecha) }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(BackgroundLight)
+            .background(EduFondo)
     ) {
-        //HEADER
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(Background)
-                .padding(horizontal = 20.dp, vertical = 16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                Image(
-                    painter = painterResource(id = R.drawable.logo_educonnect),
-                    contentDescription = "Logo",
-                    modifier = Modifier.size(46.dp)
-                )
-                Column {
-                    Text(
-                        text = "EduConnect",
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 22.sp,
-                        color = TextWhite
-                    )
-                    Text(
-                        text = "!Confirmación envío¡",
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.Normal,
-                        fontSize = 16.sp,
-                        color = TextWhite.copy(alpha = 0.85f)
-                    )
-                }
-            }
-            Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .background(EduconnectBlueMedium, CircleShape)
-                    .clickable { onClose() },
-                contentAlignment = Alignment.Center
-            ) {
-                Image(
-                    painter = painterResource(id = R.drawable.close_white),
-                    contentDescription = "Cerrar",
-                    modifier = Modifier.size(26.dp)
+        // CABECERA FIJA: solo la X para cerrar (pantalla informativa)
+        CabeceraEdu(
+            titulo = "Comunicado enviado",
+            subtitulo = "Ya se notificó a los padres",
+            colorFondo = ColorModulo.Comunicados,
+            acciones = {
+                BotonIconoCabeceraEdu(
+                    icono = Icons.Rounded.Close,
+                    descripcion = "Cerrar",
+                    onClick = onClose,
+                    colorCabecera = ColorModulo.Comunicados
                 )
             }
-        }
+        )
 
-        //CONTENIDO
+        // CONTENIDO
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 24.dp, vertical = 28.dp),
+                .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            // ÍCONO CHECK
+            // Check turquesa con halo
+            Spacer(modifier = Modifier.height(6.dp))
             Box(
-                modifier = Modifier
-                    .size(100.dp),
+                modifier = Modifier.size(96.dp).background(EduTealClaro, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
-                Image(
-                    painter = painterResource(id = R.drawable.checkcircle_green),
-                    contentDescription = null,
-                    modifier = Modifier.size(110.dp)
-                )
+                Box(
+                    modifier = Modifier.size(72.dp).background(EduTeal, CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Rounded.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(42.dp))
+                }
             }
-
-            // TÍTULO
             Text(
-                text = "¡Comunicado enviado!",
-                fontFamily = Roboto,
-                fontWeight = FontWeight.Bold,
-                fontSize = 24.sp,
-                color = ConfirmGreen,
-                textAlign = TextAlign.Center
+                "¡Comunicado enviado!", fontFamily = Nunito, fontWeight = FontWeight.Black,
+                fontSize = 22.sp, color = EduTealOscuro, textAlign = TextAlign.Center
             )
-
-            // SUBTÍTULO
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Image(
-                    painter = painterResource(id = R.drawable.users_darkgray),
-                    contentDescription = null,
-                    modifier = Modifier.size(24.dp)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ChipEdu(
+                    if (totalNotificados == 1) "1 padre notificado" else "$totalNotificados padres notificados",
+                    TonoEdu.VERDE
                 )
-                Text(
-                    text = "$totalNotificados padres notificados -",
-                    fontFamily = Roboto,
-                    fontWeight = FontWeight.Medium,
-                    fontSize = 16.sp,
-                    color = TextSecondary
-                )
-                Image(
-                    painter = painterResource(id = R.drawable.clock_darkgray),
-                    contentDescription = null,
-                    modifier = Modifier.size(24.dp)
-                )
-                Text(
-                    text = horaDisplay,
-                    fontFamily = Roboto,
-                    fontWeight = FontWeight.Medium,
-                    fontSize = 16.sp,
-                    color = TextSecondary
-                )
+                if (hora.isNotBlank()) ChipEdu(hora, TonoEdu.AZUL)
             }
 
+            // DATOS DEL ENVÍO
             Spacer(modifier = Modifier.height(4.dp))
-
-            // TARJETA DATOS
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(BackgroundWhite, RoundedCornerShape(14.dp))
-                    .border(1.dp, BorderBlue, RoundedCornerShape(14.dp))
-                    .padding(horizontal = 18.dp, vertical = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
+            TarjetaEdu(relleno = PaddingValues(horizontal = 16.dp, vertical = 14.dp)) {
                 Text(
-                    text = asunto,
-                    fontFamily = Roboto,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp,
-                    color = TextBlue
+                    asunto, fontFamily = Nunito, fontWeight = FontWeight.Black, fontSize = 16.sp,
+                    color = EduTexto, maxLines = 3, overflow = TextOverflow.Ellipsis
                 )
-
-                HorizontalDivider(
-                    modifier = Modifier.padding(vertical = 4.dp),
-                    thickness = 4.dp,
-                    color = DividerColor
-                )
-
-                FilaRegistro(
-                    iconRes = R.drawable.teacher_darkgray,
-                    label = "Docente",
-                    valor = docenteNombre,
-                    colorValor = EduconnectBlue
-                )
-                FilaRegistro(
-                    iconRes = R.drawable.task_darkgray,
-                    label = "Curso",
-                    valor = curso,
-                    colorValor = EduconnectBlue
-                )
-                FilaRegistro(
-                    iconRes = R.drawable.level_darkgray,
-                    label = "Enviado a",
-                    valor = destinatario,
-                    colorValor = EduconnectBlue
-                )
-
-                HorizontalDivider(
-                    modifier = Modifier.padding(vertical = 4.dp),
-                    thickness = 1.dp,
-                    color = DividerColor
-                )
-
-                FilaRegistro(
-                    iconRes = R.drawable.agenda_darkgray,
-                    label = "Fecha",
-                    valor = fechaDisplay,
-                    colorValor = EduconnectBlue
-                )
-                FilaRegistro(
-                    iconRes = R.drawable.clock_darkgray,
-                    label = "Hora",
-                    valor = hora,
-                    colorValor = EduconnectBlue
-                )
-                FilaRegistro(
-                    iconRes = R.drawable.users_darkgray,
-                    label = "Notificados",
-                    valor = "$totalNotificados Padres",
-                    colorValor = EduconnectBlue
-                )
+                Spacer(modifier = Modifier.height(6.dp))
+                FilaDatoComunicado(Icons.Rounded.Groups, "Para", destinatario.replace(" Sec. ", " "))
+                FilaDatoComunicado(Icons.Rounded.MenuBook, "Curso", curso.ifBlank { "General" })
+                FilaDatoComunicado(Icons.Rounded.CalendarToday, "Fecha", fechaTexto)
+                if (adjunto.isNotBlank()) FilaDatoComunicado(Icons.Rounded.AttachFile, "Adjunto", adjunto)
+                if (docenteNombre.isNotBlank()) FilaDatoComunicado(Icons.Rounded.Person, "Docente", docenteNombre)
             }
+        }
 
-            Spacer(modifier = Modifier.height(30.dp))
-
-            // BOTÓN NUEVO COMUNICADO
-            Button(
-                onClick = onNuevoComunicado,
-                modifier = Modifier.fillMaxWidth().height(54.dp),
-                shape = RoundedCornerShape(28.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = AccentOrange)
-            ) {
-                Image(
-                    painter = painterResource(id = R.drawable.document_white),
-                    contentDescription = null,
-                    modifier = Modifier.size(32.dp)
-                )
-                Spacer(modifier = Modifier.width(5.dp))
-                Text(
-                    text = "Nuevo comunicado",
-                    fontFamily = Roboto,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 20.sp,
-                    color = TextWhite
-                )
-            }
-
-            //LINK VER HISTORIAL
-            Row(
-                modifier = Modifier.clickable { onVerHistorial() },
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Image(
-                    painter = painterResource(id = R.drawable.eye_blue),
-                    contentDescription = null,
-                    modifier = Modifier.size(26.dp)
-                )
-                Text(
-                    text = "Ver Historial Comunicados",
-                    fontFamily = Roboto,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 18.sp,
-                    color = TextBlue
-                )
-            }
+        // BOTONES FIJOS ABAJO
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(EduFondo)
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            BotonPrincipalEdu(
+                texto = "Nuevo comunicado",
+                tipo = TipoBotonEdu.GUARDAR,
+                icono = Icons.Rounded.Add,
+                onClick = onNuevoComunicado
+            )
+            BotonSecundarioEdu(
+                texto = "Ver comunicados de la clase",
+                icono = Icons.Rounded.Visibility,
+                onClick = onVerHistorial
+            )
         }
     }
 }
 
-@Preview(showBackground = true)
+// Fila "ícono · etiqueta · valor" de los datos del envío
+@Composable
+private fun FilaDatoComunicado(icono: ImageVector, etiqueta: String, valor: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier.size(34.dp).background(EduAzulOscuroClaro, CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(icono, contentDescription = null, tint = EduTextoSecundario, modifier = Modifier.size(17.dp))
+        }
+        Spacer(modifier = Modifier.width(10.dp))
+        Text(
+            etiqueta, modifier = Modifier.width(76.dp), fontFamily = Nunito, fontWeight = FontWeight.Bold,
+            fontSize = 13.5.sp, color = EduTextoSecundario
+        )
+        Text(
+            valor, modifier = Modifier.weight(1f), fontFamily = Nunito, fontWeight = FontWeight.Black,
+            fontSize = 14.5.sp, color = EduTexto, maxLines = 2, overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+@Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
 fun ConfirmacionComunicadoPreview() {
     EduConnectAppTheme {
         ConfirmacionComunicadoScreen(
-            docenteNombre = "Eduardo Carranza",
-            curso = "Matemáticas",
-            asunto = "Reunion de padres - Viernes 23 de Mayo",
-            destinatario = "1er Sec. A",
-            totalNotificados = 10,
-            hora = "04:38 PM",
-            fecha = "2026-06-14",
-            onNuevoComunicado = {},
-            onVerHistorial = {},
-            onClose = {}
+            docenteNombre = "Hector Reyna Gomez",
+            curso = "Ciencia y Tecnología",
+            asunto = "Reunión de padres · viernes 23",
+            destinatario = "1er Grado Sec. A",
+            totalNotificados = 5,
+            hora = "10:24 a. m.",
+            fecha = "2026-10-19",
+            adjunto = "agenda_reunion.pdf"
         )
     }
 }
