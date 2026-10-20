@@ -1772,20 +1772,28 @@ fun EduConnectApp() {
                             val hoy = java.time.LocalDate.now()
                             val desde = hoy.withDayOfMonth(1).toString()
                             // % de asistencia del mes de cada hijo (1 petición por hijo, en paralelo)
-                            val porcentajes = coroutineScope {
+                            val asistenciasMes = coroutineScope {
                                 hijos.map { h ->
-                                    async {
-                                        // A y T cuentan como asistencia
-                                        val asistencias = obtenerAsistenciasHijo(h.alumnoId, desde, hoy.toString()).asistencias
-                                        porcentajeAsistencia(asistencias.map { it.estado })
-                                    }
+                                    async { obtenerAsistenciasHijo(h.alumnoId, desde, hoy.toString()).asistencias }
                                 }.awaitAll()
                             }
+                            val hoyTexto = hoy.toString()
                             listaHijosSel = hijos.mapIndexed { i, h ->
+                                val mesHijo = asistenciasMes[i]
+                                val deHoy = mesHijo.filter { it.fecha.take(10) == hoyTexto }.map { it.estado }
                                 HijoItem(
                                     id = h.alumnoId, nombres = h.nombres, apellidos = h.apellidos,
                                     gradoNombre = h.grado, seccionNombre = h.seccion,
-                                    porcentajeMes = porcentajes[i]
+                                    // A y T cuentan como asistencia
+                                    porcentajeMes = porcentajeAsistencia(mesHijo.map { it.estado }),
+                                    registrosMes = mesHijo.size,
+                                    faltasMes = mesHijo.count { it.estado == "F" },
+                                    estadoHoy = when {
+                                        "F" in deHoy -> "F"
+                                        "T" in deHoy -> "T"
+                                        deHoy.isNotEmpty() -> "A"
+                                        else -> null
+                                    }
                                 )
                             }
                             hijosAsistenciaCargados = true
@@ -1797,6 +1805,11 @@ fun EduConnectApp() {
                         padreId = usuarioLogueado?.id?.toString() ?: "",
                         padreNombre = usuarioLogueado?.nombrecompleto ?: "",
                         listaHijos = listaHijosSel,
+                        cargando = !hijosAsistenciaCargados,
+                        onAsociarHijo = {
+                            origenAsociarHijo = Screen.SELECCIONAR_ESTUDIANTE
+                            currentScreen = Screen.ASOCIAR_HIJO
+                        },
                         onBack = { currentScreen = Screen.HOME_PADRE },
                         onHomePadre = { currentScreen = Screen.HOME_PADRE },
                         onAvisos = { irAvisosPadre() },
@@ -1827,16 +1840,20 @@ fun EduConnectApp() {
                                 .distinctBy { it.cursoId }
                                 .map { CursoItem2(it.cursoId, it.curso) }
                                 .sortedBy { it.nombre }
-                            todasAsistenciasSel = historial.asistencias.map { a ->
-                                AsistenciaItem(
-                                    id = a.asistenciaId,
-                                    alumnoId = alumnoIdSel,
-                                    cursoId = a.cursoId,
-                                    cursoNombre = a.curso,
-                                    fecha = a.fecha,
-                                    estado = a.estado
-                                )
-                            }
+                            todasAsistenciasSel = historial.asistencias
+                                .sortedWith(compareBy({ it.fecha }, { it.hora }))   // por fecha y hora de registro
+                                .map { a ->
+                                    AsistenciaItem(
+                                        id = a.asistenciaId,
+                                        alumnoId = alumnoIdSel,
+                                        cursoId = a.cursoId,
+                                        cursoNombre = a.curso,
+                                        fecha = a.fecha,
+                                        estado = a.estado,
+                                        hora = horaAsistencia(a.hora),
+                                        docente = a.docente
+                                    )
+                                }
                             historialHijoCargadoDe = alumnoIdSel
                         } catch (e: kotlinx.coroutines.CancellationException) {
                             throw e
@@ -1850,6 +1867,9 @@ fun EduConnectApp() {
                         alumnoNombre = alumnoNombreSel,
                         todasAsistencias = todasAsistenciasSel,
                         listaCursos = listaCursosHistorialSel,
+                        gradoSeccion = listaHijosSel.find { it.id == alumnoIdSel }
+                            ?.let { "${it.gradoNombre} ${it.seccionNombre}" } ?: "",
+                        cargando = historialHijoCargadoDe != alumnoIdSel,
                         onBack = { currentScreen = Screen.SELECCIONAR_ESTUDIANTE },
                         onHomePadre = { currentScreen = Screen.HOME_PADRE },
                         onAvisos = { irAvisosPadre() },

@@ -1,67 +1,83 @@
 package com.educonnectapp.ui.screens.padre.asistencia
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.IconButton
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Notifications
+import androidx.compose.material.icons.rounded.PersonAdd
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.graphics.Color
-import com.educonnectapp.R
+import com.educonnectapp.ui.components.BarraProgresoEdu
+import com.educonnectapp.ui.components.BotonIconoCabeceraEdu
+import com.educonnectapp.ui.components.CabeceraEdu
+import com.educonnectapp.ui.components.ChipCabeceraEdu
+import com.educonnectapp.ui.components.ChipEdu
+import com.educonnectapp.ui.components.ColorModulo
+import com.educonnectapp.ui.components.IconoCirculoEdu
+import com.educonnectapp.ui.components.TarjetaEdu
+import com.educonnectapp.ui.components.TituloSeccionEdu
+import com.educonnectapp.ui.components.TonoEdu
 import com.educonnectapp.ui.screens.padre.inicio.BottomNavBarPadre
-import com.educonnectapp.ui.theme.AccentOrange
-import com.educonnectapp.ui.theme.BackgroundLight
-import com.educonnectapp.ui.theme.BackgroundWhite
-import com.educonnectapp.ui.theme.BorderBlue
+import com.educonnectapp.ui.theme.EduAmarillo
+import com.educonnectapp.ui.theme.EduAmarilloOscuro
 import com.educonnectapp.ui.theme.EduConnectAppTheme
-import com.educonnectapp.ui.theme.EduconnectBlue
-import com.educonnectapp.ui.theme.Roboto
-import com.educonnectapp.ui.theme.TextBlue
-import com.educonnectapp.ui.theme.TextSecondary
-import com.educonnectapp.ui.theme.TextWhite
-import java.text.SimpleDateFormat
-import java.util.Date
+import com.educonnectapp.ui.theme.EduCoral
+import com.educonnectapp.ui.theme.EduCoralOscuro
+import com.educonnectapp.ui.theme.EduEtiqueta
+import com.educonnectapp.ui.theme.EduFondo
+import com.educonnectapp.ui.theme.EduTeal
+import com.educonnectapp.ui.theme.EduTealClaro
+import com.educonnectapp.ui.theme.EduTealOscuro
+import com.educonnectapp.ui.theme.EduTexto
+import com.educonnectapp.ui.theme.EduTextoSecundario
+import com.educonnectapp.ui.theme.Nunito
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-// Data class para hijo del padre
+// Hijo del padre con su resumen de asistencia del mes (lo arma MainActivity)
 data class HijoItem(
     val id: Long,
     val nombres: String,
     val apellidos: String,
     val gradoNombre: String,
     val seccionNombre: String,
-    val porcentajeMes: Int
+    val porcentajeMes: Int,
+    // ----- Rediseño 2026 -----
+    val registrosMes: Int = 0,          // clases con asistencia registrada en el mes
+    val faltasMes: Int = 0,
+    val estadoHoy: String? = null       // peor estado de hoy: "A" | "T" | "F" (null = sin registros hoy)
 )
+
+// =====================================================================
+// ASISTENCIA DEL PADRE · ELEGIR HIJO (rediseño 2026)
+// Cabecera fija azul oscuro · una tarjeta por hijo (se toca y entra a su historial)
+// =====================================================================
 
 @Composable
 fun SeleccionarEstudianteScreen(
@@ -74,206 +90,198 @@ fun SeleccionarEstudianteScreen(
     onAgenda: () -> Unit = {},
     onPerfil: () -> Unit = {},
     onNotificaciones: () -> Unit = {},
-    onVerHistorial: (alumnoId: Long, alumnoNombre: String) -> Unit = { _, _ -> }
+    onVerHistorial: (alumnoId: Long, alumnoNombre: String) -> Unit = { _, _ -> },
+    // ----- Rediseño 2026 -----
+    cargando: Boolean = false,
+    onAsociarHijo: () -> Unit = {}
 ) {
-    val fechaActual = remember {
-        SimpleDateFormat("EEEE, dd 'de' MMMM yyyy", Locale("es", "PE"))
-            .format(Date()).replaceFirstChar { it.uppercase() }
-    }
-
-    val mesNombre = remember {
-        SimpleDateFormat("MMMM", Locale("es", "PE")).format(Date())
+    val mesActual = remember {
+        LocalDate.now().format(DateTimeFormatter.ofPattern("MMMM yyyy", Locale("es", "PE")))
             .replaceFirstChar { it.uppercase() }
     }
-
-    var alumnoSeleccionado by remember { mutableStateOf<HijoItem?>(null) }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(BackgroundLight)
+            .background(EduFondo)
     ) {
-        // HEADER AZUL
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(EduconnectBlue)
-                .padding(horizontal = 20.dp, vertical = 16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Row(
-                modifier = Modifier.weight(1f),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                IconButton(onClick = onBack,
-                    modifier = Modifier.size(32.dp).offset(x = (-5).dp)) {
-                    Image(painter = painterResource(id = R.drawable.arrowleft_white),
-                        contentDescription = "Volver", modifier = Modifier.size(18.dp))
-                }
-                Column {
-                    Text(text = "ASISTENCIAS", fontFamily = Roboto,
-                        fontWeight = FontWeight.Bold, fontSize = 20.sp, color = TextWhite)
-                    Text(text = "Asignados a $padreNombre", fontFamily = Roboto,
-                        fontWeight = FontWeight.Normal, fontSize = 17.sp,
-                        color = TextWhite.copy(alpha = 0.85f))
-                    Text(text = fechaActual, fontFamily = Roboto,
-                        fontWeight = FontWeight.Normal, fontSize = 14.sp,
-                        color = TextWhite.copy(alpha = 0.85f))
-                }
+        // CABECERA FIJA
+        CabeceraEdu(
+            titulo = "Asistencia",
+            subtitulo = "Elige a tu hijo",
+            onVolver = onBack,
+            colorFondo = ColorModulo.Asistencia,
+            acciones = {
+                BotonIconoCabeceraEdu(
+                    icono = Icons.Rounded.Notifications,
+                    descripcion = "Notificaciones",
+                    onClick = onNotificaciones,
+                    colorCabecera = ColorModulo.Asistencia
+                )
+            },
+            contenidoInferior = {
+                ChipCabeceraEdu(mesActual, modifier = Modifier.padding(top = 14.dp), colorCabecera = ColorModulo.Asistencia)
             }
-            IconButton(onClick = onNotificaciones) {
-                Image(painter = painterResource(id = R.drawable.notification_white),
-                    contentDescription = "Notificaciones", modifier = Modifier.size(35.dp))
-            }
-        }
+        )
 
-        Spacer(modifier = Modifier.height(20.dp))
-
-        // TÍTULO FIJO
-        Column(
-            modifier = Modifier.fillMaxWidth().background(BackgroundLight)
-                .padding(horizontal = 20.dp, vertical = 15.dp)
-        ) {
-            Text(text = "SELECCIONA EL ESTUDIANTE", fontFamily = Roboto,
-                fontWeight = FontWeight.Bold, fontSize = 20.sp, color = TextBlue)
-        }
-
-        // LISTA SCROLLEABLE
+        // CONTENIDO DESPLAZABLE
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            listaHijos.forEach { alumno ->
-                val seleccionado = alumno.id == alumnoSeleccionado?.id
-                val iniciales = "${alumno.nombres.firstOrNull() ?: ""}${alumno.apellidos.firstOrNull() ?: ""}".uppercase()
+            TituloSeccionEdu("Mis hijos")
+            when {
+                cargando && listaHijos.isEmpty() -> TarjetaEdu {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        CircularProgressIndicator(color = EduTeal, strokeWidth = 3.dp, modifier = Modifier.size(24.dp))
+                        Text(
+                            "Cargando la asistencia…", fontFamily = Nunito, fontWeight = FontWeight.Bold,
+                            fontSize = 15.sp, color = EduTextoSecundario
+                        )
+                    }
+                }
+                listaHijos.isEmpty() -> TarjetaEdu(
+                    relleno = PaddingValues(horizontal = 16.dp, vertical = 20.dp),
+                    onClick = onAsociarHijo
+                ) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        IconoCirculoEdu(Icons.Rounded.PersonAdd, TonoEdu.VERDE, tamano = 64.dp)
+                        Text(
+                            "Aún no tienes hijos asociados", fontFamily = Nunito, fontWeight = FontWeight.Black,
+                            fontSize = 17.sp, color = EduTexto
+                        )
+                        Text(
+                            "Asócialos desde tu perfil con el código de estudiante.", fontFamily = Nunito,
+                            fontWeight = FontWeight.SemiBold, fontSize = 13.5.sp, color = EduTextoSecundario,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+                else -> listaHijos.forEachIndexed { i, hijo ->
+                    TarjetaHijoAsistencia(hijo, colorAvatar = if (i % 2 == 0) EduAmarillo else EduTealClaro) {
+                        onVerHistorial(hijo.id, "${hijo.nombres} ${hijo.apellidos}".trim())
+                    }
+                }
+            }
 
+            if (listaHijos.isNotEmpty()) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(BackgroundWhite, RoundedCornerShape(25.dp))
-                        .border(
-                            if (seleccionado) 2.dp else 1.dp,
-                            if (seleccionado) EduconnectBlue else BorderBlue,
-                            RoundedCornerShape(25.dp))
-                        .clickable { alumnoSeleccionado = alumno }
-                        .padding(14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        .padding(top = 4.dp)
+                        .background(EduTealClaro, RoundedCornerShape(16.dp))
+                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Box(
-                        modifier = Modifier.size(50.dp)
-                            .background(EduconnectBlue, RoundedCornerShape(25.dp)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(text = iniciales, fontFamily = Roboto,
-                            fontWeight = FontWeight.Bold, fontSize = 22.sp, color = TextWhite)
-                    }
-
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(text = "${alumno.nombres} ${alumno.apellidos}",
-                            fontFamily = Roboto, fontWeight = FontWeight.Bold,
-                            fontSize = 18.sp, color = TextBlue)
-                        Text(text = "${alumno.gradoNombre} Sec. ${alumno.seccionNombre}",
-                            fontFamily = Roboto, fontWeight = FontWeight.Bold,
-                            fontSize = 16.sp, color = TextSecondary)
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Box(
-                            modifier = Modifier
-                                .background(AccentOrange.copy(alpha = 0.12f), RoundedCornerShape(20.dp))
-                                .border(1.dp, AccentOrange.copy(alpha = 0.4f), RoundedCornerShape(20.dp))
-                                .padding(horizontal = 10.dp, vertical = 3.dp)
-                        ) {
-                            Text(text = "${alumno.porcentajeMes}% $mesNombre",
-                                fontFamily = Roboto, fontWeight = FontWeight.SemiBold,
-                                fontSize = 14.sp, color = AccentOrange)
-                        }
-                    }
-
-                    if (seleccionado) {
-                        Box(modifier = Modifier.size(28.dp).background(EduconnectBlue, CircleShape),
-                            contentAlignment = Alignment.Center) {
-                            Image(painter = painterResource(id = R.drawable.check_white),
-                                contentDescription = null, modifier = Modifier.size(20.dp))
-                        }
-                    } else {
-                        Image(painter = painterResource(id = R.drawable.check_lightgray),
-                            contentDescription = null, modifier = Modifier.size(20.dp))
-                    }
-                }
-            }
-
-            if (listaHijos.isEmpty()) {
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.ic_no_records),
-                        contentDescription = null,
-                        modifier = Modifier.size(36.dp)
-                    )
+                    Icon(Icons.Rounded.Info, contentDescription = null, tint = EduTealOscuro, modifier = Modifier.size(22.dp))
                     Text(
-                        text = "No se tiene asignado ningún estudiante",
-                        fontFamily = Roboto,
-                        fontSize = 13.sp,
-                        color = Color(0xFFB0BEC5)
+                        "Toca a tu hijo para ver su calendario de asistencia y su avance por curso. " +
+                                "La tardanza cuenta como asistencia.",
+                        modifier = Modifier.weight(1f), fontFamily = Nunito, fontWeight = FontWeight.SemiBold,
+                        fontSize = 13.sp, lineHeight = 18.sp, color = EduEtiqueta
                     )
                 }
             }
-
-            Spacer(modifier = Modifier.height(2.dp))
         }
 
-        // BOTÓN FIJO
-        Column(
-            modifier = Modifier.fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 12.dp)
-        ) {
-            Button(
-                onClick = {
-                    alumnoSeleccionado?.let { alumno ->
-                        onVerHistorial(alumno.id, "${alumno.nombres} ${alumno.apellidos}")
-                    }
-                },
-                modifier = Modifier.fillMaxWidth().height(54.dp),
-                shape = RoundedCornerShape(28.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = AccentOrange),
-                enabled = alumnoSeleccionado != null
-            ) {
-                Image(painter = painterResource(id = R.drawable.eye_white),
-                    contentDescription = null, modifier = Modifier.size(29.dp))
-                Spacer(modifier = Modifier.width(10.dp))
-                Text(text = "Ver Asistencias de ${alumnoSeleccionado?.nombres ?: ""}",
-                    fontFamily = Roboto, fontWeight = FontWeight.Bold,
-                    fontSize = 19.sp, color = TextWhite)
-            }
-        }
-
-        // NAVBAR
         BottomNavBarPadre(
-            onInicio = onHomePadre, onAvisos = onAvisos,
-            onAgenda = onAgenda, onPerfil = onPerfil, itemActivo = "Inicio"
+            onInicio = onHomePadre,
+            onAvisos = onAvisos,
+            onAgenda = onAgenda,
+            onPerfil = onPerfil,
+            itemActivo = "Inicio"
         )
     }
 }
 
-@Preview(showBackground = true)
+// Tarjeta de un hijo: iniciales, nombre, grado, % del mes con barra y cómo le fue hoy
+@Composable
+private fun TarjetaHijoAsistencia(hijo: HijoItem, colorAvatar: androidx.compose.ui.graphics.Color, onClick: () -> Unit) {
+    val iniciales = "${hijo.nombres.firstOrNull() ?: ""}${hijo.apellidos.firstOrNull() ?: ""}".uppercase()
+    val sinRegistros = hijo.registrosMes == 0
+    val colorPct = when {
+        sinRegistros -> EduTextoSecundario
+        hijo.porcentajeMes >= 90 -> EduTealOscuro
+        hijo.porcentajeMes >= 75 -> EduAmarilloOscuro
+        else -> EduCoralOscuro
+    }
+    TarjetaEdu(relleno = PaddingValues(horizontal = 15.dp, vertical = 14.dp), onClick = onClick) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Box(
+                modifier = Modifier.size(52.dp).background(colorAvatar, CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(iniciales, fontFamily = Nunito, fontWeight = FontWeight.Black, fontSize = 19.sp, color = EduTexto)
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    "${hijo.nombres} ${hijo.apellidos}".trim(), fontFamily = Nunito, fontWeight = FontWeight.Black,
+                    fontSize = 17.sp, color = EduTexto, maxLines = 1, overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    "${hijo.gradoNombre} · Sección ${hijo.seccionNombre}", fontFamily = Nunito,
+                    fontWeight = FontWeight.Bold, fontSize = 13.sp, color = EduTextoSecundario
+                )
+            }
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    if (sinRegistros) "—" else "${hijo.porcentajeMes}%", fontFamily = Nunito,
+                    fontWeight = FontWeight.Black, fontSize = 22.sp, color = colorPct
+                )
+                Text("este mes", fontFamily = Nunito, fontWeight = FontWeight.ExtraBold, fontSize = 11.5.sp, color = EduTextoSecundario)
+            }
+            Icon(
+                Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = null,
+                tint = EduTextoSecundario, modifier = Modifier.size(24.dp)
+            )
+        }
+        BarraProgresoEdu(
+            progreso = if (sinRegistros) 0f else hijo.porcentajeMes / 100f,
+            modifier = Modifier.padding(top = 10.dp, bottom = 8.dp),
+            color = when {
+                hijo.porcentajeMes >= 90 -> EduTeal
+                hijo.porcentajeMes >= 75 -> EduAmarillo
+                else -> EduCoral
+            }
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            when (hijo.estadoHoy) {
+                "A" -> ChipEdu("Hoy: Presente", TonoEdu.VERDE)
+                "T" -> ChipEdu("Hoy: Tardanza", TonoEdu.AMARILLO)
+                "F" -> ChipEdu("Hoy: Falta", TonoEdu.CORAL)
+                else -> ChipEdu("Hoy: sin registros", TonoEdu.GRIS)
+            }
+            if (hijo.faltasMes > 0) {
+                ChipEdu(if (hijo.faltasMes == 1) "1 falta en el mes" else "${hijo.faltasMes} faltas en el mes", TonoEdu.CORAL)
+            }
+        }
+    }
+}
+
+@Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
 fun SeleccionarEstudiantePreview() {
     EduConnectAppTheme {
         SeleccionarEstudianteScreen(
-            padreId = "uuid-padre",
-            padreNombre = "Juan Perez",
+            padreId = "1",
+            padreNombre = "Luis Perez",
             listaHijos = listOf(
-                HijoItem(1L, "Pedro", "Sanchez Vega", "1er Grado", "A", 85),
-                HijoItem(2L, "Angela", "Perez Garcia", "2do Grado", "B", 90)
+                HijoItem(1L, "Angela", "Perez Garcia", "2do Grado", "A", 89, registrosMes = 37, faltasMes = 4, estadoHoy = "T"),
+                HijoItem(2L, "Pedro", "Perez Garcia", "1er Grado", "A", 88, registrosMes = 30, faltasMes = 2, estadoHoy = "F")
             )
         )
     }
