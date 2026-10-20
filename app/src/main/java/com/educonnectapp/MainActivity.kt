@@ -42,7 +42,6 @@ import com.educonnectapp.ui.screens.padre.perfil.AsociarHijoScreen
 import com.educonnectapp.ui.screens.docente.asistencia.ConfirmacionAsistenciaScreen
 import com.educonnectapp.ui.screens.docente.comunicados.ConfirmacionComunicadoScreen
 import com.educonnectapp.ui.screens.docente.comunicados.ComunicadosScreen
-import com.educonnectapp.ui.screens.padre.asistencia.DetalleAsistenciaScreen
 import com.educonnectapp.ui.screens.padre.asistencia.HistorialAsistenciasScreen
 import com.educonnectapp.ui.screens.docente.inicio.HomeDocenteScreen
 import com.educonnectapp.ui.screens.docente.inicio.ClaseHoyItem
@@ -80,7 +79,6 @@ import com.educonnectapp.ui.screens.docente.asistencia.ClaseHistorialItem
 import com.educonnectapp.ui.screens.padre.asistencia.HijoItem
 import com.educonnectapp.ui.screens.padre.asistencia.AsistenciaItem
 import com.educonnectapp.ui.screens.padre.asistencia.CursoItem2
-import com.educonnectapp.ui.screens.padre.asistencia.DetalleAsistencia
 
 import com.educonnectapp.ui.screens.docente.comunicados.SeccionDestinatario
 import com.educonnectapp.ui.screens.docente.comunicados.ClaseComunicadoItem
@@ -98,7 +96,6 @@ import com.educonnectapp.ui.screens.padre.agenda.AgendaEscolarScreen
 import com.educonnectapp.ui.screens.padre.agenda.DetalleAgendaScreen
 import com.educonnectapp.ui.screens.padre.agenda.HijoAgendaItem
 import com.educonnectapp.ui.screens.padre.agenda.PublicacionAgendaItem
-import com.educonnectapp.ui.screens.padre.comunicados.ComunicadosPadresScreen
 import com.educonnectapp.ui.screens.padre.comunicados.SeleccionarEstudianteComunicadoScreen
 import com.educonnectapp.ui.screens.padre.comunicados.ComunicadosRecibidosScreen
 import com.educonnectapp.ui.screens.padre.comunicados.DetalleComunicadoPadreScreen
@@ -200,7 +197,7 @@ enum class Screen {
     WELCOME,
     LOGIN, REGISTER, HOME_DOCENTE, HOME_PADRE, ASISTENCIAS,
     REGISTRO_ASISTENCIA, CONFIRMACION_ASISTENCIA,
-    SELECCIONAR_ESTUDIANTE, HISTORIAL_ASISTENCIAS, DETALLE_ASISTENCIA, SELECCIONAR_SECCION_HISTORIAL, HISTORIAL_ASISTENCIA_DOCENTE,
+    SELECCIONAR_ESTUDIANTE, HISTORIAL_ASISTENCIAS, SELECCIONAR_SECCION_HISTORIAL, HISTORIAL_ASISTENCIA_DOCENTE,
     DETALLE_ASISTENCIA_DOCENTE,
     COMUNICADOS, NUEVO_COMUNICADO, CONFIRMACION_COMUNICADO,
     PERFIL_DOCENTE, PERFIL_PADRE, AGREGAR_ASIGNACION, ASOCIAR_HIJO,
@@ -411,8 +408,6 @@ fun EduConnectApp() {
     var ausentesSel by remember { mutableStateOf(0) }
     var alumnoIdSel by remember { mutableStateOf(0L) }
     var alumnoNombreSel by remember { mutableStateOf("") }
-    var asistenciaIdSel by remember { mutableStateOf(0L) }
-    var fechaAsistenciaSel by remember { mutableStateOf("") }
     var comunicadoAsuntoSel by remember { mutableStateOf("") }
     var comunicadoDestinatarioSel by remember { mutableStateOf("") }
     var comunicadoNotificadosSel by remember { mutableStateOf(0) }
@@ -431,7 +426,6 @@ fun EduConnectApp() {
     var listaHijosSel by remember { mutableStateOf<List<HijoItem>>(emptyList()) }
     var todasAsistenciasSel by remember { mutableStateOf<List<AsistenciaItem>>(emptyList()) }
     var listaCursosHistorialSel by remember { mutableStateOf<List<CursoItem2>>(emptyList()) }
-    var detalleAsistenciaSel by remember { mutableStateOf<DetalleAsistencia?>(null) }
     var listaDestinatariosSel by remember { mutableStateOf<List<SeccionDestinatario>>(emptyList()) }
     var totalEnviadosSel by remember { mutableStateOf(0) }
     var totalHoySel by remember { mutableStateOf(0) }
@@ -461,9 +455,6 @@ fun EduConnectApp() {
     var historialItemSel    by remember { mutableStateOf<HistorialItem?>(null) }
     var detalleAlumnosSel   by remember { mutableStateOf<List<DetalleAlumnoItem>>(emptyList()) }
     var comunicadoPadreSel by remember { mutableStateOf<ComunicadoPadreItem?>(null) }
-    var sinLeerPadreSel by remember { mutableStateOf(0) }
-    var leidosPadreSel by remember { mutableStateOf(0) }
-    var totalPadreSel by remember { mutableStateOf(0) }
     var resumenRealizadosSel by remember { mutableStateOf(0) }
     var resumenPendientesSel by remember { mutableStateOf(0) }
     var resumenPorcentajeSel by remember { mutableStateOf(0) }
@@ -580,7 +571,6 @@ fun EduConnectApp() {
     // Confirmación de asistencia: ¿fue actualización? y qué alumnos cambiaron
     var esActualizacionAsistenciaSel by remember { mutableStateOf(false) }
     var cambiosAsistenciaSel by remember { mutableStateOf<List<CambioAsistenciaItem>>(emptyList()) }
-    var asistenciasHijoSel by remember { mutableStateOf<List<AsistenciaHijoResponse>>(emptyList()) }
     // Comunicados
     var enviandoComunicado by remember { mutableStateOf(false) }
     var comunicadosDocenteSel by remember { mutableStateOf<List<ComunicadoDocenteResponse>>(emptyList()) }
@@ -822,6 +812,8 @@ fun EduConnectApp() {
             hijos.map { h -> async { obtenerComunicadosHijo(h.alumnoId) } }.awaitAll()
         }
         hijosComunicadoSel = hijos.mapIndexed { i, h ->
+            val comunicados = respuestas[i].comunicados
+            val ultimo = comunicados.maxByOrNull { aFechaHoraLocal(it.enviadoEn) ?: java.time.LocalDateTime.MIN }
             HijoComunicadoItem(
                 id = h.alumnoId,
                 nombres = h.nombres,
@@ -829,15 +821,18 @@ fun EduConnectApp() {
                 gradoNombre = h.grado,
                 seccionNombre = h.seccion,
                 seccionId = h.seccionId,
-                sinLeer = respuestas[i].noLeidos,
-                total = respuestas[i].comunicados.size
+                sinLeer = comunicados.count { !it.leido },
+                total = comunicados.size,
+                ultimoAsunto = ultimo?.asunto ?: "",
+                ultimaFecha = ultimo?.let { fechaLocal(it.enviadoEn) } ?: ""
             )
         }
         comunicadosPorHijoSel = hijos.mapIndexed { i, h -> h.alumnoId to respuestas[i].comunicados }.toMap()
         comunicadosPadreCargados = true
     }
 
-    // Lista de comunicados de un hijo (COMUNICADOS_RECIBIDOS): más recientes primero, luego los no leídos arriba
+    // Lista de comunicados de un hijo (COMUNICADOS_RECIBIDOS): más recientes primero
+    // (la pantalla los separa en Todos / Sin leer / Leídos y los agrupa por fecha)
     fun aplicarComunicadosHijo(hijo: HijoComunicadoItem, comunicados: List<ComunicadoPadreResponse>) {
         adjuntosComunicadoSel = comunicados.mapNotNull { c -> c.archivo?.let { c.id to it } }.toMap()
         comunicadosPadreSel = comunicados
@@ -854,9 +849,10 @@ fun EduConnectApp() {
                     seccionNombre = hijo.seccionNombre,
                     cursoNombre = c.curso ?: "General",
                     leido = c.leido,
-                    leidoEn = isoLocalSinZona(c.leidoEn)
+                    leidoEn = isoLocalSinZona(c.leidoEn),
+                    adjunto = c.archivo?.nombre ?: ""
                 )
-            }.sortedBy { it.leido }
+            }
         comunicadosHijoCargadoDe = hijo.id
     }
 
@@ -1085,7 +1081,6 @@ fun EduConnectApp() {
         detalleAlumnosSel = emptyList()
         listaHijosSel = emptyList()
         todasAsistenciasSel = emptyList()
-        asistenciasHijoSel = emptyList()
         actualizarResumen(Triple(0, 0, 0))
         comunicadosDocenteSel = emptyList()
         comunicadosListaSel = emptyList()
@@ -1835,7 +1830,6 @@ fun EduConnectApp() {
                             // (el calendario filtra por mes en la pantalla)
                             val hoy = java.time.LocalDate.now()
                             val historial = obtenerAsistenciasHijo(alumnoIdSel, inicioAnioEscolar(hoy).toString(), hoy.toString())
-                            asistenciasHijoSel = historial.asistencias
                             listaCursosHistorialSel = historial.asistencias
                                 .distinctBy { it.cursoId }
                                 .map { CursoItem2(it.cursoId, it.curso) }
@@ -1875,42 +1869,8 @@ fun EduConnectApp() {
                         onAvisos = { irAvisosPadre() },
                         onAgenda = { irAgenda() },
                         onPerfil = { currentScreen = Screen.PERFIL_PADRE },
-                        onNotificaciones = { abrirNotificaciones() },
-                        onVerDetalle = { asistenciaId, fecha ->
-                            asistenciaIdSel = asistenciaId
-                            fechaAsistenciaSel = fecha
-                            currentScreen = Screen.DETALLE_ASISTENCIA
-                        }
-                    )
-                }
-
-                Screen.DETALLE_ASISTENCIA -> {
-                    androidx.compose.runtime.LaunchedEffect(asistenciaIdSel) {
-                        // Sin petición: el historial del hijo ya trae hora, curso y docente
-                        val a = asistenciasHijoSel.find { it.asistenciaId == asistenciaIdSel } ?: return@LaunchedEffect
-                        val hijo = listaHijosSel.find { it.id == alumnoIdSel }
-                        detalleAsistenciaSel = DetalleAsistencia(
-                            id = a.asistenciaId,
-                            fecha = a.fecha,
-                            hora = formatearHora(a.hora),
-                            estado = a.estado,
-                            cursoNombre = a.curso,
-                            gradoNombre = hijo?.gradoNombre ?: "",
-                            seccionNombre = hijo?.seccionNombre ?: "",
-                            docenteNombre = a.docente
-                        )
-                    }
-
-                    DetalleAsistenciaScreen(
-                        asistenciaId = asistenciaIdSel,
-                        alumnoNombre = alumnoNombreSel,
-                        detalle = detalleAsistenciaSel,
-                        onBack = { currentScreen = Screen.HISTORIAL_ASISTENCIAS },
-                        onHomePadre = { currentScreen = Screen.HOME_PADRE },
-                        onAvisos = { irAvisosPadre() },
-                        onAgenda = { irAgenda() },
-                        onPerfil = { currentScreen = Screen.PERFIL_PADRE },
                         onNotificaciones = { abrirNotificaciones() }
+                        // El detalle de una asistencia se abre en una hoja inferior dentro de la pantalla
                     )
                 }
 
@@ -3070,54 +3030,34 @@ fun EduConnectApp() {
                     )
                 }
 
-                Screen.COMUNICADOS_PADRE -> {
+                // Comunicados del padre (rediseño 2026): se entra directo a elegir el hijo
+                Screen.COMUNICADOS_PADRE, Screen.SELECCIONAR_ESTUDIANTE_COMUNICADO -> {
                     androidx.compose.runtime.LaunchedEffect(usuarioLogueado?.id) {
                         if (usuarioLogueado == null) return@LaunchedEffect
                         try {
+                            // 1 petición por hijo, en paralelo (al entrar desde la barra o el Inicio se recarga)
                             if (!comunicadosPadreCargados) cargarComunicadosPadre()
-                            sinLeerPadreSel = hijosComunicadoSel.sumOf { it.sinLeer }
-                            totalPadreSel = hijosComunicadoSel.sumOf { it.total }
-                            leidosPadreSel = totalPadreSel - sinLeerPadreSel
                         } catch (e: kotlinx.coroutines.CancellationException) {
                             throw e
-                        } catch (e: Exception) { aviso("Error: ${e.message}") }
+                        } catch (e: Exception) { aviso("Error cargando comunicados: ${e.message}") }
                     }
-                    ComunicadosPadresScreen(
-                        sinLeer = sinLeerPadreSel,
-                        leidos = leidosPadreSel,
-                        total = totalPadreSel,
+                    SeleccionarEstudianteComunicadoScreen(
+                        hijos = hijosComunicadoSel,
+                        cargando = !comunicadosPadreCargados,
                         onBack = { currentScreen = Screen.HOME_PADRE },
                         onHomePadre = { currentScreen = Screen.HOME_PADRE },
                         onAvisos = { irAvisosPadre() },
                         onAgenda = { irAgenda() },
                         onPerfil = {currentScreen = Screen.PERFIL_PADRE},
                         onNotificaciones = { abrirNotificaciones() },
-                        onVerRecibidos = { currentScreen = Screen.SELECCIONAR_ESTUDIANTE_COMUNICADO },
-                        onVerHistorial = { currentScreen = Screen.SELECCIONAR_ESTUDIANTE_COMUNICADO }
-                    )
-                }
-
-                Screen.SELECCIONAR_ESTUDIANTE_COMUNICADO -> {
-                    androidx.compose.runtime.LaunchedEffect(usuarioLogueado?.id) {
-                        if (usuarioLogueado == null) return@LaunchedEffect
-                        try {
-                            // Ya cargados en COMUNICADOS_PADRE: solo se piden si se llega por otro camino
-                            if (!comunicadosPadreCargados) cargarComunicadosPadre()
-                        } catch (e: kotlinx.coroutines.CancellationException) {
-                            throw e
-                        } catch (e: Exception) { aviso("Error: ${e.message}") }
-                    }
-                    SeleccionarEstudianteComunicadoScreen(
-                        hijos = hijosComunicadoSel,
-                        onBack = { currentScreen = Screen.COMUNICADOS_PADRE },
-                        onHomePadre = { currentScreen = Screen.HOME_PADRE },
-                        onAvisos = { irAvisosPadre() },
-                        onAgenda = { irAgenda() },
-                        onPerfil = {currentScreen = Screen.PERFIL_PADRE},
-                        onNotificaciones = { abrirNotificaciones() },
+                        onAsociarHijo = {
+                            origenAsociarHijo = Screen.COMUNICADOS_PADRE
+                            currentScreen = Screen.ASOCIAR_HIJO
+                        },
                         onVerComunicados = { hijo ->
                             hijoComunicadoSel = hijo
                             comunicadosHijoCargadoDe = null   // elegido desde la lista: datos frescos
+                            comunicadosPadreSel = emptyList()
                             currentScreen = Screen.COMUNICADOS_RECIBIDOS
                         }
                     )
@@ -3139,10 +3079,12 @@ fun EduConnectApp() {
                     }
                     ComunicadosRecibidosScreen(
                         nombreHijo = hijoComunicadoSel?.nombres ?: "",
+                        apellidosHijo = hijoComunicadoSel?.apellidos ?: "",
                         gradoNombre = hijoComunicadoSel?.gradoNombre ?: "",
                         seccionNombre = hijoComunicadoSel?.seccionNombre ?: "",
                         comunicados = comunicadosPadreSel,
-                        onBack = { currentScreen = Screen.SELECCIONAR_ESTUDIANTE_COMUNICADO },
+                        cargando = comunicadosHijoCargadoDe != hijoComunicadoSel?.id,
+                        onBack = { currentScreen = Screen.COMUNICADOS_PADRE },
                         onHomePadre = { currentScreen = Screen.HOME_PADRE },
                         onAvisos = { irAvisosPadre() },
                         onAgenda = { irAgenda() },
@@ -3183,6 +3125,7 @@ fun EduConnectApp() {
                     val adjunto = comunicadoPadreSel?.let { adjuntosComunicadoSel[it.id] }
                     DetalleComunicadoPadreScreen(
                         comunicado = comunicadoPadreSel,
+                        nombreHijo = hijoComunicadoSel?.let { "${it.nombres} ${it.apellidos}".trim() } ?: "",
                         nombreAdjunto = adjunto?.nombre,
                         descargandoAdjunto = descargandoAdjunto,
                         onAbrirAdjunto = { adjunto?.let { abrirAdjunto(it) } },

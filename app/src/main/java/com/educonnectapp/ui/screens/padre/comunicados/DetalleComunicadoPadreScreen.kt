@@ -1,34 +1,76 @@
 package com.educonnectapp.ui.screens.padre.comunicados
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Description
+import androidx.compose.material.icons.rounded.Notifications
+import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.IconButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.educonnectapp.R
+import com.educonnectapp.ui.components.BotonIconoCabeceraEdu
+import com.educonnectapp.ui.components.CabeceraEdu
+import com.educonnectapp.ui.components.ChipEdu
+import com.educonnectapp.ui.components.ColorModulo
+import com.educonnectapp.ui.components.IconoCirculoEdu
+import com.educonnectapp.ui.components.TarjetaEdu
+import com.educonnectapp.ui.components.TituloSeccionEdu
+import com.educonnectapp.ui.components.TonoEdu
 import com.educonnectapp.ui.screens.padre.inicio.BottomNavBarPadre
-import com.educonnectapp.ui.theme.*
-import java.text.SimpleDateFormat
-import java.util.*
+import com.educonnectapp.ui.theme.EduAmarillo
+import com.educonnectapp.ui.theme.EduAzulOscuro
+import com.educonnectapp.ui.theme.EduAzulOscuroClaro
+import com.educonnectapp.ui.theme.EduBorde
+import com.educonnectapp.ui.theme.EduConnectAppTheme
+import com.educonnectapp.ui.theme.EduEtiqueta
+import com.educonnectapp.ui.theme.EduFondo
+import com.educonnectapp.ui.theme.EduTealClaro
+import com.educonnectapp.ui.theme.EduTealOscuro
+import com.educonnectapp.ui.theme.EduTexto
+import com.educonnectapp.ui.theme.EduTextoSecundario
+import com.educonnectapp.ui.theme.Nunito
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
 
+// =====================================================================
+// COMUNICADOS DEL PADRE · DETALLE (rediseño 2026)
+// Cabecera fija granate · curso y grado · asunto · docente con fecha y hora · mensaje ·
+// adjunto con "Abrir" · franja turquesa "Leído ..."
+// =====================================================================
+
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun DetalleComunicadoPadreScreen(
     comunicado: ComunicadoPadreItem? = null,
@@ -40,367 +82,165 @@ fun DetalleComunicadoPadreScreen(
     onAvisos: () -> Unit = {},
     onAgenda: () -> Unit = {},
     onPerfil: () -> Unit = {},
-    onNotificaciones: () -> Unit = {}
+    onNotificaciones: () -> Unit = {},
+    // ----- Rediseño 2026 -----
+    nombreHijo: String = ""                 // "Angela Perez" (subtítulo de la cabecera)
 ) {
-    val fechaActual = remember {
-        SimpleDateFormat("EEEE, dd 'de' MMMM yyyy", Locale("es", "PE"))
-            .format(Date()).replaceFirstChar { it.uppercase() }
-    }
-
-    val fechaDisplay = remember(comunicado?.fecha) {
-        try {
-            val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-            val date = sdf.parse(comunicado?.fecha ?: "")
-            SimpleDateFormat("EEE dd 'de' MMMM yyyy", Locale("es", "PE"))
-                .format(date!!).replaceFirstChar { it.uppercase() }
-        } catch (e: Exception) { comunicado?.fecha ?: "" }
-    }
-
-    val horaLectura = remember(comunicado?.leidoEn) {
-        if (comunicado?.leidoEn == null) return@remember ""
-        try {
-            val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault())
-            val date = sdf.parse(comunicado.leidoEn)
-            SimpleDateFormat("hh:mm a", Locale("es", "PE")).format(date!!)
-        } catch (e: Exception) {
-            try {
-                val sdf2 = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
-                val date2 = sdf2.parse(comunicado.leidoEn)
-                SimpleDateFormat("hh:mm a", Locale("es", "PE")).format(date2!!)
-            } catch (e2: Exception) { comunicado.leidoEn }
-        }
-    }
+    val grado = "${comunicado?.gradoNombre ?: ""} ${comunicado?.seccionNombre ?: ""}".trim()
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(BackgroundLight)
+            .background(EduFondo)
     ) {
-        // HEADER
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(EduconnectBlue)
-                .padding(horizontal = 20.dp, vertical = 16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.weight(1f)
-            ) {
-                IconButton(
-                    onClick = onBack,
-                    modifier = Modifier.size(35.dp).offset(x = (-5).dp)
-                ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.arrowleft_white),
-                        contentDescription = "Volver",
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-                Column {
-                    Text(
-                        text = "Detalle comunicado",
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 22.sp,
-                        color = TextWhite
-                    )
-                    Text(
-                        text = "I.E. Pedro M. Ureña",
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp,
-                        color = TextWhite
-                    )
-                    Text(
-                        text = fechaActual,
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.Normal,
-                        fontSize = 15.sp,
-                        color = TextWhite
-                    )
-                }
-            }
-            IconButton(onClick = onNotificaciones) {
-                Image(
-                    painter = painterResource(id = R.drawable.notification_white),
-                    contentDescription = "Notificaciones",
-                    modifier = Modifier.size(35.dp)
+        // CABECERA FIJA
+        CabeceraEdu(
+            titulo = "Comunicado",
+            subtitulo = listOf(nombreHijo, grado).filter { it.isNotBlank() }.joinToString(" · ")
+                .ifBlank { "I.E. Pedro M. Ureña" },
+            onVolver = onBack,
+            colorFondo = ColorModulo.Comunicados,
+            acciones = {
+                BotonIconoCabeceraEdu(
+                    icono = Icons.Rounded.Notifications,
+                    descripcion = "Notificaciones",
+                    onClick = onNotificaciones,
+                    colorCabecera = ColorModulo.Comunicados
                 )
             }
-        }
+        )
 
+        // CONTENIDO DESPLAZABLE
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            // CARD IE
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(BackgroundWhite, RoundedCornerShape(14.dp))
-                    .border(3.dp, BorderBlue, RoundedCornerShape(14.dp))
-                    .padding(14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(52.dp)
-                        .background(EduconnectBlue.copy(alpha = 0.1f), CircleShape)
-                        .border(1.5.dp, EduconnectBlue, CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.logo_educonnect),
-                        contentDescription = null,
-                        modifier = Modifier.size(36.dp)
-                    )
-                }
-                Column {
+            if (comunicado == null) {
+                TarjetaEdu {
                     Text(
-                        text = "I.E. Pedro M.Ureña",
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 20.sp,
-                        color = TextBlue
+                        "No se encontró el comunicado.", fontFamily = Nunito, fontWeight = FontWeight.SemiBold,
+                        fontSize = 14.sp, color = EduTextoSecundario
                     )
+                }
+            } else {
+
+                // ---------- COMUNICADO ----------
+                TarjetaEdu(relleno = PaddingValues(16.dp)) {
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        ChipEdu(comunicado.cursoNombre.ifBlank { "General" }, TonoEdu.CORAL)
+                        if (grado.isNotBlank()) ChipEdu(grado, TonoEdu.AZUL)
+                    }
                     Text(
-                        text = "Trujillo, La Libertad",
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 18.sp,
-                        color = TextPrimary
+                        comunicado.asunto, modifier = Modifier.padding(top = 10.dp), fontFamily = Nunito,
+                        fontWeight = FontWeight.Black, fontSize = 20.sp, lineHeight = 25.sp, color = EduTexto
                     )
-                }
-            }
-
-            // CARD DETALLE COMUNICADO
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(BackgroundWhite, RoundedCornerShape(14.dp))
-                    .border(1.5.dp, BorderOrange, RoundedCornerShape(14.dp))
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                // Asunto
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.megaphone_orange),
-                        contentDescription = null,
-                        modifier = Modifier.size(30.dp)
-                    )
-                    Text(
-                        text = comunicado?.asunto ?: "",
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 18.sp,
-                        color = TextBlue
-                    )
-                }
-
-                HorizontalDivider(color = BorderOrange, thickness = 1.5.dp)
-
-                // Fecha + hora
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+                    // Docente que lo envió, con fecha y hora
                     Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Image(
-                            painter = painterResource(id = R.drawable.agenda_darkgray),
-                            contentDescription = null,
-                            modifier = Modifier.size(25.dp)
-                        )
-                        Text(
-                            text = fechaDisplay,
-                            fontFamily = Roboto,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 15.sp,
-                            color = TextPrimary
-                        )
-                    }
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Image(
-                            painter = painterResource(id = R.drawable.clock_darkgray),
-                            contentDescription = null,
-                            modifier = Modifier.size(25.dp)
-                        )
-                        Text(
-                            text = comunicado?.hora ?: "",
-                            fontFamily = Roboto,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 15.sp,
-                            color = TextPrimary
-                        )
-                    }
-                }
-
-                // Docente + sección
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Image(
-                            painter = painterResource(id = R.drawable.teacher_darkgray),
-                            contentDescription = null,
-                            modifier = Modifier.size(25.dp)
-                        )
-                        Text(
-                            text = "Prof. ${comunicado?.docenteNombre ?: ""}",
-                            fontFamily = Roboto,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 15.sp,
-                            color = TextPrimary
-                        )
-                    }
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Image(
-                            painter = painterResource(id = R.drawable.users_darkgray),
-                            contentDescription = null,
-                            modifier = Modifier.size(25.dp)
-                        )
-                        Text(
-                            text = "${comunicado?.gradoNombre ?: ""} Sec ${comunicado?.seccionNombre ?: ""}",
-                            fontFamily = Roboto,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 15.sp,
-                            color = TextPrimary
-                        )
-                    }
-                }
-
-                HorizontalDivider(color = BorderOrange, thickness = 1.dp)
-
-                // MENSAJE
-                Text(
-                    text = comunicado?.mensaje ?: "",
-                    fontFamily = Roboto,
-                    fontSize = 15.sp,
-                    color = TextPrimary,
-                    lineHeight = 22.sp
-                )
-
-                // ARCHIVO ADJUNTO
-                if (nombreAdjunto != null) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(BackgroundWhite, RoundedCornerShape(10.dp))
-                            .border(1.dp, BorderBlue, RoundedCornerShape(10.dp))
-                            .clickable(enabled = !descargandoAdjunto) { onAbrirAdjunto() }
-                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                        modifier = Modifier.padding(top = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Image(
-                            painter = painterResource(id = R.drawable.paperclip_lightgray),
-                            contentDescription = null,
-                            modifier = Modifier.size(24.dp)
-                        )
-                        Column(modifier = Modifier.weight(1f)) {
+                        Box(
+                            modifier = Modifier.size(40.dp).background(EduAmarillo, CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
                             Text(
-                                text = nombreAdjunto,
-                                fontFamily = Roboto,
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 15.sp,
-                                color = EduconnectBlue,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Text(
-                                text = if (descargandoAdjunto) "Descargando..." else "Toca para abrir",
-                                fontFamily = Roboto,
-                                fontSize = 13.sp,
-                                color = TextSecondary
+                                inicialesDe(comunicado.docenteNombre), fontFamily = Nunito, fontWeight = FontWeight.Black,
+                                fontSize = 14.sp, color = EduTexto
                             )
                         }
-                        if (descargandoAdjunto) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(22.dp),
-                                color = EduconnectBlue,
-                                strokeWidth = 2.dp
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                comunicado.docenteNombre.ifBlank { "Docente" }, fontFamily = Nunito,
+                                fontWeight = FontWeight.Black, fontSize = 14.5.sp, color = EduTexto,
+                                maxLines = 1, overflow = TextOverflow.Ellipsis
                             )
-                        } else {
-                            Image(
-                                painter = painterResource(id = R.drawable.document_blue),
-                                contentDescription = "Abrir adjunto",
-                                modifier = Modifier.size(24.dp)
+                            Text(
+                                listOf(fechaLargaComunicado(comunicado.fecha), comunicado.hora)
+                                    .filter { it.isNotBlank() }.joinToString(" · "),
+                                fontFamily = Nunito, fontWeight = FontWeight.Bold, fontSize = 12.5.sp, color = EduTextoSecundario
+                            )
+                        }
+                    }
+                    Box(modifier = Modifier.padding(vertical = 12.dp).fillMaxWidth().height(1.dp).background(EduFondo))
+                    Text(
+                        comunicado.mensaje, fontFamily = Nunito, fontWeight = FontWeight.SemiBold,
+                        fontSize = 14.5.sp, lineHeight = 22.sp, color = EduTexto
+                    )
+                }
+
+                // ---------- ADJUNTO ----------
+                if (nombreAdjunto != null) {
+                    TituloSeccionEdu("Adjunto")
+                    TarjetaEdu(
+                        relleno = PaddingValues(horizontal = 14.dp, vertical = 12.dp),
+                        onClick = if (descargandoAdjunto) null else onAbrirAdjunto
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            IconoCirculoEdu(Icons.Rounded.Description, TonoEdu.AZUL)
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    nombreAdjunto, fontFamily = Nunito, fontWeight = FontWeight.Black, fontSize = 14.5.sp,
+                                    color = EduTexto, maxLines = 1, overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    if (descargandoAdjunto) "Descargando…" else "Toca para abrir",
+                                    fontFamily = Nunito, fontWeight = FontWeight.Bold, fontSize = 12.5.sp, color = EduTextoSecundario
+                                )
+                            }
+                            if (descargandoAdjunto) {
+                                CircularProgressIndicator(color = EduAzulOscuro, strokeWidth = 3.dp, modifier = Modifier.size(24.dp))
+                            } else {
+                                // Botón secundario "Abrir"
+                                Row(
+                                    modifier = Modifier
+                                        .height(38.dp)
+                                        .clip(RoundedCornerShape(13.dp))
+                                        .background(Color.White)
+                                        .border(2.dp, EduBorde, RoundedCornerShape(13.dp))
+                                        .clickable(onClick = onAbrirAdjunto)
+                                        .padding(horizontal = 14.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Icon(Icons.Rounded.Visibility, contentDescription = null, tint = EduEtiqueta, modifier = Modifier.size(16.dp))
+                                    Text("Abrir", fontFamily = Nunito, fontWeight = FontWeight.Black, fontSize = 14.sp, color = EduEtiqueta)
+                                }
+                            }
+                        }
+                        if (descargandoAdjunto) {
+                            LinearProgressIndicator(
+                                modifier = Modifier.padding(top = 10.dp).fillMaxWidth().height(6.dp).clip(RoundedCornerShape(50)),
+                                color = EduAzulOscuro,
+                                trackColor = EduAzulOscuroClaro
                             )
                         }
                     }
                 }
 
-                HorizontalDivider(color = BorderOrange, thickness = 1.dp)
-
-                // Docente firma
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text(
-                        text = "Prof. ${comunicado?.docenteNombre ?: ""}",
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 15.sp,
-                        color = EduconnectBlue
-                    )
-                    Text(
-                        text = "Docente - ${comunicado?.cursoNombre ?: ""} - ${comunicado?.gradoNombre ?: ""} ${comunicado?.seccionNombre ?: ""}",
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp,
-                        color = TextSecondary
-                    )
-                }
-            }
-
-            // ESTADO LEÍDO
-            if (comunicado?.leido == true && horaLectura.isNotEmpty()) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(StatusGreen, RoundedCornerShape(12.dp))
-                        .border(1.5.dp, StatusGreen, RoundedCornerShape(12.dp))
-                        .padding(horizontal = 16.dp, vertical = 14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.check_white),
-                        contentDescription = null,
-                        modifier = Modifier.size(30.dp)
-                    )
-                    Text(
-                        text = "Comunicado Leído - $horaLectura",
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 19.sp,
-                        color = TextWhite
-                    )
+                // ---------- LEÍDO ----------
+                if (comunicado.leido) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(EduTealClaro, RoundedCornerShape(16.dp))
+                            .padding(horizontal = 14.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Icon(Icons.Rounded.CheckCircle, contentDescription = null, tint = EduTealOscuro, modifier = Modifier.size(22.dp))
+                        Text(
+                            textoLeido(comunicado.leidoEn), modifier = Modifier.weight(1f), fontFamily = Nunito,
+                            fontWeight = FontWeight.ExtraBold, fontSize = 13.5.sp, color = EduTealOscuro
+                        )
+                    }
                 }
             }
         }
@@ -415,25 +255,51 @@ fun DetalleComunicadoPadreScreen(
     }
 }
 
-@Preview(showBackground = true)
+// "Prof. Hector Reyna" -> "HR" (sin contar "Prof.")
+private fun inicialesDe(nombre: String): String =
+    nombre.split(" ").filter { it.isNotBlank() && !it.endsWith(".") }.take(2)
+        .mapNotNull { it.firstOrNull()?.uppercaseChar() }.joinToString("").ifBlank { "D" }
+
+// "2026-10-19" -> "Lunes 19 de octubre"
+private fun fechaLargaComunicado(fecha: String): String = try {
+    LocalDate.parse(fecha.take(10)).format(DateTimeFormatter.ofPattern("EEEE d 'de' MMMM", LOCALE_PE_COM))
+        .replaceFirstChar { it.uppercase() }
+} catch (e: Exception) { fecha }
+
+// "Leído hoy a las 11:17 a. m." · "Leído ayer a las ..." · "Leído el lunes 12 de octubre a las ..."
+private fun textoLeido(leidoEn: String?): String {
+    val f = try { leidoEn?.let { LocalDateTime.parse(it.take(19)) } } catch (e: Exception) { null }
+        ?: return "Comunicado leído"
+    val hora = f.format(DateTimeFormatter.ofPattern("hh:mm a", LOCALE_PE_COM))
+    return when (ChronoUnit.DAYS.between(f.toLocalDate(), LocalDate.now())) {
+        0L -> "Leído hoy a las $hora"
+        1L -> "Leído ayer a las $hora"
+        else -> "Leído el " + f.format(DateTimeFormatter.ofPattern("EEEE d 'de' MMMM", LOCALE_PE_COM)) + " a las $hora"
+    }
+}
+
+@Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
 fun DetalleComunicadoPadrePreview() {
+    val hoy = LocalDate.now()
     EduConnectAppTheme {
         DetalleComunicadoPadreScreen(
             comunicado = ComunicadoPadreItem(
                 id = 1L,
-                asunto = "Reunión de padres de familia",
-                mensaje = "Estimados padres de familia del 2do Sec. A,\n\nLos invitamos cordialmente a la reunión de padres de familia que se realizará el viernes 23 de mayo a las 4:00 PM en el aula de 2do Sec. A.\n\nTemas a tratar: Avance académico, comportamiento y fin de año escolar.\n\nSu asistencia es muy importante.",
-                fecha = "2026-05-23",
-                hora = "9:45 AM",
-                docenteNombre = "Eduardo Carranza",
-                gradoNombre = "2do",
+                asunto = "Reunión de padres este viernes",
+                mensaje = "Estimados padres de familia:\n\nLos esperamos el viernes 23 a las 6:00 p. m. en el aula de 2° A. " +
+                        "Revisaremos el avance del bimestre.\n\nSu asistencia es muy importante.",
+                fecha = hoy.toString(),
+                hora = "09:40 a. m.",
+                docenteNombre = "Prof. Hector Reyna",
+                gradoNombre = "2do Grado",
                 seccionNombre = "A",
-                cursoNombre = "Matemáticas",
+                cursoNombre = "Ciencia y Tecnología",
                 leido = true,
-                leidoEn = "2026-05-23T11:17:00"
+                leidoEn = "${hoy}T11:17:00"
             ),
-            nombreAdjunto = "Cronograma_reunion.pdf"
+            nombreAdjunto = "citacion_reunion.pdf",
+            nombreHijo = "Angela Perez"
         )
     }
 }
