@@ -67,7 +67,7 @@ import com.educonnectapp.ui.screens.acceso.RegisterScreen
 import com.educonnectapp.ui.screens.docente.asistencia.RegistroAsistenciaScreen
 import com.educonnectapp.ui.screens.padre.asistencia.SeleccionarEstudianteScreen
 import com.educonnectapp.ui.theme.EduConnectAppTheme
-import com.educonnectapp.ui.theme.TextPrimary
+import com.educonnectapp.ui.theme.EduTexto
 import com.educonnectapp.ui.screens.padre.perfil.HijoAsociado
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -1134,7 +1134,7 @@ fun EduConnectApp() {
     }
 
 
-    Scaffold(modifier = Modifier.fillMaxSize(), contentColor = TextPrimary) { innerPadding ->
+    Scaffold(modifier = Modifier.fillMaxSize(), contentColor = EduTexto) { innerPadding ->
         Box(modifier = Modifier.padding(innerPadding)) {
             when (currentScreen) {
 

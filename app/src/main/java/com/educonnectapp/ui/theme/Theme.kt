@@ -1,30 +1,39 @@
 package com.educonnectapp.ui.theme
 
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.graphics.Color
 
+// Esquema de Material 3 con la paleta 2026 (Color.kt).
+// Lo usan los componentes que toman el color del tema (selector de fecha, interruptores,
+// indicadores de carga por defecto, selección de texto...).
 private val EduConnectColorScheme = lightColorScheme(
-    primary = EduconnectBlue,
-    primaryContainer = EduconnectBlueMedium,
-    secondaryContainer = EduconnectBlueLight,
-    secondary = AccentOrange,
-    tertiary = AccentOrangeLight,
-    background = Background,
-    surface = BackgroundWhite,
-    surfaceVariant = BackgroundLight,
-    onPrimary = TextWhite,
-    onPrimaryContainer = TextWhite,
-    onSecondary = TextWhite,
-    onTertiary = TextPrimary,
-    onBackground = TextPrimary,
-    onSurface = TextPrimary,
-    onSurfaceVariant = TextSecondary,
-    error = StatusErrorRed,
-    onError = TextWhite,
-    outline = BorderLight,
-    outlineVariant = BorderMedium,
-    scrim = NavBarBackground,
+    primary = EduTeal,
+    onPrimary = Color.White,
+    primaryContainer = EduTealClaro,
+    onPrimaryContainer = EduTealOscuro,
+    secondary = EduAmarillo,
+    onSecondary = EduTexto,
+    secondaryContainer = EduAmarilloClaro,
+    onSecondaryContainer = EduAmarilloOscuro,
+    tertiary = EduAzulOscuro,
+    onTertiary = Color.White,
+    tertiaryContainer = EduAzulOscuroClaro,
+    onTertiaryContainer = EduAzulOscuro,
+    background = EduFondo,
+    onBackground = EduTexto,
+    surface = Color.White,
+    onSurface = EduTexto,
+    surfaceVariant = EduCampo,
+    onSurfaceVariant = EduTextoSecundario,
+    error = EduCoral,
+    onError = Color.White,
+    errorContainer = EduCoralClaro,
+    onErrorContainer = EduCoralOscuro,
+    outline = EduBorde,
+    outlineVariant = EduBorde,
+    scrim = Color.Black,
 )
 
 @Composable

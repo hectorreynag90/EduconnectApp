@@ -53,7 +53,6 @@ import com.educonnectapp.ui.components.TonoEdu
 import com.educonnectapp.ui.theme.EduAzulOscuroClaro
 import com.educonnectapp.ui.theme.EduConnectAppTheme
 import com.educonnectapp.ui.theme.EduCoralOscuro
-import com.educonnectapp.ui.theme.EduEtiqueta
 import com.educonnectapp.ui.theme.EduFondo
 import com.educonnectapp.ui.theme.EduTeal
 import com.educonnectapp.ui.theme.EduTealClaro
@@ -213,19 +212,6 @@ private fun FilaDatoPub(icono: ImageVector, etiqueta: String, valor: String, col
             valor, modifier = Modifier.weight(1f), fontFamily = Nunito, fontWeight = FontWeight.Black,
             fontSize = 14.5.sp, color = colorValor, maxLines = 2, overflow = TextOverflow.Ellipsis
         )
-    }
-}
-
-// Se conserva por compatibilidad (pantallas anteriores la usaban); ya no se usa en el rediseño
-@Composable
-fun DetalleRow(label: String, valor: String, colorValor: Color) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(label, fontFamily = Nunito, fontSize = 14.sp, color = EduEtiqueta)
-        Text(valor, fontFamily = Nunito, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = colorValor)
     }
 }
 

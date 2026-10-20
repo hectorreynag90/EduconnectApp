@@ -51,14 +51,12 @@ import com.educonnectapp.R
 import com.educonnectapp.ui.components.BotonIconoCabeceraEdu
 import com.educonnectapp.ui.components.BotonPrincipalEdu
 import com.educonnectapp.ui.components.CampoTextoEdu
-import com.educonnectapp.ui.components.ChipCabeceraEdu
 import com.educonnectapp.ui.components.ColorModulo
 import com.educonnectapp.ui.components.TipoBotonEdu
 import com.educonnectapp.ui.theme.EduAmarillo
 import com.educonnectapp.ui.theme.EduConnectAppTheme
 import com.educonnectapp.ui.theme.EduCoral
 import com.educonnectapp.ui.theme.EduFondo
-import com.educonnectapp.ui.theme.EduTeal
 import com.educonnectapp.ui.theme.EduTealOscuro
 import com.educonnectapp.ui.theme.EduTextoSecundario
 import com.educonnectapp.ui.theme.Nunito

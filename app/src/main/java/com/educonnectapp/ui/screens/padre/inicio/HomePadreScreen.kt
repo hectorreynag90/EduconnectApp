@@ -1,6 +1,5 @@
 package com.educonnectapp.ui.screens.padre.inicio
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -47,7 +46,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -83,9 +81,7 @@ import com.educonnectapp.ui.theme.EduTeal
 import com.educonnectapp.ui.theme.EduTealOscuro
 import com.educonnectapp.ui.theme.EduTexto
 import com.educonnectapp.ui.theme.EduTextoSecundario
-import com.educonnectapp.ui.theme.EduconnectBlue
 import com.educonnectapp.ui.theme.Nunito
-import com.educonnectapp.ui.theme.TextSecondary
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
@@ -840,35 +836,6 @@ fun BottomNavBarPadre(
             }
         }
     )
-}
-
-// Ítem de la barra anterior (se conserva por compatibilidad; la barra nueva usa BarraInferiorEdu)
-@Composable
-fun NavBarItem(
-    iconRes: Int,
-    label: String,
-    activo: Boolean,
-    onClick: () -> Unit
-) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier
-            .clickable { onClick() }
-            .padding(horizontal = 25.dp, vertical = 4.dp)
-    ) {
-        Image(
-            painter = painterResource(id = iconRes),
-            contentDescription = label,
-            modifier = Modifier.size(30.dp)
-        )
-        Text(
-            text = label,
-            fontFamily = Nunito,
-            fontWeight = if (activo) FontWeight.Bold else FontWeight.Normal,
-            fontSize = 14.sp,
-            color = if (activo) EduconnectBlue else TextSecondary
-        )
-    }
 }
 
 @Preview(showBackground = true, widthDp = 390, heightDp = 844)

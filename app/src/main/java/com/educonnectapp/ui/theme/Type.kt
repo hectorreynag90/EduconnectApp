@@ -8,14 +8,6 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 
-// Fuente anterior: la siguen usando las pantallas que aún no se migran
-val Roboto = FontFamily(
-    Font(R.font.roboto_regular, FontWeight.Normal),
-    Font(R.font.roboto_medium, FontWeight.Medium),
-    Font(R.font.roboto_semibold, FontWeight.SemiBold),
-    Font(R.font.roboto_bold, FontWeight.Bold),
-)
-
 // Fuente del rediseño 2026 (archivos en res/font)
 val Nunito = FontFamily(
     Font(R.font.nunito_regular, FontWeight.Normal),

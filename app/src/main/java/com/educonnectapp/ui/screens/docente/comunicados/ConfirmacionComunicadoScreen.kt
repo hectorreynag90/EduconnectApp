@@ -61,10 +61,6 @@ import com.educonnectapp.ui.theme.Nunito
 import java.text.SimpleDateFormat
 import java.util.Locale
 
-// Verde de las pantallas anteriores. Ya no se usa aquí; se conserva por si otra
-// pantalla aún no rediseñada lo importa. Se elimina al terminar el rediseño.
-val ConfirmGreen = Color(0xFF00B050)
-
 // "2026-10-19" -> "Lunes 19 de octubre"
 private fun fechaConfirmacion(fecha: String): String = try {
     val d = SimpleDateFormat("yyyy-MM-dd", Locale.US).parse(fecha.take(10))

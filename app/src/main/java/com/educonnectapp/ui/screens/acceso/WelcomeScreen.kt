@@ -41,7 +41,6 @@ import com.educonnectapp.ui.theme.EduTeal
 import com.educonnectapp.ui.theme.EduTealCirculo1
 import com.educonnectapp.ui.theme.EduTealCirculo2
 import com.educonnectapp.ui.theme.EduTealTextoCabecera
-import com.educonnectapp.ui.theme.EduTextoSecundario
 import com.educonnectapp.ui.theme.Nunito
 
 // Pantalla de bienvenida (rediseño 2026): fondo turquesa con logo y hoja blanca con los botones

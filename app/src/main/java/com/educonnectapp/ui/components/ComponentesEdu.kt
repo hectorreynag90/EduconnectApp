@@ -26,11 +26,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.Campaign
-import androidx.compose.material.icons.rounded.Groups
-import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Lock
-import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.Button
@@ -321,20 +317,6 @@ fun BotonSecundarioEdu(
     }
 }
 
-// Botón turquesa claro (alternativa suave; ya no se usa en Bienvenida, se conserva por compatibilidad)
-@Composable
-fun BotonClaroEdu(
-    texto: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    icono: ImageVector? = null
-) {
-    BotonPrincipalEdu(
-        texto = texto, onClick = onClick, modifier = modifier, icono = icono,
-        colorFondo = EduTealClaro, colorTexto = EduTealOscuro
-    )
-}
-
 // Botón flotante "+ Crear" (esquina inferior derecha, sobre la barra inferior). Tipo GUARDAR (turquesa)
 @Composable
 fun BotonCrearEdu(
@@ -610,16 +592,6 @@ fun BarraProgresoEdu(
 // ---------- Barra inferior ----------
 data class ItemNavEdu(val etiqueta: String, val icono: ImageVector)
 
-enum class TabDocente { INICIO, ALUMNOS, AVISOS, PERFIL }
-
-private val ItemsNavDocente: List<ItemNavEdu>
-    get() = listOf(
-        ItemNavEdu("Inicio", Icons.Rounded.Home),
-        ItemNavEdu("Alumnos", Icons.Rounded.Groups),
-        ItemNavEdu("Avisos", Icons.Rounded.Campaign),
-        ItemNavEdu("Perfil", Icons.Rounded.Person)
-    )
-
 @Composable
 fun BarraInferiorEdu(
     items: List<ItemNavEdu>,
@@ -671,15 +643,3 @@ fun BarraInferiorEdu(
     }
 }
 
-// Barra inferior del docente: Inicio · Alumnos · Avisos · Perfil
-@Composable
-fun BarraInferiorDocenteEdu(
-    seleccionada: TabDocente,
-    onSeleccionar: (TabDocente) -> Unit
-) {
-    BarraInferiorEdu(
-        items = ItemsNavDocente,
-        seleccionado = seleccionada.ordinal,
-        onSeleccionar = { onSeleccionar(TabDocente.entries[it]) }
-    )
-}

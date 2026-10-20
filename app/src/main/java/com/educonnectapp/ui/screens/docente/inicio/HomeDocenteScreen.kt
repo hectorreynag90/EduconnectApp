@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -491,7 +490,6 @@ private fun fechaCorta(fecha: String): String = try {
     }
 } catch (e: Exception) { fecha }
 
-
 // Avatar circular: muestra la foto de perfil si existe; si no (o si no carga), las iniciales.
 // Se reutiliza en los encabezados del docente y del padre.
 @Composable
@@ -557,35 +555,6 @@ fun BottomNavBarDocente(
             }
         }
     )
-}
-
-// Ítem de la barra anterior (se conserva por compatibilidad; la barra nueva usa BarraInferiorEdu)
-@Composable
-fun NavBarItemDocente(
-    iconRes: Int,
-    label: String,
-    activo: Boolean,
-    onClick: () -> Unit
-) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier
-            .clickable { onClick() }
-            .padding(horizontal = 25.dp, vertical = 4.dp)
-    ) {
-        androidx.compose.foundation.Image(
-            painter = androidx.compose.ui.res.painterResource(id = iconRes),
-            contentDescription = label,
-            modifier = Modifier.size(30.dp)
-        )
-        Text(
-            text = label,
-            fontFamily = Nunito,
-            fontWeight = if (activo) FontWeight.Black else FontWeight.Bold,
-            fontSize = 13.sp,
-            color = if (activo) EduTealOscuro else EduTextoSecundario
-        )
-    }
 }
 
 @Preview(showBackground = true, widthDp = 390, heightDp = 844)

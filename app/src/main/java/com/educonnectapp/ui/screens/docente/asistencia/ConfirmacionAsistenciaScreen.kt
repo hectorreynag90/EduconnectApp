@@ -1,6 +1,5 @@
 package com.educonnectapp.ui.screens.docente.asistencia
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -9,7 +8,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -36,13 +34,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.educonnectapp.R
 import com.educonnectapp.ui.components.BotonIconoCabeceraEdu
 import com.educonnectapp.ui.components.BotonPrincipalEdu
 import com.educonnectapp.ui.components.BotonSecundarioEdu
@@ -63,8 +59,6 @@ import com.educonnectapp.ui.theme.EduTealOscuro
 import com.educonnectapp.ui.theme.EduTexto
 import com.educonnectapp.ui.theme.EduTextoSecundario
 import com.educonnectapp.ui.theme.Nunito
-import com.educonnectapp.ui.theme.Roboto
-import com.educonnectapp.ui.theme.TextSecondary
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -270,48 +264,6 @@ private fun FilaDato(icono: ImageVector, etiqueta: String, valor: String) {
         Text(
             valor, modifier = Modifier.weight(1f), textAlign = TextAlign.End,
             fontFamily = Nunito, fontWeight = FontWeight.Black, fontSize = 14.sp, color = EduEtiqueta
-        )
-    }
-}
-
-// FILA DE DATO (diseño anterior). Se conserva porque la usan otras pantallas de confirmación.
-@Composable
-fun FilaRegistro(
-    iconRes: Int,
-    label: String,
-    valor: String,
-    colorValor: Color
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-            modifier = Modifier.weight(1f)
-        ) {
-            Image(
-                painter = painterResource(id = iconRes),
-                contentDescription = null,
-                modifier = Modifier.size(25.dp)
-            )
-            Text(
-                text = label,
-                fontFamily = Roboto,
-                fontWeight = FontWeight.Bold,
-                fontSize = 15.sp,
-                color = TextSecondary
-            )
-        }
-        Text(
-            text = valor,
-            fontFamily = Roboto,
-            fontWeight = FontWeight.Normal,
-            fontSize = 14.sp,
-            color = colorValor,
-            textAlign = TextAlign.End
         )
     }
 }

@@ -105,13 +105,6 @@ internal fun cuandoVence(fecha: String): String = when (diasHastaAgenda(fecha)) 
     else -> fechaCortaAgenda(fecha).replaceFirstChar { it.lowercase() }
 }
 
-// "Hoy", "1 día", "5 días" (se conserva por compatibilidad)
-fun textoDiasRestantes(dias: Int): String = when {
-    dias <= 0 -> "Hoy"
-    dias == 1 -> "1 día"
-    else -> "$dias días"
-}
-
 // =====================================================================
 // AGENDA DEL PADRE · AGENDA DE UN HIJO (rediseño 2026)
 // Cabecera fija amarilla · pestañas Todos / Tareas / Evaluaciones · "Por hacer" y "Ya pasaron"

@@ -1,11 +1,9 @@
 package com.educonnectapp.ui.screens.docente.perfil
 
 import android.net.Uri
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -15,7 +13,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -44,15 +41,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.educonnectapp.R
 import com.educonnectapp.ui.components.AvatarPerfilEditable
 import com.educonnectapp.ui.components.BotonIconoCabeceraEdu
 import com.educonnectapp.ui.components.BotonPrincipalEdu
@@ -67,18 +61,13 @@ import com.educonnectapp.ui.components.TonoEdu
 import com.educonnectapp.ui.components.estiloCabecera
 import com.educonnectapp.ui.screens.comun.AlertaDatos
 import com.educonnectapp.ui.screens.docente.inicio.BottomNavBarDocente
-import com.educonnectapp.ui.theme.AccentOrange
 import com.educonnectapp.ui.theme.EduAzulOscuro
 import com.educonnectapp.ui.theme.EduAzulOscuroClaro
 import com.educonnectapp.ui.theme.EduConnectAppTheme
 import com.educonnectapp.ui.theme.EduFondo
 import com.educonnectapp.ui.theme.EduTexto
 import com.educonnectapp.ui.theme.EduTextoSecundario
-import com.educonnectapp.ui.theme.EduconnectBlue
 import com.educonnectapp.ui.theme.Nunito
-import com.educonnectapp.ui.theme.Roboto
-import com.educonnectapp.ui.theme.TextBlue
-import com.educonnectapp.ui.theme.TextPrimary
 import androidx.compose.foundation.layout.statusBarsPadding
 
 // Data class para asignación académica (alumnos: cantidad, 0 si no se conoce)
@@ -342,112 +331,6 @@ private fun FilaAccionPerfil(icono: ImageVector, texto: String, onClick: () -> U
             Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = null, tint = EduTextoSecundario, modifier = Modifier.size(22.dp))
         }
         if (!ultima) HorizontalDivider(color = EduFondo, thickness = 1.dp)
-    }
-}
-
-// =====================================================================
-// COMPONENTES ANTERIORES: los sigue usando el perfil del padre (se rediseñan con el módulo del padre)
-// =====================================================================
-
-@Composable
-fun SeccionTitulo(titulo: String) {
-    Text(
-        text = titulo,
-        fontFamily = Roboto,
-        fontWeight = FontWeight.Bold,
-        fontSize = 12.sp,
-        color = EduconnectBlue,
-        letterSpacing = 1.sp,
-        modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
-    )
-}
-
-@Composable
-fun FilaPerfil(
-    iconRes: Int,
-    bgColor: Color,
-    label: String,
-    valor: String,
-    onClick: (() -> Unit)? = null      // null = fila solo informativa (sin flecha)
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .size(38.dp)
-                .background(bgColor, RoundedCornerShape(10.dp)),
-            contentAlignment = Alignment.Center
-        ) {
-            Image(
-                painter = painterResource(id = iconRes),
-                contentDescription = null,
-                modifier = Modifier.size(26.dp)
-            )
-        }
-        Column(modifier = Modifier.weight(1f)) {
-            Text(text = label, fontFamily = Roboto, fontSize = 16.sp, color = TextPrimary)
-            Text(text = valor, fontFamily = Roboto, fontWeight = FontWeight.Medium, fontSize = 19.sp, color = TextBlue)
-        }
-        if (onClick != null) {
-            Image(
-                painter = painterResource(id = R.drawable.next_gray),
-                contentDescription = null,
-                modifier = Modifier.size(18.dp)
-            )
-        }
-    }
-}
-
-// Botón de texto con ícono a la derecha de un título de sección (lo usa el perfil del padre)
-@Composable
-fun BotonTitulo(icono: ImageVector, texto: String, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .clip(RoundedCornerShape(20.dp))
-            .clickable { onClick() }
-            .padding(horizontal = 8.dp, vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(imageVector = icono, contentDescription = null, tint = AccentOrange, modifier = Modifier.size(20.dp))
-        Spacer(modifier = Modifier.width(3.dp))
-        Text(text = texto, fontFamily = Roboto, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = AccentOrange)
-    }
-}
-
-@Composable
-fun FilaAccion(
-    iconRes: Int,
-    bgColor: Color,
-    label: String,
-    onClick: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() }
-            .padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .size(38.dp)
-                .background(bgColor, RoundedCornerShape(10.dp)),
-            contentAlignment = Alignment.Center
-        ) {
-            Image(painter = painterResource(id = iconRes), contentDescription = null, modifier = Modifier.size(28.dp))
-        }
-        Text(
-            text = label, fontFamily = Roboto, fontWeight = FontWeight.Medium, fontSize = 17.sp,
-            color = TextPrimary, modifier = Modifier.weight(1f)
-        )
-        Image(painter = painterResource(id = R.drawable.next_gray), contentDescription = null, modifier = Modifier.size(18.dp))
     }
 }
 
