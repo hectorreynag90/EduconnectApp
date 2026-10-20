@@ -1,33 +1,33 @@
 package com.educonnectapp.ui.screens.padre.perfil
 
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Key
+import androidx.compose.material.icons.rounded.Notifications
+import androidx.compose.material.icons.rounded.PersonAdd
+import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.Verified
+import androidx.compose.material.icons.rounded.Warning
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -38,45 +38,49 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.educonnectapp.R
+import com.educonnectapp.ui.components.BotonIconoCabeceraEdu
+import com.educonnectapp.ui.components.BotonPrincipalEdu
+import com.educonnectapp.ui.components.BotonSecundarioEdu
+import com.educonnectapp.ui.components.CabeceraEdu
+import com.educonnectapp.ui.components.ChipEdu
+import com.educonnectapp.ui.components.ColorModulo
 import com.educonnectapp.ui.components.PopupConfirmacionEdu
 import com.educonnectapp.ui.components.PopupExitoEdu
 import com.educonnectapp.ui.components.PopupProcesandoEdu
+import com.educonnectapp.ui.components.TarjetaEdu
+import com.educonnectapp.ui.components.TipoBotonEdu
+import com.educonnectapp.ui.components.TituloSeccionEdu
+import com.educonnectapp.ui.components.TonoEdu
 import com.educonnectapp.ui.screens.acceso.PopupAlertaEdu
 import com.educonnectapp.ui.screens.padre.inicio.BottomNavBarPadre
-import com.educonnectapp.ui.theme.AccentOrange
-import com.educonnectapp.ui.theme.BackgroundLight
-import com.educonnectapp.ui.theme.BackgroundRedLight
-import com.educonnectapp.ui.theme.BackgroundWhite
-import com.educonnectapp.ui.theme.BorderBlue
-import com.educonnectapp.ui.theme.BorderLight
-import com.educonnectapp.ui.theme.BorderRed
+import com.educonnectapp.ui.theme.EduAmarillo
+import com.educonnectapp.ui.theme.EduAzulOscuro
+import com.educonnectapp.ui.theme.EduAzulOscuroClaro
+import com.educonnectapp.ui.theme.EduBorde
+import com.educonnectapp.ui.theme.EduCampo
 import com.educonnectapp.ui.theme.EduConnectAppTheme
-import com.educonnectapp.ui.theme.EduconnectBlue
-import com.educonnectapp.ui.theme.NaranjaMedia
-import com.educonnectapp.ui.theme.Roboto
-import com.educonnectapp.ui.theme.TextBlue
-import com.educonnectapp.ui.theme.TextPrimary
-import com.educonnectapp.ui.theme.TextRed
-import com.educonnectapp.ui.theme.TextSecondary
-import com.educonnectapp.ui.theme.TextWhite
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import com.educonnectapp.ui.theme.EduCoral
+import com.educonnectapp.ui.theme.EduCoralOscuro
+import com.educonnectapp.ui.theme.EduEtiqueta
+import com.educonnectapp.ui.theme.EduFondo
+import com.educonnectapp.ui.theme.EduTeal
+import com.educonnectapp.ui.theme.EduTealClaro
+import com.educonnectapp.ui.theme.EduTealOscuro
+import com.educonnectapp.ui.theme.EduTexto
+import com.educonnectapp.ui.theme.EduTextoSecundario
+import com.educonnectapp.ui.theme.Nunito
 
-private val BackgroundGreenLight3 = Color(0xFFEAF3DE)
-private val BackgroundOrangeLight4 = Color(0xFFFFF0ED)
-private val GreenText3 = Color(0xFF3B6D11)
-private val BlueLight3 = Color(0xFFE6F1FB)
-
-// Data class para resultado de búsqueda
+// Resultado de la búsqueda por código de estudiante
 data class AlumnoEncontrado(
     val id: Long,
     val nombres: String,
@@ -86,10 +90,16 @@ data class AlumnoEncontrado(
     val codigoEstudiante: String
 )
 
+// =====================================================================
+// ASOCIAR HIJO (rediseño 2026)
+// Cabecera fija azul oscuro · código con "Buscar" dentro del campo · estudiante encontrado ·
+// Cancelar + Asociar fijos · confirmación -> procesando -> éxito
+// =====================================================================
+
 @Composable
 fun AsociarHijoScreen(
     onBack: () -> Unit = {},
-    onHomeDocente: () -> Unit = {},
+    onHomeDocente: () -> Unit = {},             // Inicio del padre (se conserva el nombre)
     onAgenda: () -> Unit = {},
     onAvisos: () -> Unit = {},
     onPerfil: () -> Unit = {},
@@ -110,317 +120,115 @@ fun AsociarHijoScreen(
     var mostrarConfirmacion by remember { mutableStateOf(false) }
     // El alumno se guarda al confirmar para mostrarlo en el popup de éxito
     var alumnoAsociado by remember { mutableStateOf<AlumnoEncontrado?>(null) }
-
-    val iniciales = alumnoEncontrado?.let {
-        "${it.nombres.firstOrNull() ?: ""}${it.apellidos.firstOrNull() ?: ""}".uppercase()
-    } ?: ""
-
-    // obtiene la fecha actual del dispositivo en español
-    val fechaActual = remember {
-        val sdf = SimpleDateFormat("EEEE, dd 'de' MMMM yyyy", Locale("es", "PE"))
-        sdf.format(Date())
-            .replaceFirstChar { it.uppercase() } // pone la primera letra en mayúscula
-    }
+    val buscar = { if (codigo.isNotBlank()) onBuscar(codigo.trim()) }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(BackgroundLight)
+            .background(EduFondo)
     ) {
-        // HEADER
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(EduconnectBlue)
-                .padding(horizontal = 20.dp, vertical = 20.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Row(
-                modifier = Modifier.weight(1f),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                IconButton(
-                    onClick = onBack,
-                    modifier = Modifier
-                        .size(35.dp)
-                        .offset(x = (-5).dp)
-                ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.arrowleft_white),
-                        contentDescription = "Volver",
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-                Column {
-                    Text(
-                        text = "Asociar Hijo",
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 22.sp,
-                        color = TextWhite
-                    )
-                    Text(
-                        text = "Ingresa el código del estudiante",
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.Normal,
-                        fontSize = 16.sp,
-                        color = TextWhite.copy(alpha = 0.85f)
-                    )
-                    Text(
-                        text = fechaActual, // fecha actual
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.Normal,
-                        fontSize = 15.sp,
-                        color = TextWhite
-                    )
-                }
-            }
-            IconButton(onClick = onNotificaciones) {
-                Image(
-                    painter = painterResource(id = R.drawable.notification_white),
-                    contentDescription = "Notificaciones",
-                    modifier = Modifier.size(35.dp)
+        // CABECERA FIJA
+        CabeceraEdu(
+            titulo = "Asociar hijo",
+            subtitulo = "Ingresa el código del estudiante",
+            onVolver = onBack,
+            colorFondo = ColorModulo.Perfil,
+            acciones = {
+                BotonIconoCabeceraEdu(
+                    icono = Icons.Rounded.Notifications,
+                    descripcion = "Notificaciones",
+                    onClick = onNotificaciones,
+                    colorCabecera = ColorModulo.Perfil
                 )
             }
-        }
+        )
 
-        Spacer(modifier = Modifier.height(15.dp))
-
-        // CONTENIDO
+        // CONTENIDO DESPLAZABLE
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // CAMPO CÓDIGO
-            Text(
-                text = "CÓDIGO DE ESTUDIANTE",
-                fontFamily = Roboto,
-                fontWeight = FontWeight.Bold,
-                fontSize = 16.sp,
-                color = EduconnectBlue,
-                modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
+            // ---------- CÓDIGO ----------
+            CampoCodigo(
+                valor = codigo,
+                onCambio = { codigo = it.uppercase().filter { c -> !c.isWhitespace() } },
+                error = mensajeError,
+                onBuscar = buscar
             )
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(BackgroundWhite, RoundedCornerShape(14.dp))
-                    .border(0.5.dp, BorderBlue, RoundedCornerShape(14.dp))
-                    .padding(12.dp)
-            ) {
-                Text(
-                    text = "Ingresa el código brindado por la institución",
-                    fontFamily = Roboto, fontSize = 14.sp, color = TextPrimary
-                )
-                Spacer(modifier = Modifier.height(6.dp))
 
-                OutlinedTextField(
-                    value = codigo,
-                    onValueChange = { codigo = it.uppercase() },
-                    placeholder = {
-                        Text(
-                            text = "Ej. PMU0001", color = TextSecondary,
-                            fontSize = 16.sp, fontFamily = Roboto
-                        )
-                    },
-
-                    leadingIcon = {
-                        Image(
-                            painter = painterResource(id = R.drawable.key_student_blue),
-                            contentDescription = null,
-                            modifier = Modifier.size(22.dp)
-                        )
-                    },
-                    keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.Text,
-                        capitalization = KeyboardCapitalization.Characters
-                    ),
-                    shape = RoundedCornerShape(10.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = EduconnectBlue,
-                        unfocusedBorderColor = BorderLight,
-                        focusedTextColor = TextBlue,
-                        unfocusedTextColor = TextBlue,
-                        cursorColor = EduconnectBlue,
-                        focusedContainerColor = BlueLight3,
-                        unfocusedContainerColor = BlueLight3
-                    ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(50.dp),
-                    singleLine = true
-                )
-            }
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            // BOTÓN BUSCAR
-            Button(
-                onClick = { if (codigo.isNotBlank()) onBuscar(codigo) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(50.dp),
-                shape = RoundedCornerShape(25.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (codigo.isNotBlank()) EduconnectBlue else BorderLight
-                ),
-                enabled = codigo.isNotBlank()
-            ) {
-                Image(
-                    painter = painterResource(id = R.drawable.search_white),
-                    contentDescription = null,
-                    modifier = Modifier.size(24.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "Buscar Código",
-                    fontFamily = Roboto,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 20.sp,
-                    color = if (codigo.isNotBlank()) TextWhite else TextSecondary
-                )
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // ERROR
-            if (mensajeError.isNotEmpty()) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(Color(0xFFFCEBEB), RoundedCornerShape(10.dp))
-                        .border(1.dp, Color(0xFFE53935), RoundedCornerShape(10.dp))
-                        .padding(12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.close_red),
-                        contentDescription = null, modifier = Modifier.size(18.dp)
-                    )
-                    Text(
-                        text = mensajeError, fontFamily = Roboto,
-                        fontSize = 13.sp, color = Color(0xFFE53935)
-                    )
-                }
-            }
-
-            // RESULTADO ENCONTRADO
+            // ---------- ESTUDIANTE ENCONTRADO ----------
             if (alumnoEncontrado != null) {
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "ESTUDIANTE ENCONTRADO",
-                    fontFamily = Roboto,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp,
-                    color = EduconnectBlue,
-                    modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
-                )
-
-                // Card resultado
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(BackgroundWhite, RoundedCornerShape(14.dp))
-                        .border(2.dp, EduconnectBlue, RoundedCornerShape(14.dp))
-                        .padding(14.dp)
+                TituloSeccionEdu("Estudiante encontrado")
+                val forma = RoundedCornerShape(22.dp)
+                TarjetaEdu(
+                    modifier = Modifier.border(2.dp, EduTeal, forma),
+                    relleno = PaddingValues(horizontal = 15.dp, vertical = 14.dp)
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(50.dp)
-                                .clip(CircleShape)
-                                .background(BlueLight3),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = iniciales, fontFamily = Roboto,
-                                fontWeight = FontWeight.Bold, fontSize = 22.sp,
-                                color = EduconnectBlue
-                            )
-                        }
+                        InicialesHijoPerfil(alumnoEncontrado.aHijo(), EduTealClaro, tamano = 52)
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "${alumnoEncontrado.nombres} ${alumnoEncontrado.apellidos}",
-                                fontFamily = Roboto, fontWeight = FontWeight.Bold,
-                                fontSize = 17.sp, color = EduconnectBlue
+                                "${alumnoEncontrado.nombres} ${alumnoEncontrado.apellidos}".trim(), fontFamily = Nunito,
+                                fontWeight = FontWeight.Black, fontSize = 16.5.sp, color = EduTexto,
+                                maxLines = 2, overflow = TextOverflow.Ellipsis
                             )
                             Text(
-                                text = "${alumnoEncontrado.gradoNombre} · Sec. ${alumnoEncontrado.seccionNombre}",
-                                fontFamily = Roboto, fontSize = 15.sp, color = TextPrimary
+                                "${alumnoEncontrado.gradoNombre} · Sección ${alumnoEncontrado.seccionNombre}",
+                                fontFamily = Nunito, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = EduTextoSecundario
                             )
-                            Text(
-                                text = "Código: ${alumnoEncontrado.codigoEstudiante}",
-                                fontFamily = Roboto, fontSize = 15.sp, color = TextPrimary
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Box(
-                                modifier = Modifier
-                                    .background(BackgroundGreenLight3, RoundedCornerShape(20.dp))
-                                    .padding(horizontal = 10.dp, vertical = 3.dp)
-                            ) {
-                                Text(
-                                    text = "✓ Estudiante verificado",
-                                    fontFamily = Roboto, fontWeight = FontWeight.Bold,
-                                    fontSize = 14.sp, color = GreenText3
-                                )
-                            }
                         }
                     }
+                    Row(
+                        modifier = Modifier.padding(top = 10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        ChipEdu("Estudiante verificado", TonoEdu.VERDE, icono = Icons.Rounded.Verified)
+                        ChipEdu("Código ${alumnoEncontrado.codigoEstudiante}", TonoEdu.AZUL)
+                    }
                 }
-
-                Spacer(modifier = Modifier.height(15.dp))
-
-                // BOTÓN ASOCIAR: abre el popup de confirmación
-                Button(
-                    onClick = { mostrarConfirmacion = true },
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(50.dp),
-                    shape = RoundedCornerShape(25.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = AccentOrange)
+                        .background(EduAzulOscuroClaro, RoundedCornerShape(16.dp))
+                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.useradd_white),
-                        contentDescription = null, modifier = Modifier.size(30.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Icon(Icons.Rounded.Info, contentDescription = null, tint = EduAzulOscuro, modifier = Modifier.size(21.dp))
                     Text(
-                        text = "Asociar hijo", fontFamily = Roboto,
-                        fontWeight = FontWeight.Bold, fontSize = 20.sp, color = TextWhite
+                        "Al asociarlo recibirás sus asistencias, comunicados y tareas.",
+                        modifier = Modifier.weight(1f), fontFamily = Nunito, fontWeight = FontWeight.SemiBold,
+                        fontSize = 13.sp, lineHeight = 18.sp, color = EduEtiqueta
                     )
                 }
             }
-
-            Spacer(modifier = Modifier.height(1.dp))
-
-            // BOTÓN CANCELAR
-            Button(
-                onClick = onCancelar,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(46.dp),
-                shape = RoundedCornerShape(25.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = BackgroundRedLight),
-                border = BorderStroke(1.dp, BorderRed)
-            ) {
-                Text(
-                    text = "Cancelar", fontFamily = Roboto,
-                    fontWeight = FontWeight.Normal, fontSize = 20.sp, color = TextRed
-                )
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
         }
-        //NAVBAR INFERIOR
+
+        // BOTONES FIJOS
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(EduFondo)
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            BotonSecundarioEdu(texto = "Cancelar", onClick = onCancelar, modifier = Modifier.weight(1f))
+            BotonPrincipalEdu(
+                texto = "Asociar",
+                tipo = TipoBotonEdu.GUARDAR,
+                icono = Icons.Rounded.PersonAdd,
+                habilitado = alumnoEncontrado != null,
+                onClick = { mostrarConfirmacion = true },
+                modifier = Modifier.weight(1f)
+            )
+        }
+
         BottomNavBarPadre(
             onInicio = onHomeDocente,
             onAvisos = onAvisos,
@@ -431,12 +239,14 @@ fun AsociarHijoScreen(
     }
 
     // ===================== POPUPS (PopupsEdu.kt) =====================
-    // 1. Confirmación con los datos del alumno
+    // 1. Confirmación con los datos del alumno (turquesa: acción de guardar)
     if (mostrarConfirmacion && alumnoEncontrado != null) {
         PopupConfirmacionEdu(
             titulo = "¿Asociar a tu hijo?",
             mensaje = "Recibirás sus asistencias, comunicados y tareas:",
             textoConfirmar = "Asociar",
+            colorConfirmar = TipoBotonEdu.GUARDAR.fondo,
+            icono = Icons.Rounded.PersonAdd,
             onCancelar = { mostrarConfirmacion = false },
             onConfirmar = {
                 mostrarConfirmacion = false
@@ -444,7 +254,7 @@ fun AsociarHijoScreen(
                 onConfirmar(alumnoEncontrado)
             }
         ) {
-            ResumenHijoEdu(alumnoEncontrado.aHijo())
+            ResumenHijoEdu(alumnoEncontrado.aHijo(), colorBorde = EduTeal)
         }
     }
 
@@ -455,8 +265,8 @@ fun AsociarHijoScreen(
     if (exito) {
         val a = alumnoAsociado
         PopupExitoEdu(
-            titulo = "¡Hijo asociado con éxito!",
-            detalle = a?.let { "${it.nombres} ${it.apellidos}\n${it.gradoNombre} · Sec. ${it.seccionNombre}" },
+            titulo = "¡Hijo asociado!",
+            detalle = a?.let { "${it.nombres} ${it.apellidos}\n${it.gradoNombre} ${it.seccionNombre}" },
             mensaje = "Ya aparece en tu perfil.",
             onCerrar = onCerrarExito
         )
@@ -465,11 +275,95 @@ fun AsociarHijoScreen(
     // Error (por ejemplo, ya estaba asociado)
     alerta?.let {
         PopupAlertaEdu(
-            icono = Icons.Filled.Warning,
-            color = NaranjaMedia,
+            icono = Icons.Rounded.Warning,
+            color = EduAmarillo,
             titulo = it.titulo,
             mensaje = it.mensaje,
             onCerrar = onCerrarAlerta
+        )
+    }
+}
+
+// Campo del código: gris vacío · blanco con borde turquesa al escribir · granate con error.
+// El botón "Buscar" (amarillo, avanzar) va dentro del campo.
+@Composable
+private fun CampoCodigo(valor: String, onCambio: (String) -> Unit, error: String, onBuscar: () -> Unit) {
+    val hayError = error.isNotBlank()
+    val lleno = valor.isNotBlank()
+    val forma = RoundedCornerShape(16.dp)
+    Column {
+        Text(
+            "Código de estudiante", modifier = Modifier.padding(bottom = 6.dp), fontFamily = Nunito,
+            fontWeight = FontWeight.ExtraBold, fontSize = 14.sp, color = EduEtiqueta
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(forma)
+                .background(if (lleno || hayError) Color.White else EduCampo)
+                .border(
+                    if (lleno || hayError) 2.dp else 1.5.dp,
+                    when {
+                        hayError -> EduCoral
+                        lleno -> EduTeal
+                        else -> EduBorde
+                    },
+                    forma
+                )
+                .padding(start = 14.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Icon(
+                Icons.Rounded.Key, contentDescription = null, modifier = Modifier.size(20.dp),
+                tint = when {
+                    hayError -> EduCoralOscuro
+                    lleno -> EduTealOscuro
+                    else -> EduTextoSecundario
+                }
+            )
+            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                if (valor.isEmpty()) {
+                    Text("Ej. PMU0001", fontFamily = Nunito, fontWeight = FontWeight.SemiBold, fontSize = 16.sp, color = EduTextoSecundario)
+                }
+                BasicTextField(
+                    value = valor,
+                    onValueChange = onCambio,
+                    singleLine = true,
+                    textStyle = TextStyle(
+                        fontFamily = Nunito, fontWeight = FontWeight.Black, fontSize = 17.sp,
+                        letterSpacing = 1.5.sp, color = EduTexto
+                    ),
+                    cursorBrush = SolidColor(EduTeal),
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Text,
+                        capitalization = KeyboardCapitalization.Characters,
+                        imeAction = ImeAction.Search
+                    ),
+                    keyboardActions = KeyboardActions(onSearch = { onBuscar() }),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+            // Botón "Buscar" (amarillo = avanzar)
+            Row(
+                modifier = Modifier
+                    .height(38.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(if (lleno) EduAmarillo else EduAmarillo.copy(alpha = 0.45f))
+                    .clickable(enabled = lleno, onClick = onBuscar)
+                    .padding(horizontal = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Icon(Icons.Rounded.Search, contentDescription = null, tint = EduTexto, modifier = Modifier.size(17.dp))
+                Text("Buscar", fontFamily = Nunito, fontWeight = FontWeight.Black, fontSize = 14.sp, color = EduTexto)
+            }
+        }
+        Text(
+            if (hayError) error else "Lo encuentras en la ficha que te entregó el colegio",
+            modifier = Modifier.padding(top = 6.dp, start = 2.dp), fontFamily = Nunito,
+            fontWeight = if (hayError) FontWeight.ExtraBold else FontWeight.Bold, fontSize = 12.5.sp,
+            color = if (hayError) EduCoralOscuro else EduTextoSecundario
         )
     }
 }
@@ -479,7 +373,7 @@ private fun AlumnoEncontrado.aHijo() = HijoAsociado(
     gradoNombre = gradoNombre, seccionNombre = seccionNombre, codigoEstudiante = codigoEstudiante
 )
 
-@Preview(showBackground = true)
+@Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
 fun AsociarHijoPreview() {
     EduConnectAppTheme {
@@ -487,7 +381,7 @@ fun AsociarHijoPreview() {
             alumnoEncontrado = AlumnoEncontrado(
                 id = 1L,
                 nombres = "Pedro",
-                apellidos = "Sanchez Vega",
+                apellidos = "Perez Garcia",
                 gradoNombre = "1er Grado",
                 seccionNombre = "A",
                 codigoEstudiante = "PMU0001"

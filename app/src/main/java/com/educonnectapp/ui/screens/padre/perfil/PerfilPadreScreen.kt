@@ -1,70 +1,81 @@
 package com.educonnectapp.ui.screens.padre.perfil
 
 import android.net.Uri
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.PersonAdd
-import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.rounded.Logout
+import androidx.compose.material.icons.rounded.Badge
+import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.Groups
+import androidx.compose.material.icons.rounded.Key
+import androidx.compose.material.icons.rounded.Mail
+import androidx.compose.material.icons.rounded.Notifications
+import androidx.compose.material.icons.rounded.NotificationsActive
+import androidx.compose.material.icons.rounded.PersonAdd
+import androidx.compose.material.icons.rounded.Phone
+import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.IconButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.educonnectapp.R
 import com.educonnectapp.ui.components.AvatarPerfilEditable
+import com.educonnectapp.ui.components.BotonIconoCabeceraEdu
+import com.educonnectapp.ui.components.BotonPrincipalEdu
+import com.educonnectapp.ui.components.ChipEdu
+import com.educonnectapp.ui.components.ColorModulo
+import com.educonnectapp.ui.components.IconoCirculoEdu
+import com.educonnectapp.ui.components.PopupConfirmacionEdu
+import com.educonnectapp.ui.components.TarjetaEdu
+import com.educonnectapp.ui.components.TipoBotonEdu
+import com.educonnectapp.ui.components.TituloSeccionEdu
+import com.educonnectapp.ui.components.TonoEdu
+import com.educonnectapp.ui.components.estiloCabecera
 import com.educonnectapp.ui.screens.comun.AlertaDatos
-import com.educonnectapp.ui.screens.docente.perfil.BotonTitulo
-import com.educonnectapp.ui.screens.docente.perfil.FilaAccion
-import com.educonnectapp.ui.screens.docente.perfil.FilaPerfil
 import com.educonnectapp.ui.screens.padre.inicio.BottomNavBarPadre
-import com.educonnectapp.ui.theme.AccentOrange
-import com.educonnectapp.ui.theme.Background
-import com.educonnectapp.ui.theme.BackgroundLight
-import com.educonnectapp.ui.theme.BackgroundWhite
-import com.educonnectapp.ui.theme.BorderBlue
-import com.educonnectapp.ui.theme.BorderLight
+import com.educonnectapp.ui.theme.EduAmarillo
+import com.educonnectapp.ui.theme.EduAzulOscuro
+import com.educonnectapp.ui.theme.EduAzulOscuroClaro
 import com.educonnectapp.ui.theme.EduConnectAppTheme
-import com.educonnectapp.ui.theme.EduconnectBlue
-import com.educonnectapp.ui.theme.Roboto
-import com.educonnectapp.ui.theme.TextBlue
-import com.educonnectapp.ui.theme.TextPrimary
-import com.educonnectapp.ui.theme.TextSecondary
-import com.educonnectapp.ui.theme.TextWhite
+import com.educonnectapp.ui.theme.EduFondo
+import com.educonnectapp.ui.theme.EduTealClaro
+import com.educonnectapp.ui.theme.EduTealOscuro
+import com.educonnectapp.ui.theme.EduTexto
+import com.educonnectapp.ui.theme.EduTextoSecundario
+import com.educonnectapp.ui.theme.Nunito
 
-private val BackgroundBlueLight2 = Color(0xFFE6F1FB)
-private val BackgroundGreenLight2 = Color(0xFFEAF3DE)
-private val BackgroundOrangeLight2 = Color(0xFFFFF0ED)
-private val BackgroundAmberLight2 = Color(0xFFFAEEDA)
-private val BackgroundGrayLight2 = Color(0xFFF1EFE8)
-
-// Data class para hijo asociado
+// Hijo asociado al padre
 data class HijoAsociado(
     val id: Long,
     val nombres: String,
@@ -73,6 +84,12 @@ data class HijoAsociado(
     val seccionNombre: String,
     val codigoEstudiante: String
 )
+
+// =====================================================================
+// PERFIL DEL PADRE (rediseño 2026) · mismo diseño que el perfil del docente
+// Cabecera fija azul oscuro (foto, nombre, hijos asociados) · datos personales ·
+// mis hijos (Asociar / Gestionar) · configuración · "Cerrar sesión" (con confirmación)
+// =====================================================================
 
 @Composable
 fun PerfilPadreScreen(
@@ -105,326 +122,180 @@ fun PerfilPadreScreen(
     onCerrarAlertaFoto: () -> Unit = {},
     onCambiarPassword: () -> Unit = {},
     onNotificacionesConfig: () -> Unit = {},
-    onCerrarSesion: () -> Unit = {},
+    onCerrarSesion: () -> Unit = {},            // se llama después de confirmar en el popup
 ) {
+    var confirmarCierre by remember { mutableStateOf(false) }
+    val estilo = estiloCabecera(ColorModulo.Perfil)
+
+    if (confirmarCierre) {
+        PopupConfirmacionEdu(
+            titulo = "¿Cerrar sesión?",
+            mensaje = "Tendrás que ingresar de nuevo con tu correo y contraseña para volver a usar EduConnect.",
+            textoConfirmar = "Cerrar sesión",
+            colorConfirmar = TipoBotonEdu.ELIMINAR.fondo,
+            icono = Icons.AutoMirrored.Rounded.Logout,
+            onCancelar = { confirmarCierre = false },
+            onConfirmar = {
+                confirmarCierre = false
+                onCerrarSesion()
+            }
+        )
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(BackgroundLight)
+            .background(EduFondo)
     ) {
-        // HEADER AZUL
+        // CABECERA FIJA: título + campana, y debajo foto, nombre e hijos asociados
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(EduconnectBlue)
-                .padding(horizontal = 20.dp, vertical = 16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+                .background(ColorModulo.Perfil, RoundedCornerShape(bottomStart = 30.dp, bottomEnd = 30.dp))
+                .statusBarsPadding()
+                .padding(start = 18.dp, end = 18.dp, top = 16.dp, bottom = 22.dp)
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                IconButton(
-                    onClick = onBack,
-                    modifier = Modifier
-                        .size(35.dp)
-                        .offset(x = (-5).dp)
-                ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.arrowleft_white),
-                        contentDescription = "Volver",
-                        modifier = Modifier.size(18.dp)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Mi perfil", fontFamily = Nunito, fontWeight = FontWeight.Black, fontSize = 23.sp, color = estilo.titulo)
+                    Text(
+                        "Datos, hijos y configuración", fontFamily = Nunito, fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp, color = estilo.subtitulo
                     )
                 }
-                IconButton(
+                BotonIconoCabeceraEdu(
+                    icono = Icons.Rounded.Notifications,
+                    descripcion = "Notificaciones",
                     onClick = onNotificaciones,
-                    modifier = Modifier.size(32.dp)
-                ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.notification_white),
-                        contentDescription = "Notificaciones",
-                        modifier = Modifier.size(35.dp)
+                    colorCabecera = ColorModulo.Perfil
+                )
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                // Foto de perfil editable (FotoPerfilEdu.kt)
+                AvatarPerfilEditable(
+                    nombre = usuarioNombre,
+                    fotoUrl = fotoUrl,
+                    onFotoElegida = onFotoElegida,
+                    guardando = guardandoFoto,
+                    actualizada = fotoActualizada,
+                    alerta = alertaFoto,
+                    onCerrarExito = onCerrarExitoFoto,
+                    onCerrarAlerta = onCerrarAlertaFoto
+                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        usuarioNombre, fontFamily = Nunito, fontWeight = FontWeight.Black, fontSize = 19.sp,
+                        color = estilo.titulo, maxLines = 2, overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        "Padre de familia · I.E. Pedro M. Ureña", fontFamily = Nunito, fontWeight = FontWeight.Bold,
+                        fontSize = 13.5.sp, color = estilo.subtitulo
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    ChipEdu(
+                        when (hijosAsociados.size) {
+                            0 -> "Sin hijos asociados"
+                            1 -> "1 hijo asociado"
+                            else -> "${hijosAsociados.size} hijos asociados"
+                        },
+                        if (hijosAsociados.isEmpty()) TonoEdu.AMARILLO else TonoEdu.VERDE,
+                        icono = Icons.Rounded.Groups
                     )
                 }
             }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Avatar con foto de perfil editable (FotoPerfilEdu.kt)
-            AvatarPerfilEditable(
-                nombre = usuarioNombre,
-                fotoUrl = fotoUrl,
-                onFotoElegida = onFotoElegida,
-                guardando = guardandoFoto,
-                actualizada = fotoActualizada,
-                alerta = alertaFoto,
-                onCerrarExito = onCerrarExitoFoto,
-                onCerrarAlerta = onCerrarAlertaFoto
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                text = usuarioNombre,
-                fontFamily = Roboto,
-                fontWeight = FontWeight.Bold,
-                fontSize = 22.sp,
-                color = TextWhite
-            )
-            Text(
-                text = "Padre de familia",
-                fontFamily = Roboto,
-                fontWeight = FontWeight.Normal,
-                fontSize = 16.sp,
-                color = TextWhite.copy(alpha = 0.85f)
-            )
-            Spacer(modifier = Modifier.height(6.dp))
         }
 
-        // CONTENIDO SCROLLEABLE
+        // CONTENIDO DESPLAZABLE
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            // DATOS PERSONALES: título + botón "Editar" (abre EditarDatosScreen)
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(start = 4.dp, bottom = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "DATOS PERSONALES",
-                    fontFamily = Roboto,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp,
-                    color = EduconnectBlue,
-                    modifier = Modifier.weight(1f)
-                )
-                BotonTitulo(icono = Icons.Filled.Edit, texto = "", onClick = onEditarDatos)
+            // DATOS PERSONALES
+            TituloSeccionEdu("Datos personales") {
+                AccionTitulo(Icons.Rounded.Edit, "Editar", EduAzulOscuroClaro, EduAzulOscuro, onEditarDatos)
+            }
+            TarjetaEdu(relleno = PaddingValues(horizontal = 14.dp, vertical = 2.dp)) {
+                FilaDatoPerfil(Icons.Rounded.Badge, "DNI", dni.ifBlank { "No registrado" })
+                FilaDatoPerfil(Icons.Rounded.Phone, "Teléfono", telefono.ifBlank { "No registrado" })
+                FilaDatoPerfil(Icons.Rounded.Mail, "Correo", email.ifBlank { "No registrado" }, ultima = true)
             }
 
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(BackgroundWhite, RoundedCornerShape(14.dp))
-                    .border(0.5.dp, BorderBlue, RoundedCornerShape(14.dp))
-            ) {
-                FilaPerfil(
-                    iconRes = R.drawable.user_circle_darkgray,
-                    bgColor = BackgroundBlueLight2,
-                    label = "Nombre completo",
-                    valor = usuarioNombre,
-                    onClick = null
-                )
-                HorizontalDivider(color = BorderLight, thickness = 1.dp)
-                FilaPerfil(
-                    iconRes = R.drawable.dni_darkgray,
-                    bgColor = BackgroundBlueLight2,
-                    label = "DNI",
-                    valor = if (dni.isNotEmpty()) dni else "No registrado",
-                    onClick = null
-                )
-                HorizontalDivider(color = BorderLight, thickness = 1.dp)
-                FilaPerfil(
-                    iconRes = R.drawable.phone_darkgray,
-                    bgColor = BackgroundBlueLight2,
-                    label = "Teléfono",
-                    valor = if (telefono.isNotEmpty()) telefono else "No registrado",
-                    onClick = null
-                )
-                HorizontalDivider(color = BorderLight, thickness = 1.dp)
-                FilaPerfil(
-                    iconRes = R.drawable.mail_darkgray,
-                    bgColor = BackgroundBlueLight2,
-                    label = "Correo",
-                    valor = if (email.isNotEmpty()) email else "No registrado",
-                    onClick = null
-                )
-            }
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            // MIS HIJOS: título + "Gestionar" (ver y quitar) + "Asociar" (ícono de usuario con +)
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(start = 4.dp, bottom = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "HIJOS ASIGNADOS",
-                    fontFamily = Roboto,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp,
-                    color = EduconnectBlue,
-                    modifier = Modifier.weight(1f)
-                )
-
-
-                BotonTitulo(icono = Icons.Filled.PersonAdd, texto = "", onClick = onAsociarHijo)
-
-                if (hijosAsociados.isNotEmpty()) {
-                    BotonTitulo(
-                        icono = Icons.Filled.Settings,
-                        texto = "",
-                        onClick = onGestionarHijos
-                    )
+            // MIS HIJOS
+            Spacer(modifier = Modifier.height(2.dp))
+            TituloSeccionEdu(if (hijosAsociados.isEmpty()) "Mis hijos" else "Mis hijos · ${hijosAsociados.size}") {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    AccionTitulo(Icons.Rounded.PersonAdd, "Asociar", EduTealClaro, EduTealOscuro, onAsociarHijo)
+                    if (hijosAsociados.isNotEmpty()) {
+                        AccionTitulo(Icons.Rounded.Settings, "Gestionar", EduAzulOscuroClaro, EduAzulOscuro, onGestionarHijos)
+                    }
                 }
             }
-
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(BackgroundWhite, RoundedCornerShape(14.dp))
-                    .border(0.5.dp, BorderBlue, RoundedCornerShape(14.dp))
-            ) {
+            TarjetaEdu(relleno = PaddingValues(horizontal = 14.dp, vertical = 2.dp)) {
                 if (hijosAsociados.isEmpty()) {
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
+                        modifier = Modifier.padding(vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(38.dp)
-                                .background(BackgroundGreenLight2, RoundedCornerShape(10.dp)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Image(
-                                painter = painterResource(id = R.drawable.students_blue),
-                                contentDescription = null,
-                                modifier = Modifier.size(22.dp)
-                            )
-                        }
+                        IconoCirculoEdu(Icons.Rounded.Groups, TonoEdu.GRIS, tamano = 38.dp)
                         Text(
-                            text = "Sin hijos asociados · usa \"Asociar\"",
-                            fontFamily = Roboto,
-                            fontSize = 14.sp,
-                            color = TextSecondary
+                            "Aún no tienes hijos asociados. Usa \"Asociar\" con el código que te dio el colegio.",
+                            modifier = Modifier.weight(1f), fontFamily = Nunito, fontWeight = FontWeight.SemiBold,
+                            fontSize = 14.sp, color = EduTextoSecundario
                         )
                     }
-                } else {
-                    hijosAsociados.forEachIndexed { indice, hijo ->
-                        val inicialesHijo = "${hijo.nombres.firstOrNull() ?: ""}${hijo.apellidos.firstOrNull() ?: ""}".uppercase()
+                }
+                hijosAsociados.forEachIndexed { i, h ->
+                    Column {
                         Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 11.dp),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(42.dp)
-                                    .background(BackgroundBlueLight2, CircleShape),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = inicialesHijo,
-                                    fontFamily = Roboto,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize =18.sp,
-                                    color = EduconnectBlue
-                                )
-                            }
+                            InicialesHijoPerfil(h, if (i % 2 == 0) EduAmarillo else EduTealClaro)
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = "${hijo.nombres} ${hijo.apellidos}",
-                                    fontFamily = Roboto,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 16.sp,
-                                    color = TextBlue
+                                    "${h.nombres} ${h.apellidos}".trim(), fontFamily = Nunito, fontWeight = FontWeight.Black,
+                                    fontSize = 15.sp, color = EduTexto, maxLines = 1, overflow = TextOverflow.Ellipsis
                                 )
                                 Text(
-                                    text = "${hijo.gradoNombre} · Sec. ${hijo.seccionNombre}",
-                                    fontFamily = Roboto,
-                                    fontSize = 15.sp,
-                                    color = TextPrimary
-                                )
-                                Text(
-                                    text = "Código: ${hijo.codigoEstudiante}",
-                                    fontFamily = Roboto,
-                                    fontSize = 15.sp,
-                                    color = TextPrimary
+                                    "${h.gradoNombre} ${h.seccionNombre} · Código ${h.codigoEstudiante}",
+                                    fontFamily = Nunito, fontWeight = FontWeight.Bold, fontSize = 12.5.sp, color = EduTextoSecundario
                                 )
                             }
                         }
-                        if (indice < hijosAsociados.lastIndex) {
-                            HorizontalDivider(color = BorderLight, thickness = 1.dp)
-                        }
+                        if (i < hijosAsociados.lastIndex) HorizontalDivider(color = EduFondo, thickness = 1.dp)
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(4.dp))
-
-            // SECCIÓN CONFIGURACIÓN
-            Text(
-                text = "CONFIGURACIÓN",
-                fontFamily = Roboto,
-                fontWeight = FontWeight.Bold,
-                fontSize = 16.sp,
-                color = EduconnectBlue,
-                modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
-            )
-
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(BackgroundWhite, RoundedCornerShape(14.dp))
-                    .border(0.5.dp, BorderBlue, RoundedCornerShape(14.dp))
-            ) {
-                FilaAccion(
-                    iconRes = R.drawable.closed_white,
-                    bgColor = Background,
-                    label = "Cambiar contraseña",
-                    onClick = onCambiarPassword
-                )
-                HorizontalDivider(color = BorderLight, thickness = 1.dp)
-                FilaAccion(
-                    iconRes = R.drawable.notification_white,
-                    bgColor = Background,
-                    label = "Notificaciones",
-                    onClick = onNotificacionesConfig
-                )
+            // CONFIGURACIÓN
+            Spacer(modifier = Modifier.height(2.dp))
+            TituloSeccionEdu("Configuración")
+            TarjetaEdu(relleno = PaddingValues(horizontal = 14.dp, vertical = 2.dp)) {
+                FilaAccionPerfil(Icons.Rounded.Key, "Cambiar contraseña", onCambiarPassword)
+                FilaAccionPerfil(Icons.Rounded.NotificationsActive, "Notificaciones", onNotificacionesConfig, ultima = true)
             }
-
-            Spacer(modifier = Modifier.height(8.dp))
 
             // CERRAR SESIÓN
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(BackgroundOrangeLight2, RoundedCornerShape(14.dp))
-                    .border(1.dp, AccentOrange, RoundedCornerShape(14.dp))
-                    .clickable { onCerrarSesion() }
-                    .padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center
-            ) {
-                Image(
-                    painter = painterResource(id = R.drawable.logout_orange),
-                    contentDescription = null,
-                    modifier = Modifier.size(30.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "Cerrar sesión",
-                    fontFamily = Roboto,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 22.sp,
-                    color = AccentOrange
-                )
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(6.dp))
+            BotonPrincipalEdu(
+                texto = "Cerrar sesión",
+                tipo = TipoBotonEdu.ELIMINAR,
+                icono = Icons.AutoMirrored.Rounded.Logout,
+                onClick = { confirmarCierre = true }
+            )
+            Spacer(modifier = Modifier.height(4.dp))
         }
 
-        // NAVBAR
         BottomNavBarPadre(
             onInicio = onHomePadre,
             onAvisos = onAvisos,
@@ -435,7 +306,78 @@ fun PerfilPadreScreen(
     }
 }
 
-@Preview(showBackground = true)
+// Acción pequeña a la derecha de un título de sección ("Editar", "Asociar", "Gestionar")
+@Composable
+private fun AccionTitulo(icono: ImageVector, texto: String, fondo: Color, color: Color, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(10.dp))
+            .background(fondo)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(5.dp)
+    ) {
+        Icon(icono, contentDescription = null, tint = color, modifier = Modifier.size(15.dp))
+        Text(texto, fontFamily = Nunito, fontWeight = FontWeight.Black, fontSize = 13.sp, color = color)
+    }
+}
+
+// Fila informativa: ícono en círculo, etiqueta pequeña y valor
+@Composable
+private fun FilaDatoPerfil(icono: ImageVector, etiqueta: String, valor: String, ultima: Boolean = false) {
+    Column {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(vertical = 11.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            IconoCirculoEdu(icono, TonoEdu.AZUL, tamano = 38.dp)
+            Column(modifier = Modifier.weight(1f)) {
+                Text(etiqueta, fontFamily = Nunito, fontWeight = FontWeight.Bold, fontSize = 12.5.sp, color = EduTextoSecundario)
+                Text(
+                    valor, fontFamily = Nunito, fontWeight = FontWeight.Black, fontSize = 15.sp, color = EduTexto,
+                    maxLines = 2, overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+        if (!ultima) HorizontalDivider(color = EduFondo, thickness = 1.dp)
+    }
+}
+
+// Fila de acción con flecha (Cambiar contraseña, Notificaciones)
+@Composable
+private fun FilaAccionPerfil(icono: ImageVector, texto: String, onClick: () -> Unit, ultima: Boolean = false) {
+    Column {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClick)
+                .padding(vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            IconoCirculoEdu(icono, TonoEdu.AZUL, tamano = 38.dp)
+            Text(texto, modifier = Modifier.weight(1f), fontFamily = Nunito, fontWeight = FontWeight.Black, fontSize = 15.sp, color = EduTexto)
+            Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = null, tint = EduTextoSecundario, modifier = Modifier.size(22.dp))
+        }
+        if (!ultima) HorizontalDivider(color = EduFondo, thickness = 1.dp)
+    }
+}
+
+// Iniciales del hijo en un círculo de color (también la usan Mis hijos y Asociar hijo)
+@Composable
+internal fun InicialesHijoPerfil(hijo: HijoAsociado, fondo: Color, tamano: Int = 42) {
+    val iniciales = "${hijo.nombres.firstOrNull() ?: ""}${hijo.apellidos.firstOrNull() ?: ""}".uppercase()
+    Box(
+        modifier = Modifier.size(tamano.dp).background(fondo, CircleShape),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(iniciales, fontFamily = Nunito, fontWeight = FontWeight.Black, fontSize = (tamano * 0.36f).sp, color = EduTexto)
+    }
+}
+
+@Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
 fun PerfilPadrePreview() {
     EduConnectAppTheme {
@@ -445,7 +387,8 @@ fun PerfilPadrePreview() {
             telefono = "912345678",
             email = "luis@gmail.com",
             hijosAsociados = listOf(
-                HijoAsociado(1L, "Pedro", "Sanchez Vega", "1er Grado", "A", "PMU0001")
+                HijoAsociado(1L, "Angela", "Perez Garcia", "2do Grado", "A", "PMU0006"),
+                HijoAsociado(2L, "Pedro", "Perez Garcia", "1er Grado", "A", "PMU0001")
             ),
         )
     }

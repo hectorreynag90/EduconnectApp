@@ -1,32 +1,28 @@
 package com.educonnectapp.ui.screens.padre.perfil
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.PersonRemove
-import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material.icons.rounded.Groups
+import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Notifications
+import androidx.compose.material.icons.rounded.PersonAdd
+import androidx.compose.material.icons.rounded.PersonRemove
+import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -35,39 +31,49 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.educonnectapp.R
+import com.educonnectapp.ui.components.BotonIconoCabeceraEdu
+import com.educonnectapp.ui.components.BotonPrincipalEdu
+import com.educonnectapp.ui.components.CabeceraEdu
+import com.educonnectapp.ui.components.ChipCabeceraEdu
+import com.educonnectapp.ui.components.ColorModulo
+import com.educonnectapp.ui.components.IconoCirculoEdu
 import com.educonnectapp.ui.components.PopupConfirmacionEdu
 import com.educonnectapp.ui.components.PopupExitoEdu
 import com.educonnectapp.ui.components.PopupProcesandoEdu
+import com.educonnectapp.ui.components.TarjetaEdu
+import com.educonnectapp.ui.components.TipoBotonEdu
+import com.educonnectapp.ui.components.TituloSeccionEdu
+import com.educonnectapp.ui.components.TonoEdu
 import com.educonnectapp.ui.screens.acceso.PopupAlertaEdu
 import com.educonnectapp.ui.screens.padre.inicio.BottomNavBarPadre
-import com.educonnectapp.ui.theme.AccentOrange
-import com.educonnectapp.ui.theme.BackgroundLight
-import com.educonnectapp.ui.theme.BackgroundWhite
-import com.educonnectapp.ui.theme.BorderBlue
+import com.educonnectapp.ui.theme.EduAmarillo
 import com.educonnectapp.ui.theme.EduConnectAppTheme
-import com.educonnectapp.ui.theme.EduconnectBlue
-import com.educonnectapp.ui.theme.FondoRojo
-import com.educonnectapp.ui.theme.NaranjaMedia
-import com.educonnectapp.ui.theme.Roboto
-import com.educonnectapp.ui.theme.RojoError
-import com.educonnectapp.ui.theme.TextBlue
-import com.educonnectapp.ui.theme.TextPrimary
-import com.educonnectapp.ui.theme.TextSecondary
-import com.educonnectapp.ui.theme.TextWhite
-
-private val FondoAzulHijos = Color(0xFFE6F1FB)
+import com.educonnectapp.ui.theme.EduCoral
+import com.educonnectapp.ui.theme.EduCoralClaro
+import com.educonnectapp.ui.theme.EduEtiqueta
+import com.educonnectapp.ui.theme.EduFondo
+import com.educonnectapp.ui.theme.EduTeal
+import com.educonnectapp.ui.theme.EduTealClaro
+import com.educonnectapp.ui.theme.EduTealOscuro
+import com.educonnectapp.ui.theme.EduTexto
+import com.educonnectapp.ui.theme.EduTextoSecundario
+import com.educonnectapp.ui.theme.Nunito
 
 // Error al quitar o asociar un hijo (lo arma MainActivity y se muestra como popup)
 data class AlertaHijo(val titulo: String, val mensaje: String)
 
-// Gestionar hijos: lista con el botón para quitar (desasociar) cada uno
+// =====================================================================
+// MIS HIJOS (rediseño 2026) · mismo diseño que "Mis asignaciones" del docente
+// Cabecera fija azul oscuro · un hijo por tarjeta con botón quitar · "Asociar hijo" fijo
+// =====================================================================
+
 @Composable
 fun MisHijosScreen(
     hijos: List<HijoAsociado> = emptyList(),
@@ -91,113 +97,94 @@ fun MisHijosScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(BackgroundLight)
+            .background(EduFondo)
     ) {
-        // HEADER
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(EduconnectBlue)
-                .padding(horizontal = 20.dp, vertical = 20.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Row(
-                modifier = Modifier.weight(1f),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                IconButton(
-                    onClick = onBack,
-                    modifier = Modifier.size(35.dp).offset(x = (-5).dp)
-                ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.arrowleft_white),
-                        contentDescription = "Volver",
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-                Column {
-                    Text(text = "Mis hijos", fontFamily = Roboto,
-                        fontWeight = FontWeight.Bold, fontSize = 22.sp, color = TextWhite)
-                    Text(text = "Estudiantes asociados a tu cuenta", fontFamily = Roboto,
-                        fontSize = 16.sp, color = TextWhite.copy(alpha = 0.85f))
-                }
-            }
-            IconButton(onClick = onNotificaciones) {
-                Image(
-                    painter = painterResource(id = R.drawable.notification_white),
-                    contentDescription = "Notificaciones",
-                    modifier = Modifier.size(35.dp)
+        // CABECERA FIJA
+        CabeceraEdu(
+            titulo = "Mis hijos",
+            subtitulo = "Estudiantes asociados a tu cuenta",
+            onVolver = onBack,
+            colorFondo = ColorModulo.Perfil,
+            acciones = {
+                BotonIconoCabeceraEdu(
+                    icono = Icons.Rounded.Notifications,
+                    descripcion = "Notificaciones",
+                    onClick = onNotificaciones,
+                    colorCabecera = ColorModulo.Perfil
+                )
+            },
+            contenidoInferior = {
+                ChipCabeceraEdu(
+                    when (hijos.size) { 0 -> "Sin hijos"; 1 -> "1 hijo"; else -> "${hijos.size} hijos" },
+                    modifier = Modifier.padding(top = 14.dp),
+                    colorCabecera = ColorModulo.Perfil
                 )
             }
-        }
+        )
 
-        // CONTENIDO
+        // CONTENIDO DESPLAZABLE
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 20.dp),
+                .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Text(
-                text = if (hijos.isEmpty()) "SIN HIJOS ASOCIADOS" else "HIJOS ASOCIADOS (${hijos.size})",
-                fontFamily = Roboto, fontWeight = FontWeight.Bold, fontSize = 16.sp,
-                color = EduconnectBlue, modifier = Modifier.padding(start = 4.dp)
-            )
-
+            TituloSeccionEdu("Hijos asociados")
             if (hijos.isEmpty()) {
-                Text(
-                    text = "Aún no tienes hijos asociados. Usa \"Asociar hijo\" con el código que te dio la institución.",
-                    fontFamily = Roboto, fontSize = 15.sp, color = TextSecondary,
-                    lineHeight = 20.sp, modifier = Modifier.padding(horizontal = 4.dp)
-                )
+                TarjetaEdu {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        IconoCirculoEdu(Icons.Rounded.Groups, TonoEdu.GRIS)
+                        Text(
+                            "Aún no tienes hijos asociados. Usa \"Asociar hijo\" con el código que te dio el colegio.",
+                            modifier = Modifier.weight(1f), fontFamily = Nunito, fontWeight = FontWeight.SemiBold,
+                            fontSize = 14.sp, color = EduTextoSecundario
+                        )
+                    }
+                }
+            }
+            hijos.forEachIndexed { i, h ->
+                TarjetaHijo(h, if (i % 2 == 0) EduAmarillo else EduTealClaro, onQuitar = { porQuitar = h })
             }
 
-            hijos.forEach { hijo ->
-                FilaHijo(hijo = hijo, onQuitar = { porQuitar = hijo })
-            }
-
-            // Aviso: qué pasa al quitar
+            // AVISO: el historial se conserva
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(FondoAzulHijos, RoundedCornerShape(12.dp))
-                    .padding(12.dp),
-                verticalAlignment = Alignment.Top,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    .padding(top = 4.dp)
+                    .background(EduTealClaro, RoundedCornerShape(16.dp))
+                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                Icon(Icons.Filled.Info, contentDescription = null,
-                    tint = EduconnectBlue, modifier = Modifier.size(20.dp))
+                Icon(Icons.Rounded.Info, contentDescription = null, tint = EduTealOscuro, modifier = Modifier.size(22.dp))
                 Text(
-                    text = "Al quitar a un hijo dejarás de recibir sus asistencias, comunicados y tareas. " +
+                    "Al quitar a un hijo dejarás de recibir sus asistencias, comunicados y tareas. " +
                             "Su historial se conserva y puedes volver a asociarlo con su código.",
-                    fontFamily = Roboto, fontSize = 14.sp, color = TextBlue, lineHeight = 19.sp
+                    modifier = Modifier.weight(1f), fontFamily = Nunito, fontWeight = FontWeight.SemiBold,
+                    fontSize = 13.sp, lineHeight = 18.sp, color = EduEtiqueta
                 )
             }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // BOTÓN ASOCIAR
-            Button(
-                onClick = onAsociar,
-                modifier = Modifier.fillMaxWidth().height(50.dp),
-                shape = RoundedCornerShape(25.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = AccentOrange)
-            ) {
-                Image(painter = painterResource(id = R.drawable.useradd_white),
-                    contentDescription = null, modifier = Modifier.size(28.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(text = "Asociar hijo", fontFamily = Roboto,
-                    fontWeight = FontWeight.Bold, fontSize = 20.sp, color = TextWhite)
-            }
-
-            Spacer(modifier = Modifier.height(20.dp))
         }
 
-        // NAVBAR
+        // BOTÓN FIJO
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(EduFondo)
+                .padding(horizontal = 16.dp, vertical = 12.dp)
+        ) {
+            BotonPrincipalEdu(
+                texto = "Asociar hijo",
+                tipo = TipoBotonEdu.GUARDAR,
+                icono = Icons.Rounded.PersonAdd,
+                onClick = onAsociar
+            )
+        }
+
         BottomNavBarPadre(
             onInicio = onHomePadre,
             onAvisos = onAvisos,
@@ -207,21 +194,22 @@ fun MisHijosScreen(
         )
     }
 
-    // ===================== POPUPS (PopupsEdu.kt) =====================
-    // 1. Confirmación (en rojo)
+    // ===================== POPUPS =====================
+    // 1. Confirmación (granate: acción de quitar)
     porQuitar?.let { h ->
         PopupConfirmacionEdu(
             titulo = "¿Quitar a tu hijo?",
             mensaje = "Dejarás de recibir sus notificaciones. Podrás volver a asociarlo con su código.",
             textoConfirmar = "Quitar",
-            colorConfirmar = RojoError,
+            colorConfirmar = TipoBotonEdu.ELIMINAR.fondo,
+            icono = Icons.Rounded.PersonRemove,
             onCancelar = { porQuitar = null },
             onConfirmar = {
                 porQuitar = null
                 onQuitar(h)
             }
         ) {
-            ResumenHijoEdu(h, colorBorde = RojoError)
+            ResumenHijoEdu(h, colorBorde = EduCoral)
         }
     }
 
@@ -231,8 +219,8 @@ fun MisHijosScreen(
     // 3. Éxito: se cierra solo a los 5 segundos o con la X (se queda en la lista)
     quitado?.let { h ->
         PopupExitoEdu(
-            titulo = "¡Hijo desasociado con éxito!",
-            detalle = "${h.nombres} ${h.apellidos}\n${h.gradoNombre} · Sec. ${h.seccionNombre}",
+            titulo = "¡Hijo desasociado!",
+            detalle = "${h.nombres} ${h.apellidos}\n${h.gradoNombre} ${h.seccionNombre}",
             mensaje = "Ya no aparece en tu perfil.",
             onCerrar = onCerrarExito
         )
@@ -241,8 +229,8 @@ fun MisHijosScreen(
     // Error
     alerta?.let {
         PopupAlertaEdu(
-            icono = Icons.Filled.Warning,
-            color = NaranjaMedia,
+            icono = Icons.Rounded.Warning,
+            color = EduAmarillo,
             titulo = it.titulo,
             mensaje = it.mensaje,
             onCerrar = onCerrarAlerta
@@ -250,84 +238,75 @@ fun MisHijosScreen(
     }
 }
 
-// Tarjeta con el resumen de un hijo (iniciales, nombre, grado, sección y código).
-// También la usa AsociarHijoScreen en su confirmación.
+// Tarjeta con el resumen de un hijo (iniciales, nombre, grado y código) para los popups.
+// Fondo claro del color del borde: granate al quitar, turquesa al asociar.
 @Composable
-fun ResumenHijoEdu(hijo: HijoAsociado, colorBorde: Color = EduconnectBlue) {
+fun ResumenHijoEdu(hijo: HijoAsociado, colorBorde: Color = EduTeal) {
+    val fondo = if (colorBorde == EduCoral) EduCoralClaro else EduTealClaro
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(FondoAzulHijos, RoundedCornerShape(12.dp))
-            .border(1.dp, colorBorde, RoundedCornerShape(12.dp))
+            .background(fondo, RoundedCornerShape(16.dp))
+            .border(1.5.dp, colorBorde, RoundedCornerShape(16.dp))
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        InicialesHijo(hijo, fondo = BackgroundWhite)
+        InicialesHijoPerfil(hijo, Color.White, tamano = 40)
         Column(modifier = Modifier.weight(1f)) {
-            Text(text = "${hijo.nombres} ${hijo.apellidos}", fontFamily = Roboto,
-                fontWeight = FontWeight.Bold, fontSize = 16.sp, color = EduconnectBlue)
-            Text(text = "${hijo.gradoNombre} · Sec. ${hijo.seccionNombre}", fontFamily = Roboto,
-                fontSize = 14.sp, color = TextPrimary)
-            Text(text = "Código: ${hijo.codigoEstudiante}", fontFamily = Roboto,
-                fontSize = 14.sp, color = TextPrimary)
+            Text(
+                "${hijo.nombres} ${hijo.apellidos}".trim(), fontFamily = Nunito, fontWeight = FontWeight.Black,
+                fontSize = 15.sp, color = EduTexto, maxLines = 1, overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                "${hijo.gradoNombre} ${hijo.seccionNombre} · Código ${hijo.codigoEstudiante}",
+                fontFamily = Nunito, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = EduTextoSecundario
+            )
         }
     }
 }
 
+// Un hijo: iniciales, nombre, grado · código y botón quitar
 @Composable
-private fun InicialesHijo(hijo: HijoAsociado, fondo: Color = FondoAzulHijos) {
-    val iniciales = "${hijo.nombres.firstOrNull() ?: ""}${hijo.apellidos.firstOrNull() ?: ""}".uppercase()
-    Box(
-        modifier = Modifier.size(44.dp).background(fondo, CircleShape),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(text = iniciales, fontFamily = Roboto, fontWeight = FontWeight.Bold,
-            fontSize = 18.sp, color = EduconnectBlue)
-    }
-}
-
-// Un hijo: iniciales, nombre, grado · sección, código y botón quitar
-@Composable
-private fun FilaHijo(hijo: HijoAsociado, onQuitar: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(BackgroundWhite, RoundedCornerShape(14.dp))
-            .border(0.5.dp, BorderBlue, RoundedCornerShape(14.dp))
-            .padding(start = 14.dp, top = 12.dp, bottom = 12.dp, end = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        InicialesHijo(hijo)
-        Column(modifier = Modifier.weight(1f)) {
-            Text(text = "${hijo.nombres} ${hijo.apellidos}", fontFamily = Roboto,
-                fontWeight = FontWeight.Bold, fontSize = 17.sp, color = TextBlue)
-            Text(text = "${hijo.gradoNombre} · Sec. ${hijo.seccionNombre}", fontFamily = Roboto,
-                fontSize = 15.sp, color = TextPrimary)
-            Text(text = "Código: ${hijo.codigoEstudiante}", fontFamily = Roboto,
-                fontSize = 13.sp, color = TextSecondary)
-        }
-        IconButton(onClick = onQuitar) {
+private fun TarjetaHijo(h: HijoAsociado, colorAvatar: Color, onQuitar: () -> Unit) {
+    TarjetaEdu(relleno = PaddingValues(horizontal = 14.dp, vertical = 12.dp)) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            InicialesHijoPerfil(h, colorAvatar, tamano = 46)
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    "${h.nombres} ${h.apellidos}".trim(), fontFamily = Nunito, fontWeight = FontWeight.Black,
+                    fontSize = 15.5.sp, color = EduTexto, maxLines = 1, overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    "${h.gradoNombre} ${h.seccionNombre} · Código ${h.codigoEstudiante}",
+                    fontFamily = Nunito, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = EduTextoSecundario
+                )
+            }
             Box(
-                modifier = Modifier.size(38.dp).background(FondoRojo, RoundedCornerShape(10.dp)),
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(EduCoralClaro)
+                    .clickable(onClick = onQuitar),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Filled.PersonRemove, contentDescription = "Quitar hijo",
-                    tint = RojoError, modifier = Modifier.size(22.dp))
+                Icon(Icons.Rounded.PersonRemove, contentDescription = "Quitar hijo", tint = EduCoral, modifier = Modifier.size(21.dp))
             }
         }
     }
 }
 
-@Preview(showBackground = true)
+@Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
 fun MisHijosPreview() {
     EduConnectAppTheme {
         MisHijosScreen(
             hijos = listOf(
-                HijoAsociado(1L, "Angela", "Perez Garcia", "2do", "A", "PMU0006"),
-                HijoAsociado(2L, "Pedro", "Sanchez Vega", "1er", "A", "PMU0001")
+                HijoAsociado(1L, "Angela", "Perez Garcia", "2do Grado", "A", "PMU0006"),
+                HijoAsociado(2L, "Pedro", "Perez Garcia", "1er Grado", "A", "PMU0001")
             )
         )
     }
