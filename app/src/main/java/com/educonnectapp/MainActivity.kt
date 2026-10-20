@@ -631,6 +631,8 @@ fun EduConnectApp() {
     // Pantalla a la que vuelven el detalle de un comunicado y el de una tarea/evaluación del padre
     var origenDetalleComunicadoPadre by remember { mutableStateOf(Screen.COMUNICADOS_RECIBIDOS) }
     var origenDetalleAgenda by remember { mutableStateOf(Screen.AGENDA_ESCOLAR) }
+    // Pantalla a la que vuelve "Notificaciones" (configuración) si se abrió desde el panel de la campana
+    var origenConfigNotificaciones by remember { mutableStateOf<Screen?>(null) }
 
     fun aviso(mensaje: String) { Toast.makeText(context, mensaje, Toast.LENGTH_SHORT).show() }
 
@@ -2067,7 +2069,7 @@ fun EduConnectApp() {
                         onCerrarAlertaFoto = { alertaFotoSel = null },
                         onEliminarAsignacion = {},
                         onCambiarPassword = { currentScreen = Screen.CAMBIAR_CONTRASENA },
-                        onNotificacionesConfig = { currentScreen = Screen.CONFIG_NOTIFICACIONES },
+                        onNotificacionesConfig = { origenConfigNotificaciones = null; currentScreen = Screen.CONFIG_NOTIFICACIONES },
                         onCerrarSesion = {
                             CoroutineScope(Dispatchers.Main).launch {
                                 try {
@@ -2123,7 +2125,7 @@ fun EduConnectApp() {
                         onCerrarExitoFoto = { fotoActualizada = false },
                         onCerrarAlertaFoto = { alertaFotoSel = null },
                         onCambiarPassword = { currentScreen = Screen.CAMBIAR_CONTRASENA },
-                        onNotificacionesConfig = { currentScreen = Screen.CONFIG_NOTIFICACIONES },
+                        onNotificacionesConfig = { origenConfigNotificaciones = null; currentScreen = Screen.CONFIG_NOTIFICACIONES },
                         onCerrarSesion = {
                             CoroutineScope(Dispatchers.Main).launch {
                                 try {
@@ -2438,7 +2440,10 @@ fun EduConnectApp() {
                         preferencias = preferenciasNotifSel,
                         cargando = cargandoPreferencias,
                         notificacionesSistemaActivas = notifSistemaActivas,
-                        onBack = { currentScreen = perfil },
+                        onBack = {
+                            currentScreen = origenConfigNotificaciones ?: perfil
+                            origenConfigNotificaciones = null
+                        },
                         onNotificaciones = { abrirNotificaciones() },
                         // Se llama después de que el usuario confirma en el popup
                         onGuardar = { cambios ->
@@ -3339,6 +3344,12 @@ fun EduConnectApp() {
                 noLeidas = notificacionesNoLeidasSel.toInt(),
                 cargando = cargandoNotificaciones,
                 onCerrar = { mostrarNotificaciones = false },
+                // "Configurar notificaciones": abre los interruptores por tipo y "Volver" regresa aquí
+                onConfigurar = {
+                    mostrarNotificaciones = false
+                    if (currentScreen != Screen.CONFIG_NOTIFICACIONES) origenConfigNotificaciones = currentScreen
+                    currentScreen = Screen.CONFIG_NOTIFICACIONES
+                },
                 onMarcarTodas = {
                     notificacionesSel = notificacionesSel.map { it.copy(leida = true) }
                     notificacionesNoLeidasSel = 0L
