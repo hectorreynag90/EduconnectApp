@@ -1,44 +1,121 @@
 package com.educonnectapp.ui.screens.padre.agenda
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.IconButton
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.material.icons.rounded.Assignment
+import androidx.compose.material.icons.rounded.CalendarMonth
+import androidx.compose.material.icons.rounded.Event
+import androidx.compose.material.icons.rounded.Notifications
+import androidx.compose.material.icons.rounded.WbSunny
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.educonnectapp.R
+import com.educonnectapp.ui.components.BotonIconoCabeceraEdu
+import com.educonnectapp.ui.components.CabeceraEdu
+import com.educonnectapp.ui.components.ChipCabeceraEdu
+import com.educonnectapp.ui.components.ChipEdu
+import com.educonnectapp.ui.components.ColorModulo
+import com.educonnectapp.ui.components.IconoCirculoEdu
+import com.educonnectapp.ui.components.TarjetaEdu
+import com.educonnectapp.ui.components.TonoEdu
 import com.educonnectapp.ui.screens.padre.inicio.BottomNavBarPadre
-import com.educonnectapp.ui.theme.*
-import java.text.SimpleDateFormat
-import java.util.*
-import java.util.concurrent.TimeUnit
+import com.educonnectapp.ui.theme.EduAmarillo
+import com.educonnectapp.ui.theme.EduBorde
+import com.educonnectapp.ui.theme.EduConnectAppTheme
+import com.educonnectapp.ui.theme.EduEtiqueta
+import com.educonnectapp.ui.theme.EduFondo
+import com.educonnectapp.ui.theme.EduTexto
+import com.educonnectapp.ui.theme.EduTextoSecundario
+import com.educonnectapp.ui.theme.Nunito
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
+import java.util.Locale
 
+// Tarea o evaluación de la agenda del hijo (la arma MainActivity)
 data class PublicacionAgendaItem(
     val id: Long,
     val titulo: String,
     val descripcion: String,
-    val tipo: String,
+    val tipo: String,                   // "Tarea" | "Evaluación"
     val cursoNombre: String,
     val docenteNombre: String,
-    val fechaEntrega: String,
+    val fechaEntrega: String,           // "yyyy-MM-dd"
     val estado: String = "Pendiente",   // Tarea: "Pendiente", "Entregada", "No entregada", "Vencida" | Evaluación: "Pendiente", "Realizado"
-    val archivoAdjunto: String = ""
+    val archivoAdjunto: String = "",
+    // ----- Rediseño 2026 -----
+    val publicadoEn: String = ""        // "yyyy-MM-dd" (hora local)
 )
+
+// ---------------------------------------------------------------------
+// Fechas de la agenda (compartidas por las 3 pantallas del módulo)
+// ---------------------------------------------------------------------
+internal val LOCALE_PE_AGENDA = Locale("es", "PE")
+
+// Días desde hoy hasta la fecha ("yyyy-MM-dd"); null si no hay fecha válida
+internal fun diasHastaAgenda(fecha: String): Long? = try {
+    ChronoUnit.DAYS.between(LocalDate.now(), LocalDate.parse(fecha.take(10)))
+} catch (e: Exception) { null }
+
+// "2026-10-20" -> "Mar 20 oct"
+internal fun fechaCortaAgenda(fecha: String): String = try {
+    LocalDate.parse(fecha.take(10)).format(DateTimeFormatter.ofPattern("EEE d MMM", LOCALE_PE_AGENDA))
+        .replace(".", "").replaceFirstChar { it.uppercase() }
+} catch (e: Exception) { fecha }
+
+// "2026-10-20" -> "Martes 20 de octubre"
+internal fun fechaLargaAgenda(fecha: String): String = try {
+    LocalDate.parse(fecha.take(10)).format(DateTimeFormatter.ofPattern("EEEE d 'de' MMMM", LOCALE_PE_AGENDA))
+        .replaceFirstChar { it.uppercase() }
+} catch (e: Exception) { fecha }
+
+// "vence hoy" · "vence mañana" · "vie 23 oct"
+internal fun cuandoVence(fecha: String): String = when (diasHastaAgenda(fecha)) {
+    null -> "sin fecha"
+    0L -> "vence hoy"
+    1L -> "vence mañana"
+    else -> fechaCortaAgenda(fecha).replaceFirstChar { it.lowercase() }
+}
+
+// "Hoy", "1 día", "5 días" (se conserva por compatibilidad)
+fun textoDiasRestantes(dias: Int): String = when {
+    dias <= 0 -> "Hoy"
+    dias == 1 -> "1 día"
+    else -> "$dias días"
+}
+
+// =====================================================================
+// AGENDA DEL PADRE · AGENDA DE UN HIJO (rediseño 2026)
+// Cabecera fija amarilla · pestañas Todos / Tareas / Evaluaciones · "Por hacer" y "Ya pasaron"
+// =====================================================================
 
 @Composable
 fun AgendaEscolarScreen(
@@ -52,190 +129,106 @@ fun AgendaEscolarScreen(
     onAgenda: () -> Unit = {},
     onPerfil: () -> Unit = {},
     onNotificaciones: () -> Unit = {},
-    onVerDetalle: (PublicacionAgendaItem) -> Unit = {}
+    onVerDetalle: (PublicacionAgendaItem) -> Unit = {},
+    // ----- Rediseño 2026 -----
+    apellidosHijo: String = ""
 ) {
-    var tabSeleccionado by remember { mutableStateOf("Tareas") }
-
-    val fechaActual = remember {
-        SimpleDateFormat("EEEE, dd 'de' MMMM yyyy", Locale("es", "PE"))
-            .format(Date()).replaceFirstChar { it.uppercase() }
+    var pestana by remember { mutableStateOf(0) }       // 0 = Todos · 1 = Tareas · 2 = Evaluaciones
+    val tareas = publicaciones.filter { it.tipo == "Tarea" }
+    val evaluaciones = publicaciones.filter { it.tipo == "Evaluación" }
+    val visibles = when (pestana) {
+        1 -> tareas
+        2 -> evaluaciones
+        else -> publicaciones
     }
-
-    val hoy = remember {
-        SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
-    }
-
-    val publicacionesFiltradas = publicaciones.filter { item ->
-        when (tabSeleccionado) {
-            "Tareas" -> item.tipo == "Tarea"
-            "Evaluaciones" -> item.tipo == "Evaluación"
-            else -> true
-        }
-    }.sortedWith(compareBy(
-        { if (it.estado == "Pendiente") 0 else 1 },
-        { it.fechaEntrega }
-    ))
-
-    val pendientes = publicacionesFiltradas.filter { it.estado.lowercase() == "pendiente" }
-    val entregadas = publicacionesFiltradas.filter { it.estado.lowercase() != "pendiente" }
+    // Por hacer: lo pendiente, de la fecha más cercana a la más lejana
+    val porHacer = visibles.filter { it.estado == "Pendiente" }.sortedBy { it.fechaEntrega.ifEmpty { "9999-12-31" } }
+    // Ya pasaron: lo entregado, no entregado, vencido o realizado, de lo más reciente a lo más antiguo
+    val pasadas = visibles.filter { it.estado != "Pendiente" }.sortedByDescending { it.fechaEntrega }
+    val tareasPorHacer = tareas.count { it.estado == "Pendiente" }
+    val evaluacionesProximas = evaluaciones.count { it.estado == "Pendiente" }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(BackgroundLight)
+            .background(EduFondo)
     ) {
-        // HEADER
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(EduconnectBlue)
-                .padding(horizontal = 20.dp, vertical = 20.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.weight(1f)
-            ) {
-                IconButton(
-                    onClick = onBack,
-                    modifier = Modifier.size(32.dp).offset(x = (-5).dp)
-                ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.arrowleft_white),
-                        contentDescription = "Volver",
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-                Column {
-                    Text(
-                        text = "Agenda Escolar",
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 22.sp,
-                        color = TextWhite
-                    )
-                    Text(
-                        text = "$nombreHijo - $gradoNombre Sec. $seccionNombre",
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp,
-                        color = TextWhite.copy(alpha = 0.85f)
-                    )
-                    Text(
-                        text = fechaActual,
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.Normal,
-                        fontSize = 15.sp,
-                        color = TextWhite.copy(alpha = 0.7f)
-                    )
-                }
-            }
-            IconButton(onClick = onNotificaciones) {
-                Image(
-                    painter = painterResource(id = R.drawable.notification_white),
-                    contentDescription = "Notificaciones",
-                    modifier = Modifier.size(35.dp)
+        // CABECERA FIJA
+        CabeceraEdu(
+            titulo = "Agenda",
+            subtitulo = listOf("$nombreHijo $apellidosHijo".trim(), "$gradoNombre $seccionNombre".trim())
+                .filter { it.isNotBlank() }.joinToString(" · "),
+            onVolver = onBack,
+            colorFondo = ColorModulo.Publicaciones,
+            acciones = {
+                BotonIconoCabeceraEdu(
+                    icono = Icons.Rounded.Notifications,
+                    descripcion = "Notificaciones",
+                    onClick = onNotificaciones,
+                    colorCabecera = ColorModulo.Publicaciones
+                )
+            },
+            contenidoInferior = {
+                ChipCabeceraEdu(
+                    listOf(
+                        when (tareasPorHacer) { 0 -> "Sin tareas por hacer"; 1 -> "1 tarea por hacer"; else -> "$tareasPorHacer tareas por hacer" },
+                        when (evaluacionesProximas) { 0 -> ""; 1 -> "1 evaluación"; else -> "$evaluacionesProximas evaluaciones" }
+                    ).filter { it.isNotBlank() }.joinToString(" · "),
+                    modifier = Modifier.padding(top = 14.dp),
+                    colorCabecera = ColorModulo.Publicaciones
                 )
             }
-        }
+        )
 
+        // CONTENIDO DESPLAZABLE
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
-                .padding(horizontal = 20.dp, vertical = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            // TABS
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                listOf("Todos", "Tareas", "Evaluaciones").forEachIndexed { index, tab ->
-                    val isActive = tabSeleccionado == tab
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(if (isActive) EduconnectBlue else Color.White)
-                            .border(1.5.dp, if (isActive) EduconnectBlue else BorderBlue, RoundedCornerShape(20.dp))
-                            .clickable { tabSeleccionado = tab }
-                            .padding(horizontal = 25.dp, vertical = 8.dp),
-                        contentAlignment = Alignment.Center
+            Pestanas(
+                opciones = listOf("Todos (${publicaciones.size})", "Tareas (${tareas.size})", "Evaluaciones (${evaluaciones.size})"),
+                seleccionada = pestana,
+                onElegir = { pestana = it }
+            )
+
+            if (visibles.isEmpty()) {
+                TarjetaEdu(relleno = PaddingValues(horizontal = 16.dp, vertical = 18.dp)) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
+                        IconoCirculoEdu(Icons.Rounded.WbSunny, TonoEdu.VERDE, tamano = 64.dp)
                         Text(
-                            text = tab,
-                            fontFamily = Roboto,
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 16.sp,
-                            color = if (isActive) TextWhite else TextPrimary
+                            when (pestana) { 1 -> "Sin tareas"; 2 -> "Sin evaluaciones"; else -> "Agenda vacía" },
+                            fontFamily = Nunito, fontWeight = FontWeight.Black, fontSize = 17.sp, color = EduTexto
                         )
-                    }
-                    if (index < 2) Spacer(modifier = Modifier.width(8.dp))
-                }
-            }
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(15.dp)) {
-                // PENDIENTES
-                if (pendientes.isNotEmpty()) {
-                    item {
                         Text(
-                            text = "PRÓXIMAS - ORDENADO POR FECHA",
-                            fontFamily = Roboto,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 15.sp,
-                            color = TextBlue
+                            "Aún no hay publicaciones para $nombreHijo. Te avisaremos cuando el docente publique algo.",
+                            fontFamily = Nunito, fontWeight = FontWeight.SemiBold, fontSize = 13.5.sp,
+                            lineHeight = 19.sp, color = EduTextoSecundario, textAlign = TextAlign.Center
                         )
-                    }
-                    items(pendientes) { item ->
-                        PublicacionAgendaCard(
-                            item = item,
-                            hoy = hoy,
-                            onClick = { onVerDetalle(item) }
-                        )
-                    }
-                } else {
-                    item {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(BackgroundWhite, RoundedCornerShape(16.dp))
-                                .border(1.dp, BorderBlue, RoundedCornerShape(16.dp))
-                                .padding(32.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Image(
-                                painter = painterResource(id = R.drawable.agenda_gray),
-                                contentDescription = null,
-                                modifier = Modifier.size(56.dp)
-                            )
-                            Text(
-                                text = "No hay tareas o eventos",
-                                fontFamily = Roboto,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 16.sp,
-                                color = TextPrimary
-                            )
-                            Text(
-                                text = "programados por el momento.",
-                                fontFamily = Roboto,
-                                fontSize = 14.sp,
-                                color = TextSecondary
-                            )
-                        }
                     }
                 }
-
-                // ENTREGADAS
-                if (entregadas.isNotEmpty()) {
-                    items(entregadas) { item ->
-                        EntregadaAgendaCard(item = item)
+            } else {
+                Grupo(if (pestana == 2) "Próximas" else "Por hacer")
+                if (porHacer.isEmpty()) {
+                    TarjetaEdu {
+                        Text(
+                            if (pestana == 2) "No hay evaluaciones próximas." else "¡Todo al día! No hay pendientes por ahora.",
+                            modifier = Modifier.fillMaxWidth(), fontFamily = Nunito, fontWeight = FontWeight.SemiBold,
+                            fontSize = 14.sp, color = EduTextoSecundario, textAlign = TextAlign.Center
+                        )
                     }
+                }
+                porHacer.forEach { p -> TarjetaAgenda(p) { onVerDetalle(p) } }
+                if (pasadas.isNotEmpty()) {
+                    Grupo("Ya pasaron")
+                    pasadas.forEach { p -> TarjetaAgenda(p) { onVerDetalle(p) } }
                 }
             }
         }
@@ -251,229 +244,119 @@ fun AgendaEscolarScreen(
 }
 
 @Composable
-fun PublicacionAgendaCard(
-    item: PublicacionAgendaItem,
-    hoy: String,
-    onClick: () -> Unit
-) {
-    val diasRestantes = remember(item.fechaEntrega) {
-        try {
-            val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-            val fechaE = sdf.parse(item.fechaEntrega)!!
-            val fechaH = sdf.parse(hoy)!!
-            val diff = fechaE.time - fechaH.time
-            TimeUnit.MILLISECONDS.toDays(diff).toInt()
-        } catch (e: Exception) { 0 }
-    }
-
-    val fechaDisplay = remember(item.fechaEntrega) {
-        try {
-            val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-            val date = sdf.parse(item.fechaEntrega)
-            SimpleDateFormat("EEE dd 'de' MMMM yyyy", Locale("es", "PE"))
-                .format(date!!).replaceFirstChar { it.uppercase() }
-        } catch (e: Exception) { item.fechaEntrega }
-    }
-
-    val colorBorde = when {
-        diasRestantes <= 3 -> StatusErrorRed
-        diasRestantes <= 7 -> AccentOrange
-        else -> BorderBlue
-    }
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(BackgroundWhite, RoundedCornerShape(16.dp))
-            .border(1.5.dp, AccentOrange, RoundedCornerShape(16.dp))
-            .clickable { onClick() }
-            .padding(14.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        // Título + días restantes
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.Top,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                modifier = Modifier.weight(1f)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .background(AccentOrange, RoundedCornerShape(10.dp)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Image(
-                        painter = painterResource(
-                            id = if (item.tipo == "Tarea") R.drawable.document_text_white
-                            else R.drawable.exam_white
-                        ),
-                        contentDescription = null,
-                        modifier = Modifier.size(30.dp)
-                    )
-                }
-                Column {
-                    Text(
-                        text = item.titulo,
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 17.sp,
-                        color = TextBlue,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        text = "${item.cursoNombre} - Prof. ${item.docenteNombre}",
-                        fontFamily = Roboto,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = TextSecondary
-                    )
-                }
-            }
-            Text(
-                text = textoDiasRestantes(diasRestantes),
-                fontFamily = Roboto,
-                fontWeight = FontWeight.Bold,
-                fontSize = 15.sp,
-                color = colorBorde
-            )
-        }
-
-        // Fecha + estado
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Image(
-                    painter = painterResource(id = R.drawable.agenda_orange),
-                    contentDescription = null,
-                    modifier = Modifier.size(30.dp)
-                )
-                Text(
-                    text = fechaDisplay,
-                    fontFamily = Roboto,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 15.sp,
-                    color = TextOrange
-                )
-            }
-            // Tarea: "Pendiente" (por entregar) | Evaluación: "Programada" (solo aviso)
-            val colorChip = if (item.tipo == "Evaluación") EduconnectBlue else StatusErrorRed
-            Box(
-                modifier = Modifier
-                    .background(colorChip.copy(alpha = 0.08f), RoundedCornerShape(20.dp))
-                    .padding(horizontal = 12.dp, vertical = 4.dp)
-            ) {
-                Text(
-                    text = if (item.tipo == "Evaluación") "Programada" else "Pendiente",
-                    fontFamily = Roboto,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 14.sp,
-                    color = colorChip
-                )
-            }
-        }
-    }
+private fun Grupo(texto: String) {
+    Text(
+        texto.uppercase(), modifier = Modifier.padding(start = 2.dp, top = 2.dp),
+        fontFamily = Nunito, fontWeight = FontWeight.Black, fontSize = 12.5.sp,
+        letterSpacing = 0.6.sp, color = EduTextoSecundario.copy(alpha = 0.8f)
+    )
 }
 
-// "Hoy", "1 día", "5 días"
-fun textoDiasRestantes(dias: Int): String = when {
-    dias <= 0 -> "Hoy"
-    dias == 1 -> "1 día"
-    else -> "$dias días"
-}
-
+// Pestañas Todos / Tareas / Evaluaciones (la elegida en amarillo)
 @Composable
-fun EntregadaAgendaCard(item: PublicacionAgendaItem) {
-    // Etiqueta y color según el estado (las evaluaciones solo pueden estar "Realizado")
-    val (etiqueta, colorEstado) = when (item.estado) {
-        "Entregada" -> "Entregada" to StatusGreen
-        "No entregada" -> "No entregada" to StatusErrorRed
-        "Realizado" -> "Realizada" to TextSecondary
-        else -> "Vencida" to TextSecondary
-    }
-
-    val fechaDisplay = remember(item.fechaEntrega) {
-        try {
-            val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-            val date = sdf.parse(item.fechaEntrega)
-            SimpleDateFormat("EEE dd 'de' MMMM", Locale("es", "PE"))
-                .format(date!!).replaceFirstChar { it.uppercase() }
-        } catch (e: Exception) { item.fechaEntrega }
-    }
-
+private fun Pestanas(opciones: List<String>, seleccionada: Int, onElegir: (Int) -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(BackgroundWhite, RoundedCornerShape(16.dp))
-            .border(
-                1.8.dp,
-                if (item.estado == "Entregada") BorderGreen.copy(alpha = 0.4f) else colorEstado.copy(alpha = 0.3f),
-                RoundedCornerShape(16.dp)
-            )
-            .padding(horizontal = 14.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
+            .background(Color.White, RoundedCornerShape(16.dp))
+            .border(1.5.dp, EduBorde, RoundedCornerShape(16.dp))
+            .padding(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(modifier = Modifier.weight(1f)) {
+        opciones.forEachIndexed { i, texto ->
+            val activa = i == seleccionada
             Text(
-                text = item.titulo,
-                fontFamily = Roboto,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 17.sp,
-                color = TextBlue
-            )
-            Text(
-                text = "${item.cursoNombre} - $fechaDisplay",
-                fontFamily = Roboto,
-                fontSize = 15.sp,
-                color = TextSecondary
-            )
-        }
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            if (item.estado == "Entregada") {
-                Image(
-                    painter = painterResource(id = R.drawable.check_green_dark),
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp)
-                )
-            }
-            Text(
-                text = etiqueta,
-                fontFamily = Roboto,
-                fontWeight = FontWeight.Bold,
-                fontSize = 14.sp,
-                color = colorEstado
+                texto,
+                modifier = Modifier
+                    .weight(if (i == 2) 1.35f else 1f)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(if (activa) EduAmarillo else Color.Transparent)
+                    .clickable { onElegir(i) }
+                    .padding(vertical = 10.dp),
+                fontFamily = Nunito, fontWeight = FontWeight.Black, fontSize = 13.5.sp,
+                color = if (activa) EduTexto else EduEtiqueta, textAlign = TextAlign.Center, maxLines = 1
             )
         }
     }
 }
 
-@Preview(showBackground = true)
+// Tarjeta de una tarea o evaluación: ícono, título, curso · docente, fecha y estado
+@Composable
+private fun TarjetaAgenda(p: PublicacionAgendaItem, onClick: () -> Unit) {
+    val esEvaluacion = p.tipo == "Evaluación"
+    val dias = diasHastaAgenda(p.fechaEntrega)
+    TarjetaEdu(relleno = PaddingValues(horizontal = 14.dp, vertical = 13.dp), onClick = onClick) {
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            IconoCirculoEdu(
+                if (esEvaluacion) Icons.Rounded.Event else Icons.Rounded.Assignment,
+                if (esEvaluacion) TonoEdu.AZUL else TonoEdu.AMARILLO, tamano = 42.dp
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        p.titulo, modifier = Modifier.weight(1f), fontFamily = Nunito, fontWeight = FontWeight.Black,
+                        fontSize = 15.5.sp, color = EduTexto, maxLines = 1, overflow = TextOverflow.Ellipsis
+                    )
+                    Icon(
+                        Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = null,
+                        tint = EduTextoSecundario, modifier = Modifier.size(20.dp)
+                    )
+                }
+                Text(
+                    listOf(p.cursoNombre, p.docenteNombre).filter { it.isNotBlank() }.joinToString(" · "),
+                    fontFamily = Nunito, fontWeight = FontWeight.ExtraBold, fontSize = 12.5.sp,
+                    color = EduTextoSecundario, maxLines = 1, overflow = TextOverflow.Ellipsis
+                )
+                Row(
+                    modifier = Modifier.padding(top = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Icon(Icons.Rounded.CalendarMonth, contentDescription = null, tint = EduTextoSecundario, modifier = Modifier.size(15.dp))
+                    Text(
+                        if (p.fechaEntrega.isBlank()) "Sin fecha" else fechaCortaAgenda(p.fechaEntrega),
+                        modifier = Modifier.weight(1f), fontFamily = Nunito, fontWeight = FontWeight.ExtraBold,
+                        fontSize = 12.5.sp, color = EduTextoSecundario
+                    )
+                    ChipEstadoAgenda(p.estado, esEvaluacion, dias)
+                }
+            }
+        }
+    }
+}
+
+// Chip del estado: cuenta regresiva si está pendiente; resultado si ya pasó
+@Composable
+internal fun ChipEstadoAgenda(estado: String, esEvaluacion: Boolean, dias: Long?) {
+    when (estado) {
+        "Pendiente" -> when {
+            dias == null -> ChipEdu(if (esEvaluacion) "Programada" else "Pendiente", if (esEvaluacion) TonoEdu.AZUL else TonoEdu.AMARILLO)
+            dias <= 0L -> ChipEdu(if (esEvaluacion) "Hoy" else "Vence hoy", TonoEdu.CORAL)
+            dias == 1L -> ChipEdu(if (esEvaluacion) "Mañana" else "Vence mañana", TonoEdu.CORAL)
+            else -> ChipEdu("En $dias días", if (esEvaluacion) TonoEdu.AZUL else TonoEdu.AMARILLO)
+        }
+        "Entregada" -> ChipEdu("Entregó", TonoEdu.VERDE)
+        "No entregada" -> ChipEdu("No entregó", TonoEdu.CORAL)
+        "Realizado" -> ChipEdu("Realizada", TonoEdu.GRIS)
+        else -> ChipEdu("Vencida", TonoEdu.GRIS)
+    }
+}
+
+@Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
 fun AgendaEscolarPreview() {
+    val hoy = LocalDate.now()
     EduConnectAppTheme {
         AgendaEscolarScreen(
-            nombreHijo = "Carlos",
-            gradoNombre = "2do",
+            nombreHijo = "Angela",
+            apellidosHijo = "Perez",
+            gradoNombre = "2do Grado",
             seccionNombre = "A",
             publicaciones = listOf(
-                PublicacionAgendaItem(1L, "Ejercicios Cap. 5", "Resolver los 5 ejercicios del 1 al 20 del capítulo 5.", "Tarea", "Matemáticas", "Eduardo Carranza", "2026-05-23", "Pendiente"),
-                PublicacionAgendaItem(2L, "Ejercicios Cap. 6", "Resolver los ejercicios del 1 al 10 del cap. 6.", "Tarea", "Matemáticas", "Eduardo Carranza", "2026-05-26", "Pendiente"),
-                PublicacionAgendaItem(3L, "Lectura Cap. 8", "Leer capítulo 8.", "Tarea", "Comunicación", "Rosa A.", "2026-05-16", "Entregada"),
-                PublicacionAgendaItem(4L, "Práctica 2", "Resolver la práctica.", "Evaluación", "Ciencias", "Rosa A.", "2026-05-12", "Vencida")
+                PublicacionAgendaItem(1L, "Maqueta de ecosistemas", "Elaborar una maqueta.", "Tarea", "Ciencia y Tecnología", "Prof. Hector Reyna", hoy.plusDays(1).toString()),
+                PublicacionAgendaItem(2L, "Evaluación de fracciones", "Fracciones equivalentes.", "Evaluación", "Matemáticas", "Prof. Rosa Díaz", hoy.plusDays(7).toString()),
+                PublicacionAgendaItem(3L, "Resumen del cuento", "Media página.", "Tarea", "Comunicación", "Prof. Ana Ruiz", hoy.minusDays(3).toString(), "Entregada")
             )
         )
     }

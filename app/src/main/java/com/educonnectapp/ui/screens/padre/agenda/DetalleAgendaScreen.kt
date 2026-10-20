@@ -1,38 +1,79 @@
 package com.educonnectapp.ui.screens.padre.agenda
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Alarm
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Description
+import androidx.compose.material.icons.rounded.Event
+import androidx.compose.material.icons.rounded.EventAvailable
+import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Lightbulb
+import androidx.compose.material.icons.rounded.Notifications
+import androidx.compose.material.icons.rounded.Visibility
+import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.IconButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.educonnectapp.R
-import com.educonnectapp.ui.screens.docente.asistencia.FilaRegistro
+import com.educonnectapp.ui.components.BotonIconoCabeceraEdu
+import com.educonnectapp.ui.components.CabeceraEdu
+import com.educonnectapp.ui.components.ChipEdu
+import com.educonnectapp.ui.components.ColorModulo
+import com.educonnectapp.ui.components.IconoCirculoEdu
+import com.educonnectapp.ui.components.TarjetaEdu
+import com.educonnectapp.ui.components.TituloSeccionEdu
+import com.educonnectapp.ui.components.TonoEdu
+import com.educonnectapp.ui.components.coloresDeTono
 import com.educonnectapp.ui.screens.padre.inicio.BottomNavBarPadre
-import com.educonnectapp.ui.theme.*
-import java.text.SimpleDateFormat
-import java.util.*
-import java.util.concurrent.TimeUnit
+import com.educonnectapp.ui.theme.EduAmarillo
+import com.educonnectapp.ui.theme.EduAzulOscuro
+import com.educonnectapp.ui.theme.EduAzulOscuroClaro
+import com.educonnectapp.ui.theme.EduBorde
+import com.educonnectapp.ui.theme.EduConnectAppTheme
+import com.educonnectapp.ui.theme.EduEtiqueta
+import com.educonnectapp.ui.theme.EduFondo
+import com.educonnectapp.ui.theme.EduTexto
+import com.educonnectapp.ui.theme.EduTextoSecundario
+import com.educonnectapp.ui.theme.Nunito
 
+// =====================================================================
+// AGENDA DEL PADRE · DETALLE (rediseño 2026)
+// Cabecera fija amarilla · franja con el estado · tarjeta con curso, título, docente y
+// descripción (o temario) · adjunto con "Abrir" · nota según el tipo
+// =====================================================================
+
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun DetalleAgendaScreen(
     nombreHijo: String = "",
@@ -46,337 +87,177 @@ fun DetalleAgendaScreen(
     onAvisos: () -> Unit = {},
     onAgenda: () -> Unit = {},
     onPerfil: () -> Unit = {},
-    onNotificaciones: () -> Unit = {}
+    onNotificaciones: () -> Unit = {},
+    // ----- Rediseño 2026 -----
+    apellidosHijo: String = ""
 ) {
-    val fechaActual = remember {
-        SimpleDateFormat("EEEE, dd 'de' MMMM yyyy", Locale("es", "PE"))
-            .format(Date()).replaceFirstChar { it.uppercase() }
-    }
-
-    val hoy = remember {
-        SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
-    }
-
-    val diasRestantes = remember(publicacion?.fechaEntrega) {
-        try {
-            val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-            val fechaE = sdf.parse(publicacion?.fechaEntrega ?: "") !!
-            val fechaH = sdf.parse(hoy)!!
-            val diff = fechaE.time - fechaH.time
-            TimeUnit.MILLISECONDS.toDays(diff).toInt()
-        } catch (e: Exception) { 0 }
-    }
-
-    val fechaDisplay = remember(publicacion?.fechaEntrega) {
-        try {
-            val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-            val date = sdf.parse(publicacion?.fechaEntrega ?: "")
-            SimpleDateFormat("EEE dd 'de' MMMM yyyy", Locale("es", "PE"))
-                .format(date!!).replaceFirstChar { it.uppercase() }
-        } catch (e: Exception) { publicacion?.fechaEntrega ?: "" }
-    }
-
-    val colorDias = when {
-        diasRestantes <= 3 -> StatusErrorRed
-        diasRestantes <= 7 -> AccentOrange
-        else -> EduconnectBlue
-    }
+    val esEvaluacion = publicacion?.tipo == "Evaluación"
+    val primerNombre = nombreHijo.trim().split(" ").firstOrNull().orEmpty()
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(BackgroundLight)
+            .background(EduFondo)
     ) {
-        // HEADER
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(EduconnectBlue)
-                .padding(horizontal = 20.dp, vertical = 20.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.weight(1f)
-            ) {
-                IconButton(
-                    onClick = onBack,
-                    modifier = Modifier.size(35.dp).offset(x = (-5).dp)
-                ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.arrowleft_white),
-                        contentDescription = "Volver",
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-                Column {
-                    Text(
-                        text = if (publicacion?.tipo == "Evaluación") "Detalle de Evaluación" else "Detalle de Tarea",
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 22.sp,
-                        color = TextWhite
-                    )
-                    Text(
-                        text = "$nombreHijo $gradoNombre Sec. $seccionNombre",
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp,
-                        color = TextWhite.copy(alpha = 0.85f)
-                    )
-                    Text(
-                        text = fechaActual,
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.Normal,
-                        fontSize = 15.sp,
-                        color = TextWhite.copy(alpha = 0.7f)
-                    )
-                }
-            }
-            IconButton(onClick = onNotificaciones) {
-                Image(
-                    painter = painterResource(id = R.drawable.notification_white),
-                    contentDescription = "Notificaciones",
-                    modifier = Modifier.size(35.dp)
+        // CABECERA FIJA
+        CabeceraEdu(
+            titulo = if (esEvaluacion) "Evaluación" else "Tarea",
+            subtitulo = listOf("$nombreHijo $apellidosHijo".trim(), "$gradoNombre $seccionNombre".trim())
+                .filter { it.isNotBlank() }.joinToString(" · "),
+            onVolver = onBack,
+            colorFondo = ColorModulo.Publicaciones,
+            acciones = {
+                BotonIconoCabeceraEdu(
+                    icono = Icons.Rounded.Notifications,
+                    descripcion = "Notificaciones",
+                    onClick = onNotificaciones,
+                    colorCabecera = ColorModulo.Publicaciones
                 )
             }
-        }
+        )
 
-        Spacer(modifier = Modifier.height(10.dp))
-
+        // CONTENIDO DESPLAZABLE
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            // BANNER DE ESTADO
-            // Tarea: lo que registró el docente (o cuánto falta si sigue pendiente)
-            // Evaluación: solo aviso de la fecha
-            val esEvaluacion = publicacion?.tipo == "Evaluación"
-            when (publicacion?.estado?.lowercase()) {
-                "pendiente" -> BannerEstado(
-                    icono = R.drawable.alert_orange,
-                    tinte = null,
-                    texto = when {
-                        esEvaluacion && diasRestantes <= 0 -> "Evaluación hoy - $fechaDisplay"
-                        esEvaluacion && diasRestantes == 1 -> "Evaluación mañana - $fechaDisplay"
-                        esEvaluacion -> "Evaluación en $diasRestantes días - $fechaDisplay"
-                        diasRestantes <= 0 -> "Vence hoy - $fechaDisplay"
-                        diasRestantes == 1 -> "Vence mañana - $fechaDisplay"
-                        else -> "Vence en $diasRestantes días - $fechaDisplay"
-                    },
-                    detalle = if (esEvaluacion) "Ayude a su hijo a prepararse" else null,
-                    color = TextOrange,
-                    borde = BorderOrange
-                )
-                "realizado" -> BannerEstado(
-                    icono = R.drawable.agenda_gray,
-                    tinte = null,
-                    texto = "Evaluación realizada",
-                    detalle = fechaDisplay,
-                    color = TextSecondary,
-                    borde = BorderMedium
-                )
-                "entregada" -> BannerEstado(
-                    icono = R.drawable.checkcircle_green,
-                    tinte = null,
-                    texto = "Tarea entregada",
-                    detalle = "Registrado por el docente",
-                    color = StatusGreen,
-                    borde = StatusGreen
-                )
-                "no entregada" -> BannerEstado(
-                    icono = R.drawable.close_white,
-                    tinte = StatusErrorRed,
-                    texto = "Tarea no entregada",
-                    detalle = "Registrado por el docente",
-                    color = StatusErrorRed,
-                    borde = StatusErrorRed
-                )
-                "vencida" -> BannerEstado(
-                    icono = R.drawable.alert_orange,
-                    tinte = null,
-                    texto = "Plazo vencido - $fechaDisplay",
-                    detalle = "El docente aún no registra la entrega",
-                    color = TextOrange,
-                    borde = BorderOrange
-                )
-                else -> {}
-            }
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            // CARD DETALLE
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(BackgroundWhite, RoundedCornerShape(16.dp))
-                    .border(1.5.dp, BorderBlue, RoundedCornerShape(16.dp))
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                // Título + tipo
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(46.dp)
-                            .background(EduconnectBlueMedium, RoundedCornerShape(12.dp)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Image(
-                            painter = painterResource(
-                                id = if (publicacion?.tipo == "Evaluación") R.drawable.exam_white
-                                else R.drawable.document_text_white
-                            ),
-                            contentDescription = null,
-                            modifier = Modifier.size(35.dp)
-                        )
-                    }
-                    Column {
-                        Text(
-                            text = publicacion?.titulo ?: "",
-                            fontFamily = Roboto,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 18.sp,
-                            color = TextBlue
-                        )
-                        Text(
-                            text = publicacion?.tipo ?: "",
-                            fontFamily = Roboto,
-                            fontSize = 15.sp,
-                            color = TextPrimary
-                        )
-                    }
+            if (publicacion == null) {
+                TarjetaEdu {
+                    Text(
+                        "No se encontró la publicación.", fontFamily = Nunito, fontWeight = FontWeight.SemiBold,
+                        fontSize = 14.sp, color = EduTextoSecundario
+                    )
                 }
+            } else {
+                // ---------- FRANJA DE ESTADO ----------
+                FranjaEstado(publicacion, esEvaluacion)
 
-                HorizontalDivider(color = BorderBlue.copy(alpha = 0.3f), thickness = 1.5.dp)
-
-                // Fila Curso
-                FilaRegistro(
-                    iconRes = R.drawable.task_darkgray,
-                    label = "Curso",
-                    valor = publicacion?.cursoNombre ?: "",
-                    colorValor = TextBlue
-                )
-
-                // Fila Docente
-                FilaRegistro(
-                    iconRes = R.drawable.teacher_darkgray,
-                    label = "Docente",
-                    valor = "Prof. ${publicacion?.docenteNombre ?: ""}",
-                    colorValor = TextBlue
-                )
-
-                // Fila Fecha límite
-                FilaRegistro(
-                    iconRes = R.drawable.agenda_darkgray,
-                    label = if (publicacion?.tipo == "Evaluación") "Fecha Evaluación" else "Fecha límite",
-                    valor = fechaDisplay,
-                    colorValor = TextOrange
-                )
-
-                // Fila Tiempo restante
-                FilaRegistro(
-                    iconRes = R.drawable.clock_darkgray,
-                    label = "Tiempo restante",
-                    valor = textoDiasRestantes(diasRestantes),
-                    colorValor = colorDias
-                )
-
-                HorizontalDivider(color = BorderBlue.copy(alpha = 0.5f), thickness = 1.5.dp)
-
-                // Descripción
-                Text(
-                    text = publicacion?.descripcion ?: "",
-                    fontFamily = Roboto,
-                    fontSize = 16.sp,
-                    color = TextPrimary,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(BackgroundBlueLight, RoundedCornerShape(10.dp))
-                        .padding(12.dp)
-                )
-
-                // Adjunto
-                if (!publicacion?.archivoAdjunto.isNullOrEmpty()) {
-                    HorizontalDivider(color = BorderBlue.copy(alpha = 0.3f), thickness = 1.5.dp)
+                // ---------- DETALLE ----------
+                TarjetaEdu(relleno = PaddingValues(16.dp)) {
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        ChipEdu(publicacion.cursoNombre, if (esEvaluacion) TonoEdu.AZUL else TonoEdu.AMARILLO)
+                        ChipEdu(if (esEvaluacion) "Aviso de evaluación" else "Tarea", TonoEdu.GRIS)
+                    }
+                    Text(
+                        publicacion.titulo, modifier = Modifier.padding(top = 10.dp), fontFamily = Nunito,
+                        fontWeight = FontWeight.Black, fontSize = 20.sp, lineHeight = 25.sp, color = EduTexto
+                    )
+                    // Docente y fecha de publicación
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(EduconnectBlue.copy(alpha = 0.06f), RoundedCornerShape(10.dp))
-                            .border(1.dp, BorderBlue, RoundedCornerShape(10.dp))
-                            .clickable(enabled = !descargandoAdjunto) { onAbrirAdjunto() }
-                            .padding(12.dp),
+                        modifier = Modifier.padding(top = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Image(
-                            painter = painterResource(id = R.drawable.paperclip_lightgray),
-                            contentDescription = null,
-                            modifier = Modifier.size(22.dp)
-                        )
-                        Column(modifier = Modifier.weight(1f)) {
+                        Box(
+                            modifier = Modifier.size(40.dp).background(EduAmarillo, CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
                             Text(
-                                text = publicacion?.archivoAdjunto?.substringAfterLast("/") ?: "",
-                                fontFamily = Roboto,
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 14.sp,
-                                color = EduconnectBlue
-                            )
-                            Text(
-                                text = if (descargandoAdjunto) "Descargando..." else "Toca para abrir",
-                                fontFamily = Roboto,
-                                fontSize = 13.sp,
-                                color = TextSecondary
+                                inicialesDocente(publicacion.docenteNombre), fontFamily = Nunito,
+                                fontWeight = FontWeight.Black, fontSize = 14.sp, color = EduTexto
                             )
                         }
-                        if (descargandoAdjunto) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(22.dp),
-                                color = EduconnectBlue,
-                                strokeWidth = 2.dp
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                publicacion.docenteNombre.ifBlank { "Docente" }, fontFamily = Nunito,
+                                fontWeight = FontWeight.Black, fontSize = 14.5.sp, color = EduTexto,
+                                maxLines = 1, overflow = TextOverflow.Ellipsis
                             )
-                        } else {
-                            Image(
-                                painter = painterResource(id = R.drawable.adjunto_orange),
-                                contentDescription = null,
-                                modifier = Modifier.size(22.dp)
+                            Text(
+                                if (publicacion.publicadoEn.isNotBlank())
+                                    "Publicado el " + fechaLargaAgenda(publicacion.publicadoEn).replaceFirstChar { it.lowercase() }
+                                else if (esEvaluacion) "Fecha: ${fechaLargaAgenda(publicacion.fechaEntrega)}"
+                                else "Fecha límite: ${fechaLargaAgenda(publicacion.fechaEntrega)}",
+                                fontFamily = Nunito, fontWeight = FontWeight.Bold, fontSize = 12.5.sp, color = EduTextoSecundario
+                            )
+                        }
+                    }
+                    if (publicacion.descripcion.isNotBlank()) {
+                        Box(modifier = Modifier.padding(vertical = 12.dp).fillMaxWidth().height(1.dp).background(EduFondo))
+                        Text(
+                            if (esEvaluacion) "TEMARIO" else "DESCRIPCIÓN", fontFamily = Nunito,
+                            fontWeight = FontWeight.Black, fontSize = 12.5.sp, letterSpacing = 0.6.sp,
+                            color = EduTextoSecundario, modifier = Modifier.padding(bottom = 6.dp)
+                        )
+                        Text(
+                            publicacion.descripcion, fontFamily = Nunito, fontWeight = FontWeight.SemiBold,
+                            fontSize = 14.5.sp, lineHeight = 22.sp, color = EduTexto
+                        )
+                    }
+                }
+
+                // ---------- ADJUNTO ----------
+                if (publicacion.archivoAdjunto.isNotBlank()) {
+                    TituloSeccionEdu("Adjunto")
+                    TarjetaEdu(
+                        relleno = PaddingValues(horizontal = 14.dp, vertical = 12.dp),
+                        onClick = if (descargandoAdjunto) null else onAbrirAdjunto
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            IconoCirculoEdu(Icons.Rounded.Description, TonoEdu.AZUL)
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    publicacion.archivoAdjunto.substringAfterLast("/"), fontFamily = Nunito,
+                                    fontWeight = FontWeight.Black, fontSize = 14.5.sp, color = EduTexto,
+                                    maxLines = 1, overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    if (descargandoAdjunto) "Descargando…" else "Toca para abrir",
+                                    fontFamily = Nunito, fontWeight = FontWeight.Bold, fontSize = 12.5.sp, color = EduTextoSecundario
+                                )
+                            }
+                            if (descargandoAdjunto) {
+                                CircularProgressIndicator(color = EduAzulOscuro, strokeWidth = 3.dp, modifier = Modifier.size(24.dp))
+                            } else {
+                                // Botón secundario "Abrir"
+                                Row(
+                                    modifier = Modifier
+                                        .height(38.dp)
+                                        .clip(RoundedCornerShape(13.dp))
+                                        .background(Color.White)
+                                        .border(2.dp, EduBorde, RoundedCornerShape(13.dp))
+                                        .clickable(onClick = onAbrirAdjunto)
+                                        .padding(horizontal = 14.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Icon(Icons.Rounded.Visibility, contentDescription = null, tint = EduEtiqueta, modifier = Modifier.size(16.dp))
+                                    Text("Abrir", fontFamily = Nunito, fontWeight = FontWeight.Black, fontSize = 14.sp, color = EduEtiqueta)
+                                }
+                            }
+                        }
+                        if (descargandoAdjunto) {
+                            LinearProgressIndicator(
+                                modifier = Modifier.padding(top = 10.dp).fillMaxWidth().height(6.dp).clip(RoundedCornerShape(50)),
+                                color = EduAzulOscuro,
+                                trackColor = EduAzulOscuroClaro
                             )
                         }
                     }
                 }
-            }
 
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // BOTÓN VOLVER
-            Button(
-                onClick = onBack,
-                modifier = Modifier.fillMaxWidth().height(54.dp),
-                shape = RoundedCornerShape(28.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = AccentOrange)
-            ) {
-                Image(
-                    painter = painterResource(id = R.drawable.arrowleft_white),
-                    contentDescription = null,
-                    modifier = Modifier.size(30.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "Volver a la Agenda",
-                    fontFamily = Roboto,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 22.sp,
-                    color = TextWhite
-                )
+                // ---------- NOTA ----------
+                when {
+                    esEvaluacion && publicacion.estado == "Pendiente" -> Nota(
+                        "Ayude a $primerNombre a repasar el temario. Es solo un aviso: la evaluación se toma en clase.",
+                        Icons.Rounded.Lightbulb, TonoEdu.AMARILLO
+                    )
+                    !esEvaluacion && publicacion.estado == "Pendiente" -> Nota(
+                        "El docente registrará si $primerNombre entregó la tarea; te llegará una notificación.",
+                        Icons.Rounded.Info, TonoEdu.AZUL
+                    )
+                    publicacion.estado == "Vencida" -> Nota(
+                        "El plazo ya pasó y el docente aún no registra la entrega. Si tienes dudas, comunícate con el docente.",
+                        Icons.Rounded.Info, TonoEdu.AZUL
+                    )
+                }
             }
         }
 
@@ -390,69 +271,103 @@ fun DetalleAgendaScreen(
     }
 }
 
-// Banner superior del detalle: ícono + texto principal + detalle opcional
+// Contenido de la franja de estado
+private data class Franja(val icono: ImageVector, val tono: TonoEdu, val titulo: String, val detalle: String)
+
+// Franja superior con el estado de la tarea o evaluación
 @Composable
-private fun BannerEstado(
-    icono: Int,
-    tinte: Color?,
-    texto: String,
-    detalle: String?,
-    color: Color,
-    borde: Color
-) {
+private fun FranjaEstado(p: PublicacionAgendaItem, esEvaluacion: Boolean) {
+    val dias = diasHastaAgenda(p.fechaEntrega)
+    val fecha = fechaLargaAgenda(p.fechaEntrega)
+    val f = when (p.estado) {
+        "Pendiente" -> if (esEvaluacion) {
+            when {
+                dias == null -> Franja(Icons.Rounded.Event, TonoEdu.AZUL, "Evaluación programada", "Sin fecha")
+                dias <= 0L -> Franja(Icons.Rounded.Event, TonoEdu.CORAL, "Evaluación hoy", fecha)
+                dias == 1L -> Franja(Icons.Rounded.Event, TonoEdu.CORAL, "Evaluación mañana", fecha)
+                else -> Franja(Icons.Rounded.Event, TonoEdu.AZUL, "Evaluación en $dias días", fecha)
+            }
+        } else {
+            when {
+                dias == null -> Franja(Icons.Rounded.Alarm, TonoEdu.AMARILLO, "Tarea pendiente", "Sin fecha límite")
+                dias <= 0L -> Franja(Icons.Rounded.Alarm, TonoEdu.CORAL, "Vence hoy", fecha)
+                dias == 1L -> Franja(Icons.Rounded.Alarm, TonoEdu.CORAL, "Vence mañana", fecha)
+                else -> Franja(Icons.Rounded.Alarm, TonoEdu.AMARILLO, "Vence en $dias días", fecha)
+            }
+        }
+        "Entregada" -> Franja(Icons.Rounded.Check, TonoEdu.VERDE, "Tarea entregada", "Registrado por el docente · fecha límite ${fechaCortaAgenda(p.fechaEntrega).replaceFirstChar { it.lowercase() }}")
+        "No entregada" -> Franja(Icons.Rounded.Close, TonoEdu.CORAL, "Tarea no entregada", "Registrado por el docente · fecha límite ${fechaCortaAgenda(p.fechaEntrega).replaceFirstChar { it.lowercase() }}")
+        "Realizado" -> Franja(Icons.Rounded.EventAvailable, TonoEdu.GRIS, "Evaluación realizada", fecha)
+        else -> Franja(Icons.Rounded.Warning, TonoEdu.AMARILLO, "Plazo vencido", "$fecha · sin registro del docente")
+    }
+    val c = coloresDeTono(f.tono)
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(BackgroundWhite, RoundedCornerShape(12.dp))
-            .border(1.5.dp, borde, RoundedCornerShape(12.dp))
-            .padding(horizontal = 14.dp, vertical = 12.dp),
+            .clip(RoundedCornerShape(20.dp))
+            .background(c.fondo)
+            .border(1.5.dp, c.solido, RoundedCornerShape(20.dp))
+            .padding(horizontal = 14.dp, vertical = 13.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp)
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Image(
-            painter = painterResource(id = icono),
-            contentDescription = null,
-            colorFilter = tinte?.let { ColorFilter.tint(it) },
-            modifier = Modifier.size(40.dp)
-        )
-        Column {
-            Text(
-                text = texto,
-                fontFamily = Roboto,
-                fontWeight = FontWeight.Bold,
-                fontSize = 18.sp,
-                color = color
-            )
-            if (detalle != null) {
-                Text(
-                    text = detalle,
-                    fontFamily = Roboto,
-                    fontSize = 14.sp,
-                    color = TextSecondary
-                )
-            }
+        Box(
+            modifier = Modifier.size(44.dp).background(Color.White, CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(f.icono, contentDescription = null, tint = c.texto, modifier = Modifier.size(22.dp))
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(f.titulo, fontFamily = Nunito, fontWeight = FontWeight.Black, fontSize = 16.sp, color = c.texto)
+            Text(f.detalle, fontFamily = Nunito, fontWeight = FontWeight.Bold, fontSize = 12.5.sp, color = EduEtiqueta)
         }
     }
 }
 
-@Preview(showBackground = true)
+@Composable
+private fun Nota(texto: String, icono: ImageVector, tono: TonoEdu) {
+    val c = coloresDeTono(tono)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(c.fondo, RoundedCornerShape(16.dp))
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Icon(icono, contentDescription = null, tint = c.texto, modifier = Modifier.size(21.dp))
+        Text(
+            texto, modifier = Modifier.weight(1f), fontFamily = Nunito, fontWeight = FontWeight.SemiBold,
+            fontSize = 13.sp, lineHeight = 18.sp, color = EduEtiqueta
+        )
+    }
+}
+
+// "Prof. Hector Reyna" -> "HR"
+private fun inicialesDocente(nombre: String): String =
+    nombre.split(" ").filter { it.isNotBlank() && !it.endsWith(".") }.take(2)
+        .mapNotNull { it.firstOrNull()?.uppercaseChar() }.joinToString("").ifBlank { "D" }
+
+@Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
 fun DetalleAgendaPreview() {
+    val hoy = java.time.LocalDate.now()
     EduConnectAppTheme {
         DetalleAgendaScreen(
-            nombreHijo = "Carlos",
-            gradoNombre = "2do",
+            nombreHijo = "Angela",
+            apellidosHijo = "Perez",
+            gradoNombre = "2do Grado",
             seccionNombre = "A",
             publicacion = PublicacionAgendaItem(
                 id = 1L,
-                titulo = "Ejercicios Cap. 5 - Funciones",
-                descripcion = "Resolver los ejercicios del 1 al 20 del capítulo 5. Incluir los ejercicios de repaso de la página 98. Presentar en hoja bond con nombre completo.",
+                titulo = "Maqueta de ecosistemas",
+                descripcion = "Elaborar una maqueta de un ecosistema de la costa con material reciclado. Incluir un cartel con 3 seres vivos.",
                 tipo = "Tarea",
-                cursoNombre = "Matemáticas",
-                docenteNombre = "Eduardo C.",
-                fechaEntrega = "2026-05-23",
+                cursoNombre = "Ciencia y Tecnología",
+                docenteNombre = "Prof. Hector Reyna",
+                fechaEntrega = hoy.plusDays(1).toString(),
                 estado = "Pendiente",
-                archivoAdjunto = "Practica_funciones.pdf"
+                archivoAdjunto = "guia_maqueta.pdf",
+                publicadoEn = hoy.minusDays(4).toString()
             )
         )
     }

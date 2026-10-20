@@ -1,32 +1,60 @@
 package com.educonnectapp.ui.screens.padre.agenda
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.IconButton
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.material.icons.rounded.Alarm
+import androidx.compose.material.icons.rounded.Notifications
+import androidx.compose.material.icons.rounded.PersonAdd
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.educonnectapp.R
+import com.educonnectapp.ui.components.BotonIconoCabeceraEdu
+import com.educonnectapp.ui.components.CabeceraEdu
+import com.educonnectapp.ui.components.ChipCabeceraEdu
+import com.educonnectapp.ui.components.ChipEdu
+import com.educonnectapp.ui.components.ColorModulo
+import com.educonnectapp.ui.components.IconoCirculoEdu
+import com.educonnectapp.ui.components.TarjetaEdu
+import com.educonnectapp.ui.components.TituloSeccionEdu
+import com.educonnectapp.ui.components.TonoEdu
+import com.educonnectapp.ui.components.coloresDeTono
 import com.educonnectapp.ui.screens.padre.inicio.BottomNavBarPadre
-import com.educonnectapp.ui.theme.*
-import java.text.SimpleDateFormat
-import java.util.*
+import com.educonnectapp.ui.theme.EduAmarillo
+import com.educonnectapp.ui.theme.EduConnectAppTheme
+import com.educonnectapp.ui.theme.EduCoralOscuro
+import com.educonnectapp.ui.theme.EduEtiqueta
+import com.educonnectapp.ui.theme.EduFondo
+import com.educonnectapp.ui.theme.EduTeal
+import com.educonnectapp.ui.theme.EduTealClaro
+import com.educonnectapp.ui.theme.EduTexto
+import com.educonnectapp.ui.theme.EduTextoSecundario
+import com.educonnectapp.ui.theme.Nunito
 
+// Hijo con el resumen de su agenda (lo arma MainActivity)
 data class HijoAgendaItem(
     val id: Long,
     val nombres: String,
@@ -37,8 +65,16 @@ data class HijoAgendaItem(
     val gradoId: Long,
     val seccionId: Long,
     val tareasPendientes: Int = 0,
-    val examenesPendientes: Int = 0
+    val examenesPendientes: Int = 0,        // evaluaciones próximas
+    // ----- Rediseño 2026 -----
+    val proximoTitulo: String = "",         // lo próximo que vence (tarea o evaluación)
+    val proximaFecha: String = ""           // "yyyy-MM-dd"
 )
+
+// =====================================================================
+// AGENDA DEL PADRE · ELEGIR HIJO (rediseño 2026)
+// Cabecera fija amarilla (como Publicaciones del docente) · resumen · una tarjeta por hijo
+// =====================================================================
 
 @Composable
 fun SeleccionarHijoAgendaScreen(
@@ -49,133 +85,92 @@ fun SeleccionarHijoAgendaScreen(
     onAgenda: () -> Unit = {},
     onPerfil: () -> Unit = {},
     onNotificaciones: () -> Unit = {},
-    onVerAgenda: (hijo: HijoAgendaItem) -> Unit = {}
+    onVerAgenda: (hijo: HijoAgendaItem) -> Unit = {},
+    // ----- Rediseño 2026 -----
+    cargando: Boolean = false,
+    onAsociarHijo: () -> Unit = {}
 ) {
-    var hijoSeleccionado by remember { mutableStateOf<HijoAgendaItem?>(null) }
-
-    val fechaActual = remember {
-        SimpleDateFormat("EEEE, dd 'de' MMMM yyyy", Locale("es", "PE"))
-            .format(Date()).replaceFirstChar { it.uppercase() }
-    }
+    val tareas = hijos.sumOf { it.tareasPendientes }
+    val evaluaciones = hijos.sumOf { it.examenesPendientes }
+    val vencePronto = hijos.count { (diasHastaAgenda(it.proximaFecha) ?: 99L) <= 1L }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(BackgroundLight)
+            .background(EduFondo)
     ) {
-        // HEADER
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(EduconnectBlue)
-                .padding(horizontal = 20.dp, vertical = 16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.weight(1f)
-            ) {
-                IconButton(
-                    onClick = onBack,
-                    modifier = Modifier.size(32.dp).offset(x = (-5).dp)
-                ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.arrowleft_white),
-                        contentDescription = "Volver",
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-                Column {
-                    Text(
-                        text = "Agenda Escolar",
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 22.sp,
-                        color = TextWhite
-                    )
-                    Text(
-                        text = "Selecciona el estudiante",
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.Normal,
-                        fontSize = 16.sp,
-                        color = TextWhite.copy(alpha = 0.8f)
-                    )
-                    Text(
-                        text = fechaActual,
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.Normal,
-                        fontSize = 15.sp,
-                        color = TextWhite.copy(alpha = 0.7f)
-                    )
-                }
-            }
-            IconButton(onClick = onNotificaciones) {
-                Image(
-                    painter = painterResource(id = R.drawable.notification_white),
-                    contentDescription = "Notificaciones",
-                    modifier = Modifier.size(35.dp)
+        // CABECERA FIJA
+        CabeceraEdu(
+            titulo = "Agenda",
+            subtitulo = "Elige a tu hijo",
+            onVolver = onBack,
+            colorFondo = ColorModulo.Publicaciones,
+            acciones = {
+                BotonIconoCabeceraEdu(
+                    icono = Icons.Rounded.Notifications,
+                    descripcion = "Notificaciones",
+                    onClick = onNotificaciones,
+                    colorCabecera = ColorModulo.Publicaciones
                 )
+            },
+            contenidoInferior = {
+                ChipCabeceraEdu("Tareas y evaluaciones", modifier = Modifier.padding(top = 14.dp), colorCabecera = ColorModulo.Publicaciones)
             }
-        }
+        )
 
-        Spacer(modifier = Modifier.height(20.dp))
-
+        // CONTENIDO DESPLAZABLE
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
-                .padding(horizontal = 20.dp, vertical = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Text(
-                text = "¿AGENDA DE QUIÉN DESEA VER?",
-                fontFamily = Roboto,
-                fontWeight = FontWeight.Bold,
-                fontSize = 18.sp,
-                color = TextBlue
-            )
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            LazyColumn(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                items(hijos) { hijo ->
-                    val isSelected = hijoSeleccionado?.id == hijo.id
-                    HijoAgendaCard(
-                        hijo = hijo,
-                        isSelected = isSelected,
-                        onClick = { hijoSeleccionado = hijo }
-                    )
+            when {
+                cargando && hijos.isEmpty() -> TarjetaEdu {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        CircularProgressIndicator(color = EduTeal, strokeWidth = 3.dp, modifier = Modifier.size(24.dp))
+                        Text(
+                            "Cargando la agenda…", fontFamily = Nunito, fontWeight = FontWeight.Bold,
+                            fontSize = 15.sp, color = EduTextoSecundario
+                        )
+                    }
                 }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // BOTÓN VER AGENDA
-            hijoSeleccionado?.let { hijo ->
-                Button(
-                    onClick = { onVerAgenda(hijo) },
-                    modifier = Modifier.fillMaxWidth().height(54.dp),
-                    shape = RoundedCornerShape(28.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = EduconnectBlue)
+                hijos.isEmpty() -> TarjetaEdu(
+                    relleno = PaddingValues(horizontal = 16.dp, vertical = 20.dp),
+                    onClick = onAsociarHijo
                 ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.agenda_white),
-                        contentDescription = null,
-                        modifier = Modifier.size(30.dp)
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Text(
-                        text = "Ver agenda de ${hijo.nombres}",
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 22.sp,
-                        color = TextWhite
-                    )
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        IconoCirculoEdu(Icons.Rounded.PersonAdd, TonoEdu.VERDE, tamano = 64.dp)
+                        Text(
+                            "Aún no tienes hijos asociados", fontFamily = Nunito, fontWeight = FontWeight.Black,
+                            fontSize = 17.sp, color = EduTexto
+                        )
+                        Text(
+                            "Asócialos con el código de estudiante para ver sus tareas y evaluaciones.", fontFamily = Nunito,
+                            fontWeight = FontWeight.SemiBold, fontSize = 13.5.sp, color = EduTextoSecundario,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+                else -> {
+                    Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                        Indicador("$tareas", "Tareas por hacer", TonoEdu.AMARILLO, Modifier.weight(1f))
+                        Indicador("$evaluaciones", "Evaluaciones", TonoEdu.AZUL, Modifier.weight(1f))
+                        Indicador("$vencePronto", "Vence pronto", TonoEdu.CORAL, Modifier.weight(1f))
+                    }
+                    TituloSeccionEdu("Mis hijos")
+                    hijos.forEachIndexed { i, hijo ->
+                        TarjetaHijoAgenda(hijo, colorAvatar = if (i % 2 == 0) EduAmarillo else EduTealClaro) { onVerAgenda(hijo) }
+                    }
                 }
             }
         }
@@ -191,133 +186,103 @@ fun SeleccionarHijoAgendaScreen(
 }
 
 @Composable
-fun HijoAgendaCard(
-    hijo: HijoAgendaItem,
-    isSelected: Boolean,
-    onClick: () -> Unit
-) {
-    val iniciales = "${hijo.nombres.firstOrNull() ?: ""}${hijo.apellidos.firstOrNull() ?: ""}".uppercase()
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(
-                if (isSelected) EduconnectBlue.copy(alpha = 0.08f) else BackgroundWhite,
-                RoundedCornerShape(16.dp)
-            )
-            .border(
-                width = if (isSelected) 2.5.dp else 1.dp,
-                color = if (isSelected) EduconnectBlue else BorderBlue,
-                shape = RoundedCornerShape(16.dp)
-            )
-            .clickable { onClick() }
-            .padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(14.dp)
+private fun Indicador(valor: String, etiqueta: String, tono: TonoEdu, modifier: Modifier = Modifier) {
+    val c = coloresDeTono(tono)
+    Column(
+        modifier = modifier
+            .background(c.fondo, RoundedCornerShape(18.dp))
+            .padding(vertical = 10.dp, horizontal = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Avatar
-        Box(
-            modifier = Modifier
-                .size(50.dp)
-                .background(AccentOrange, CircleShape),
-            contentAlignment = Alignment.Center
+        Text(valor, fontFamily = Nunito, fontWeight = FontWeight.Black, fontSize = 21.sp, color = c.texto)
+        Text(
+            etiqueta, fontFamily = Nunito, fontWeight = FontWeight.ExtraBold, fontSize = 12.sp,
+            color = c.texto, maxLines = 1, overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+// Tarjeta de un hijo: tareas pendientes, evaluaciones próximas y lo próximo que vence
+@Composable
+private fun TarjetaHijoAgenda(hijo: HijoAgendaItem, colorAvatar: Color, onClick: () -> Unit) {
+    val iniciales = "${hijo.nombres.firstOrNull() ?: ""}${hijo.apellidos.firstOrNull() ?: ""}".uppercase()
+    val dias = diasHastaAgenda(hijo.proximaFecha)
+    TarjetaEdu(relleno = PaddingValues(horizontal = 15.dp, vertical = 14.dp), onClick = onClick) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text(
-                text = iniciales,
-                fontFamily = Roboto,
-                fontWeight = FontWeight.Bold,
-                fontSize = 20.sp,
-                color = TextWhite
+            Box(
+                modifier = Modifier.size(52.dp).background(colorAvatar, CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(iniciales, fontFamily = Nunito, fontWeight = FontWeight.Black, fontSize = 19.sp, color = EduTexto)
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    "${hijo.nombres} ${hijo.apellidos}".trim(), fontFamily = Nunito, fontWeight = FontWeight.Black,
+                    fontSize = 17.sp, color = EduTexto, maxLines = 1, overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    "${hijo.gradoNombre} · Sección ${hijo.seccionNombre}", fontFamily = Nunito,
+                    fontWeight = FontWeight.Bold, fontSize = 13.sp, color = EduTextoSecundario
+                )
+            }
+            Icon(
+                Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = null,
+                tint = EduTextoSecundario, modifier = Modifier.size(24.dp)
             )
         }
-
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(
-                text = "${hijo.nombres} ${hijo.apellidos}",
-                fontFamily = Roboto,
-                fontWeight = FontWeight.Bold,
-                fontSize = 18.sp,
-                color = TextBlue
-            )
-            Text(
-                text = "${hijo.gradoNombre} Sec. ${hijo.seccionNombre}",
-                fontFamily = Roboto,
-                fontSize = 16.sp,
-                color = TextPrimary
-            )
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .background(
-                            if (hijo.tareasPendientes > 0) StatusErrorRed.copy(alpha = 0.1f)
-                            else EduconnectBlue.copy(alpha = 0.08f),
-                            RoundedCornerShape(20.dp)
-                        )
-                        .padding(horizontal = 10.dp, vertical = 3.dp)
-                ) {
-                    Text(
-                        text = if (hijo.tareasPendientes == 0) "Sin tareas"
-                        else if (hijo.tareasPendientes == 1) "1 Tarea"
-                        else "${hijo.tareasPendientes} Tareas",
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 15.sp,
-                        color = if (hijo.tareasPendientes > 0) AccentOrange else TextSecondary
-                    )
-                }
-                Box(
-                    modifier = Modifier
-                        .background(
-                            if (hijo.examenesPendientes > 0) AccentOrange.copy(alpha = 0.1f)
-                            else EduconnectBlue.copy(alpha = 0.08f),
-                            RoundedCornerShape(20.dp)
-                        )
-                        .padding(horizontal = 10.dp, vertical = 3.dp)
-                ) {
-                    Text(
-                        text = if (hijo.examenesPendientes == 0) "Sin exámenes"
-                        else if (hijo.examenesPendientes == 1) "1 Examen"
-                        else "${hijo.examenesPendientes} Exámenes",
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 15.sp,
-                        color = if (hijo.examenesPendientes > 0) AccentOrange else TextSecondary
-                    )
-                }
+        Row(
+            modifier = Modifier.padding(top = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            when (hijo.tareasPendientes) {
+                0 -> ChipEdu("Sin tareas pendientes", TonoEdu.VERDE)
+                1 -> ChipEdu("1 tarea pendiente", TonoEdu.AMARILLO)
+                else -> ChipEdu("${hijo.tareasPendientes} tareas pendientes", TonoEdu.AMARILLO)
+            }
+            if (hijo.examenesPendientes > 0) {
+                ChipEdu(
+                    if (hijo.examenesPendientes == 1) "1 evaluación próxima" else "${hijo.examenesPendientes} evaluaciones",
+                    TonoEdu.AZUL
+                )
             }
         }
-
-        if (isSelected) {
-            Image(
-                painter = painterResource(id = R.drawable.checkcircle_blue),
-                contentDescription = null,
-                modifier = Modifier.size(35.dp)
-            )
-        } else {
-            Image(
-                painter = painterResource(id = R.drawable.check_lightgray),
-                contentDescription = null,
-                modifier = Modifier.size(22.dp)
-            )
+        if (hijo.proximoTitulo.isNotBlank()) {
+            val urgente = dias != null && dias <= 1L
+            Row(
+                modifier = Modifier
+                    .padding(top = 10.dp)
+                    .fillMaxWidth()
+                    .background(EduFondo, RoundedCornerShape(14.dp))
+                    .padding(horizontal = 11.dp, vertical = 9.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    Icons.Rounded.Alarm, contentDescription = null,
+                    tint = if (urgente) EduCoralOscuro else EduTextoSecundario, modifier = Modifier.size(17.dp)
+                )
+                Text(
+                    "Próximo: ${hijo.proximoTitulo} · ${cuandoVence(hijo.proximaFecha)}",
+                    modifier = Modifier.weight(1f), fontFamily = Nunito, fontWeight = FontWeight.ExtraBold,
+                    fontSize = 13.sp, color = EduEtiqueta, maxLines = 2, overflow = TextOverflow.Ellipsis
+                )
+            }
         }
     }
 }
 
-@Preview(showBackground = true)
+@Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
 fun SeleccionarHijoAgendaPreview() {
+    val hoy = java.time.LocalDate.now()
     EduConnectAppTheme {
         SeleccionarHijoAgendaScreen(
             hijos = listOf(
-                HijoAgendaItem(1L, "Carlos", "Pérez", "2do", "A", "Matemáticas", 1L, 1L, 3, 1),
-                HijoAgendaItem(2L, "María", "Pérez", "1ro", "B", "Comunicación", 1L, 2L, 1, 0),
-                HijoAgendaItem(3L, "Jorge", "Párez", "2do", "A", "Matemáticas", 1L, 1L, 0, 0)
+                HijoAgendaItem(1L, "Angela", "Perez", "2do Grado", "A", "", 1L, 1L, 2, 1, "Maqueta de ecosistemas", hoy.plusDays(1).toString()),
+                HijoAgendaItem(2L, "Pedro", "Perez", "1er Grado", "A", "", 1L, 2L, 1, 1, "Resolver la ficha 12", hoy.plusDays(4).toString())
             )
         )
     }

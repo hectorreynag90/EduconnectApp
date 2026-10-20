@@ -280,7 +280,8 @@ private fun PublicacionPadreResponse.aPublicacionAgendaItem(hoy: String): Public
         docenteNombre = docente,
         fechaEntrega = fecha,
         estado = estadoUi,
-        archivoAdjunto = archivo?.nombre ?: ""
+        archivoAdjunto = archivo?.nombre ?: "",
+        publicadoEn = fechaLocal(publicadoEn)
     )
 }
 
@@ -790,6 +791,9 @@ fun EduConnectApp() {
         val hoyTexto = hoy.toString()
         hijosAgendaSel = hijos.map { h ->
             val items = publicacionesPorHijo[h.alumnoId].orEmpty().map { it.aPublicacionAgendaItem(hoyTexto) }
+            // Lo próximo que vence (tarea o evaluación pendiente con la fecha más cercana)
+            val proximo = items.filter { it.estado == "Pendiente" && it.fechaEntrega.isNotBlank() }
+                .minByOrNull { it.fechaEntrega }
             HijoAgendaItem(
                 id = h.alumnoId,
                 nombres = h.nombres,
@@ -799,7 +803,9 @@ fun EduConnectApp() {
                 gradoId = h.gradoId,
                 seccionId = h.seccionId,
                 tareasPendientes = items.count { it.tipo == "Tarea" && it.estado == "Pendiente" },
-                examenesPendientes = items.count { it.tipo == "Evaluación" && it.estado == "Pendiente" }
+                examenesPendientes = items.count { it.tipo == "Evaluación" && it.estado == "Pendiente" },
+                proximoTitulo = proximo?.titulo ?: "",
+                proximaFecha = proximo?.fechaEntrega?.take(10) ?: ""
             )
         }
         agendaCargada = true
@@ -2959,6 +2965,11 @@ fun EduConnectApp() {
                     }
                     SeleccionarHijoAgendaScreen(
                         hijos = hijosAgendaSel,
+                        cargando = !agendaCargada,
+                        onAsociarHijo = {
+                            origenAsociarHijo = Screen.SELECCIONAR_HIJO_AGENDA
+                            currentScreen = Screen.ASOCIAR_HIJO
+                        },
                         onBack = { currentScreen = Screen.HOME_PADRE },
                         onHomePadre = { currentScreen = Screen.HOME_PADRE },
                         onAvisos = { irAvisosPadre() },
@@ -2982,6 +2993,7 @@ fun EduConnectApp() {
                     }
                     AgendaEscolarScreen(
                         nombreHijo = hijoAgendaSel?.nombres ?: "",
+                        apellidosHijo = hijoAgendaSel?.apellidos ?: "",
                         gradoNombre = hijoAgendaSel?.gradoNombre ?: "",
                         seccionNombre = hijoAgendaSel?.seccionNombre ?: "",
                         publicaciones = publicacionesAgendaSel,
@@ -3013,6 +3025,7 @@ fun EduConnectApp() {
                     val adjunto = publicacionAgendaSel?.let { adjuntosPublicacionSel[it.id] }
                     DetalleAgendaScreen(
                         nombreHijo = hijoAgendaSel?.nombres ?: "",
+                        apellidosHijo = hijoAgendaSel?.apellidos ?: "",
                         gradoNombre = hijoAgendaSel?.gradoNombre ?: "",
                         seccionNombre = hijoAgendaSel?.seccionNombre ?: "",
                         publicacion = publicacionAgendaSel,
