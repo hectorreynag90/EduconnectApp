@@ -48,6 +48,11 @@ import com.educonnectapp.ui.screens.docente.inicio.HomeDocenteScreen
 import com.educonnectapp.ui.screens.docente.inicio.ClaseHoyItem
 import com.educonnectapp.ui.screens.docente.inicio.EnviadoInicioItem
 import com.educonnectapp.ui.screens.padre.inicio.HomePadreScreen
+import com.educonnectapp.ui.screens.padre.inicio.HijoInicioItem
+import com.educonnectapp.ui.screens.padre.inicio.AsistenciaHoyItem
+import com.educonnectapp.ui.screens.padre.inicio.NovedadPadreItem
+import com.educonnectapp.ui.screens.padre.inicio.ResumenInicioHijo
+import com.educonnectapp.ui.screens.padre.inicio.TipoNovedad
 import com.educonnectapp.ui.screens.acceso.LoginScreen
 import com.educonnectapp.ui.screens.docente.comunicados.NuevoComunicadoScreen
 import com.educonnectapp.ui.screens.docente.perfil.PerfilDocenteScreen
@@ -281,6 +286,91 @@ private fun PublicacionPadreResponse.aPublicacionAgendaItem(hoy: String): Public
         archivoAdjunto = archivo?.nombre ?: ""
     )
 }
+
+// =====================================================================
+// INICIO DEL PADRE · reglas de NOVEDADES (rediseño 2026)
+//  - Comunicados: los sin leer (siempre) y los leídos de los últimos 7 días
+//  - Tareas pendientes: hasta su fecha límite
+//  - Tareas con resultado (Entregó / No entregó): hasta 7 días después de la fecha límite
+//  - Evaluaciones: desde 14 días antes hasta el mismo día
+// Orden: sin leer y tareas que vencen hoy o mañana -> próximas -> leídos y resueltas
+// =====================================================================
+private fun armarResumenInicioPadre(
+    asistenciasMes: List<AsistenciaHijoResponse>,
+    comunicados: List<ComunicadoPadreResponse>,
+    agenda: List<PublicacionPadreResponse>,
+    hoy: java.time.LocalDate
+): ResumenInicioHijo {
+    val hoyTexto = hoy.toString()
+    val mananaTexto = hoy.plusDays(1).toString()
+    val hace7 = hoy.minusDays(7).toString()
+    val en14 = hoy.plusDays(14).toString()
+
+    // Asistencia de hoy (A, T o F por curso)
+    val asistenciaHoy = asistenciasMes
+        .filter { it.fecha.take(10) == hoyTexto }
+        .sortedBy { it.hora }
+        .map { AsistenciaHoyItem(it.curso, horaAsistencia(it.hora), it.estado, it.docente) }
+
+    // Comunicados
+    val coms = comunicados
+        .filter { !it.leido || fechaLocal(it.enviadoEn) >= hace7 }
+        .sortedByDescending { aFechaHoraLocal(it.enviadoEn) }
+        .map { c ->
+            NovedadPadreItem(
+                id = c.id, tipo = TipoNovedad.COMUNICADO, titulo = c.asunto, detalle = c.mensaje,
+                curso = c.curso ?: "General", docente = c.docente, fecha = isoLocalSinZona(c.enviadoEn) ?: "",
+                leido = c.leido, adjunto = c.archivo?.nombre ?: ""
+            )
+        }
+
+    // Tareas (solo las vigentes; las anuladas ya se quitaron al cargar la agenda)
+    val tareas = agenda.filter { it.tipo == "TAREA" }.mapNotNull { p ->
+        val fecha = p.fechaEntrega?.take(10).orEmpty()
+        val estado = when (p.calificacionHijo?.estado) {
+            "ENTREGADO", "CALIFICADO" -> "Entregada"
+            "NO_ENTREGADO" -> "No entregada"
+            else -> "Pendiente"
+        }
+        val entra = if (estado == "Pendiente") fecha.isEmpty() || fecha >= hoyTexto
+        else fecha.ifEmpty { fechaLocal(p.publicadoEn) } >= hace7
+        if (!entra) null
+        else NovedadPadreItem(
+            id = p.id, tipo = TipoNovedad.TAREA, titulo = p.titulo, curso = p.curso,
+            docente = p.docente, fecha = fecha, estado = estado
+        )
+    }
+
+    // Evaluaciones de los próximos 14 días
+    val evaluaciones = agenda.filter { it.tipo == "EVALUACION" }.mapNotNull { p ->
+        val fecha = p.fechaEntrega?.take(10).orEmpty()
+        if (fecha.isEmpty() || fecha < hoyTexto || fecha > en14) null
+        else NovedadPadreItem(
+            id = p.id, tipo = TipoNovedad.EVALUACION, titulo = p.titulo, curso = p.curso,
+            docente = p.docente, fecha = fecha
+        )
+    }
+
+    val pendientes = tareas.filter { it.estado == "Pendiente" }
+    val urgentes = pendientes.filter { it.fecha.isNotEmpty() && it.fecha <= mananaTexto }.sortedBy { it.fecha }
+    val proximas = (pendientes.filter { it !in urgentes } + evaluaciones).sortedBy { it.fecha.ifEmpty { "9999-12-31" } }
+    val resueltas = tareas.filter { it.estado != "Pendiente" }.sortedByDescending { it.fecha }
+
+    return ResumenInicioHijo(
+        porcentajeMes = if (asistenciasMes.isEmpty()) null else porcentajeAsistencia(asistenciasMes.map { it.estado }),
+        sinLeer = comunicados.count { !it.leido },
+        pendientes = pendientes.size,
+        asistenciaHoy = asistenciaHoy,
+        novedades = coms.filter { !it.leido } + urgentes + proximas + coms.filter { it.leido } + resueltas
+    )
+}
+
+// Hora de registro de la asistencia ("08:05:00" o fecha-hora ISO) -> "08:05 a. m."
+private fun horaAsistencia(hora: String): String = try {
+    val t = if (hora.contains('T')) aFechaHoraLocal(hora)?.toLocalTime()
+    else java.time.LocalTime.parse(hora.take(8))
+    t?.format(java.time.format.DateTimeFormatter.ofPattern("hh:mm a", java.util.Locale("es", "PE"))) ?: ""
+} catch (e: Exception) { hora }
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -543,6 +633,13 @@ fun EduConnectApp() {
     var mostrarNotificaciones by remember { mutableStateOf(false) }   // panel debajo de la campana
     // Comunicados de cada hijo (para ubicar el comunicado de una notificación sin pedirlo de nuevo)
     var comunicadosPorHijoSel by remember { mutableStateOf<Map<Long, List<ComunicadoPadreResponse>>>(emptyMap()) }
+    // Inicio del padre (rediseño 2026): hijo elegido y asistencias del mes de cada hijo
+    var hijoInicioSelId by remember { mutableStateOf<Long?>(null) }
+    var asistenciaInicioPorHijo by remember { mutableStateOf<Map<Long, List<AsistenciaHijoResponse>>>(emptyMap()) }
+    var inicioPadreListo by remember { mutableStateOf(false) }
+    // Pantalla a la que vuelven el detalle de un comunicado y el de una tarea/evaluación del padre
+    var origenDetalleComunicadoPadre by remember { mutableStateOf(Screen.COMUNICADOS_RECIBIDOS) }
+    var origenDetalleAgenda by remember { mutableStateOf(Screen.AGENDA_ESCOLAR) }
 
     fun aviso(mensaje: String) { Toast.makeText(context, mensaje, Toast.LENGTH_SHORT).show() }
 
@@ -776,7 +873,7 @@ fun EduConnectApp() {
 
     // Notificación de comunicado: abre directamente su detalle (DETALLE_COMUNICADO_PADRE).
     // "Volver" lleva a la lista de comunicados de ese hijo. Si no se encuentra, abre el módulo Comunicados.
-    fun abrirComunicadoDeNotificacion(comunicadoId: Long?) {
+    fun abrirComunicadoDeNotificacion(comunicadoId: Long?, origen: Screen = Screen.COMUNICADOS_RECIBIDOS) {
         CoroutineScope(Dispatchers.Main).launch {
             try {
                 var contexto = contextoComunicado(comunicadoId)
@@ -792,6 +889,7 @@ fun EduConnectApp() {
                     hijoComunicadoSel = hijo
                     aplicarComunicadosHijo(hijo, comunicadosPorHijoSel[hijo.id].orEmpty())
                     comunicadoPadreSel = comunicadosPadreSel.find { it.id == comunicado.id }
+                    origenDetalleComunicadoPadre = origen
                     currentScreen = Screen.DETALLE_COMUNICADO_PADRE
                 }
             } catch (e: Exception) {
@@ -845,7 +943,7 @@ fun EduConnectApp() {
 
     // Notificación de tarea/evaluación: abre directamente su detalle (DETALLE_AGENDA).
     // Si no está en la agenda cargada, la pide al backend; si no se encuentra, abre la Agenda.
-    fun abrirPublicacionDeNotificacion(publicacionId: Long?) {
+    fun abrirPublicacionDeNotificacion(publicacionId: Long?, origen: Screen = Screen.AGENDA_ESCOLAR) {
         CoroutineScope(Dispatchers.Main).launch {
             try {
                 if (!agendaCargada) cargarAgendaPadre()
@@ -870,6 +968,7 @@ fun EduConnectApp() {
                         hijoAgendaSel = encontrado.first
                         publicacionAgendaSel = encontrado.second
                             .aPublicacionAgendaItem(java.time.LocalDate.now().toString())
+                        origenDetalleAgenda = origen
                         currentScreen = Screen.DETALLE_AGENDA
                     }
                 }
@@ -1026,6 +1125,9 @@ fun EduConnectApp() {
         notificacionesNoLeidasSel = 0L
         mostrarNotificaciones = false
         comunicadosPorHijoSel = emptyMap()
+        hijoInicioSelId = null
+        asistenciaInicioPorHijo = emptyMap()
+        inicioPadreListo = false
     }
 
 
@@ -1437,25 +1539,75 @@ fun EduConnectApp() {
                     androidx.compose.runtime.LaunchedEffect(usuarioLogueado?.id) {
                         if (usuarioLogueado == null) return@LaunchedEffect
                         try {
-                            // 1 petición: notificaciones sin leer para el punto rojo de la campana
+                            // 1 petición: notificaciones sin leer para el punto de la campana
                             val bandeja = obtenerBandeja()
                             notificacionesSel = bandeja.notificaciones
                             notificacionesNoLeidasSel = bandeja.noLeidas
+                            // Si llegaron comunicados, tareas o entregas nuevas, esos datos se vuelven a pedir
+                            val sinLeer = bandeja.notificaciones.filter { !it.leida }
+                            if (sinLeer.any { it.tipo == "COMUNICADO" }) comunicadosPadreCargados = false
+                            if (sinLeer.any { it.tipo == "PUBLICACION" || it.tipo == "CALIFICACION" }) agendaCargada = false
                         } catch (e: kotlinx.coroutines.CancellationException) {
                             throw e
                         } catch (e: Exception) { /* silencioso */ }
+                        try {
+                            val hijos = hijosDelPadre()
+                            if (hijos.none { it.alumnoId == hijoInicioSelId }) hijoInicioSelId = hijos.firstOrNull()?.alumnoId
+                            if (hijos.isNotEmpty()) {
+                                // Asistencias del mes de cada hijo (1 petición por hijo, en paralelo; siempre frescas)
+                                // + comunicados y agenda (solo si no están cargados)
+                                val hoy = java.time.LocalDate.now()
+                                val desde = maxOf(hoy.withDayOfMonth(1), inicioAnioEscolar(hoy)).toString()
+                                coroutineScope {
+                                    val asistencias = hijos.map { h ->
+                                        async { h.alumnoId to obtenerAsistenciasHijo(h.alumnoId, desde, hoy.toString()).asistencias }
+                                    }
+                                    val comunicados = async { if (!comunicadosPadreCargados) cargarComunicadosPadre() }
+                                    val agenda = async { if (!agendaCargada) cargarAgendaPadre() }
+                                    asistenciaInicioPorHijo = asistencias.awaitAll().toMap()
+                                    comunicados.await()
+                                    agenda.await()
+                                }
+                            }
+                        } catch (e: kotlinx.coroutines.CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            aviso("Error cargando el inicio: ${e.message}")
+                        } finally {
+                            inicioPadreListo = true
+                        }
                     }
+                    // Resumen del hijo elegido (se arma con los datos ya cargados; sin peticiones)
+                    val hijoId = hijoInicioSelId
+                    val resumenInicio = if (hijoId == null || (!inicioPadreListo && hijoId !in asistenciaInicioPorHijo)) null
+                    else armarResumenInicioPadre(
+                        asistenciasMes = asistenciaInicioPorHijo[hijoId].orEmpty(),
+                        comunicados = comunicadosPorHijoSel[hijoId].orEmpty(),
+                        agenda = agendaPorHijoSel[hijoId].orEmpty(),
+                        hoy = java.time.LocalDate.now()
+                    )
                     HomePadreScreen(
                         usuarioNombre = usuarioLogueado?.nombrecompleto ?: "",
                         fotoUrl = usuarioLogueado?.fotoId?.let { urlArchivo(it) },
                         tieneNotificaciones = notificacionesNoLeidasSel > 0,
+                        hijos = hijosApiSel?.map { HijoInicioItem(it.alumnoId, it.nombres, it.grado, it.seccion) },
+                        hijoSeleccionadoId = hijoId,
+                        resumen = resumenInicio,
+                        onElegirHijo = { hijoInicioSelId = it },
+                        onAbrirNovedad = { novedad ->
+                            if (novedad.tipo == TipoNovedad.COMUNICADO) abrirComunicadoDeNotificacion(novedad.id, Screen.HOME_PADRE)
+                            else abrirPublicacionDeNotificacion(novedad.id, Screen.HOME_PADRE)
+                        },
+                        onAsociarHijo = {
+                            origenAsociarHijo = Screen.HOME_PADRE
+                            currentScreen = Screen.ASOCIAR_HIJO
+                        },
                         onAsistencias = {
                             hijosAsistenciaCargados = false
                             currentScreen = Screen.SELECCIONAR_ESTUDIANTE
                         },
                         onComunicados = { irAvisosPadre() },
                         onAgenda = { irAgenda() },
-                        onEstadoAcademico = { aviso("Estado académico disponible próximamente") },
                         onAvisos = { irAvisosPadre() },
                         onPerfil = { currentScreen = Screen.PERFIL_PADRE },
                         onNotificaciones = { abrirNotificaciones() }
@@ -2861,6 +3013,7 @@ fun EduConnectApp() {
                         onNotificaciones = { abrirNotificaciones() },
                         onVerDetalle = { publicacion ->
                             publicacionAgendaSel = publicacion
+                            origenDetalleAgenda = Screen.AGENDA_ESCOLAR
                             currentScreen = Screen.DETALLE_AGENDA
                         }
                     )
@@ -2885,7 +3038,10 @@ fun EduConnectApp() {
                         publicacion = publicacionAgendaSel,
                         descargandoAdjunto = descargandoAdjunto,
                         onAbrirAdjunto = { adjunto?.let { abrirAdjunto(it) } },
-                        onBack = { currentScreen = Screen.AGENDA_ESCOLAR },
+                        onBack = {
+                            currentScreen = origenDetalleAgenda
+                            origenDetalleAgenda = Screen.AGENDA_ESCOLAR
+                        },
                         onHomePadre = { currentScreen = Screen.HOME_PADRE },
                         onAvisos = { irAvisosPadre() },
                         onAgenda = { irAgenda() },
@@ -2974,6 +3130,7 @@ fun EduConnectApp() {
                         onNotificaciones = { abrirNotificaciones() },
                         onVerDetalle = { comunicado ->
                             comunicadoPadreSel = comunicado
+                            origenDetalleComunicadoPadre = Screen.COMUNICADOS_RECIBIDOS
                             currentScreen = Screen.DETALLE_COMUNICADO_PADRE
                         }
                     )
@@ -2989,6 +3146,10 @@ fun EduConnectApp() {
                             val actualizado = comunicado.copy(leido = true, leidoEn = ahora)
                             comunicadoPadreSel = actualizado
                             comunicadosPadreSel = comunicadosPadreSel.map { if (it.id == comunicado.id) actualizado else it }
+                            // También en los comunicados de cada hijo (Inicio y notificaciones)
+                            comunicadosPorHijoSel = comunicadosPorHijoSel.mapValues { (_, lista) ->
+                                lista.map { if (it.id == comunicado.id) it.copy(leido = true, leidoEn = ahora) else it }
+                            }
                             // Un "sin leer" menos en la tarjeta del hijo (sin volver a pedir los datos)
                             hijoComunicadoSel?.let { h ->
                                 val hijoActualizado = h.copy(sinLeer = (h.sinLeer - 1).coerceAtLeast(0))
@@ -3005,7 +3166,10 @@ fun EduConnectApp() {
                         nombreAdjunto = adjunto?.nombre,
                         descargandoAdjunto = descargandoAdjunto,
                         onAbrirAdjunto = { adjunto?.let { abrirAdjunto(it) } },
-                        onBack = { currentScreen = Screen.COMUNICADOS_RECIBIDOS },
+                        onBack = {
+                            currentScreen = origenDetalleComunicadoPadre
+                            origenDetalleComunicadoPadre = Screen.COMUNICADOS_RECIBIDOS
+                        },
                         onHomePadre = { currentScreen = Screen.HOME_PADRE },
                         onAvisos = { irAvisosPadre() },
                         onAgenda = { irAgenda() },
