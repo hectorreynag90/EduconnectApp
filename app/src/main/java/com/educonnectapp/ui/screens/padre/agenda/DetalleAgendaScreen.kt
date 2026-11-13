@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Alarm
+import androidx.compose.material.icons.rounded.Block
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Description
@@ -42,6 +43,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -144,9 +146,12 @@ fun DetalleAgendaScreen(
                         ChipEdu(publicacion.cursoNombre, if (esEvaluacion) TonoEdu.AZUL else TonoEdu.AMARILLO)
                         ChipEdu(if (esEvaluacion) "Aviso de evaluación" else "Tarea", TonoEdu.GRIS)
                     }
+                    val anulada = publicacion.estado == "Anulada"
                     Text(
                         publicacion.titulo, modifier = Modifier.padding(top = 10.dp), fontFamily = Nunito,
-                        fontWeight = FontWeight.Black, fontSize = 20.sp, lineHeight = 25.sp, color = EduTexto
+                        fontWeight = FontWeight.Black, fontSize = 20.sp, lineHeight = 25.sp,
+                        color = if (anulada) EduTextoSecundario else EduTexto,
+                        textDecoration = if (anulada) TextDecoration.LineThrough else null
                     )
                     // Docente y fecha de publicación
                     Row(
@@ -255,6 +260,11 @@ fun DetalleAgendaScreen(
                         "El docente registrará si $primerNombre entregó la tarea; te llegará una notificación.",
                         Icons.Rounded.Info, TonoEdu.AZUL
                     )
+                    publicacion.estado == "Anulada" -> Nota(
+                        if (esEvaluacion) "El docente anuló este aviso: la evaluación no se realizará en esa fecha."
+                        else "El docente anuló esta tarea: $primerNombre ya no tiene que entregarla.",
+                        Icons.Rounded.Info, TonoEdu.GRIS
+                    )
                     publicacion.estado == "Vencida" -> Nota(
                         "El plazo ya pasó y el docente aún no registra la entrega. Si tienes dudas, comunícate con el docente.",
                         Icons.Rounded.Info, TonoEdu.AZUL
@@ -300,6 +310,11 @@ private fun FranjaEstado(p: PublicacionAgendaItem, esEvaluacion: Boolean) {
         "Entregada" -> Franja(Icons.Rounded.Check, TonoEdu.VERDE, "Tarea entregada", "Registrado por el docente · fecha límite ${fechaCortaAgenda(p.fechaEntrega).replaceFirstChar { it.lowercase() }}")
         "No entregada" -> Franja(Icons.Rounded.Close, TonoEdu.CORAL, "Tarea no entregada", "Registrado por el docente · fecha límite ${fechaCortaAgenda(p.fechaEntrega).replaceFirstChar { it.lowercase() }}")
         "Realizado" -> Franja(Icons.Rounded.EventAvailable, TonoEdu.GRIS, "Evaluación realizada", fecha)
+        "Anulada" -> Franja(
+            Icons.Rounded.Block, TonoEdu.GRIS,
+            if (esEvaluacion) "Evaluación anulada" else "Tarea anulada",
+            "El docente la anuló" + (if (p.fechaEntrega.isNotBlank()) " · era para el ${fechaCortaAgenda(p.fechaEntrega).replaceFirstChar { it.lowercase() }}" else "")
+        )
         else -> Franja(Icons.Rounded.Warning, TonoEdu.AMARILLO, "Plazo vencido", "$fecha · sin registro del docente")
     }
     val c = coloresDeTono(f.tono)

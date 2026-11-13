@@ -90,6 +90,7 @@ import com.educonnectapp.ui.screens.docente.publicaciones.PublicacionesScreen
 import com.educonnectapp.ui.screens.docente.publicaciones.ClasePublicacionItem
 import com.educonnectapp.ui.screens.docente.publicaciones.NuevaTareaScreen
 import com.educonnectapp.ui.screens.docente.publicaciones.NuevaEvaluacionScreen
+import com.educonnectapp.ui.screens.docente.publicaciones.EditarPublicacionScreen
 import com.educonnectapp.ui.screens.docente.publicaciones.ConfirmacionPublicacionScreen
 import com.educonnectapp.ui.screens.padre.agenda.SeleccionarHijoAgendaScreen
 import com.educonnectapp.ui.screens.padre.agenda.AgendaEscolarScreen
@@ -112,6 +113,9 @@ import com.educonnectapp.data.api.restablecerContrasena
 import com.educonnectapp.data.api.solicitarCodigoRecuperacion
 import com.educonnectapp.data.api.verificarCodigoRecuperacion
 import com.educonnectapp.data.api.ApiException
+import com.educonnectapp.data.api.reenviarComunicado
+import com.educonnectapp.data.api.editarPublicacion
+import com.educonnectapp.data.api.anularPublicacion
 import com.educonnectapp.data.api.ingresar
 import com.educonnectapp.data.api.registrar
 import com.educonnectapp.data.api.cerrarSesion
@@ -208,7 +212,7 @@ enum class Screen {
     PUBLICACIONES, NUEVA_TAREA, NUEVA_EVALUACION, CONFIRMACION_PUBLICACION,
     SELECCIONAR_HIJO_AGENDA, AGENDA_ESCOLAR, DETALLE_AGENDA,
     COMUNICADOS_PADRE, SELECCIONAR_ESTUDIANTE_COMUNICADO, COMUNICADOS_RECIBIDOS, DETALLE_COMUNICADO_PADRE,
-    HISTORIAL_PUBLICACIONES, CALIFICAR_PUBLICACION,
+    HISTORIAL_PUBLICACIONES, CALIFICAR_PUBLICACION, EDITAR_PUBLICACION,
     HISTORIAL_DOCENTE, HISTORIAL_COMUNICADOS,
     RECUPERAR_CORREO, RECUPERAR_CODIGO, RECUPERAR_NUEVA, RECUPERAR_LISTO
 }
@@ -266,7 +270,8 @@ private suspend fun cargarDetalleDia(seccionId: Long, cursoId: Long, fecha: Stri
 private fun PublicacionPadreResponse.aPublicacionAgendaItem(hoy: String): PublicacionAgendaItem {
     val fecha = fechaEntrega ?: ""
     val yaPaso = fecha.isNotEmpty() && fecha < hoy
-    val estadoUi = if (tipo == "EVALUACION") {
+    val estadoUi = if (estado == "ANULADA") "Anulada"   // el docente la anuló: se ve tachada
+    else if (tipo == "EVALUACION") {
         if (yaPaso) "Realizado" else "Pendiente"
     } else when (calificacionHijo?.estado) {
         "ENTREGADO", "CALIFICADO" -> "Entregada"
@@ -310,14 +315,14 @@ private fun armarResumenInicioPadre(
     // Tareas pendientes: sin entrega registrada y con fecha de hoy en adelante (o sin fecha)
     val tareasPendientes = agenda.filter { p ->
         val fecha = p.fechaEntrega?.take(10).orEmpty()
-        p.tipo == "TAREA" &&
+        p.tipo == "TAREA" && p.estado != "ANULADA" &&
                 (p.calificacionHijo?.estado ?: "") !in listOf("ENTREGADO", "CALIFICADO", "NO_ENTREGADO") &&
                 (fecha.isEmpty() || fecha >= hoyTexto)
     }
     // Evaluaciones próximas (de hoy en adelante)
     val evaluacionesProximas = agenda.filter { p ->
         val fecha = p.fechaEntrega?.take(10).orEmpty()
-        p.tipo == "EVALUACION" && fecha.isNotEmpty() && fecha >= hoyTexto
+        p.tipo == "EVALUACION" && p.estado != "ANULADA" && fecha.isNotEmpty() && fecha >= hoyTexto
     }
 
     return ResumenInicioHijo(
@@ -586,6 +591,13 @@ fun EduConnectApp() {
     var detallePublicacionSel by remember { mutableStateOf<DetallePublicacionDocenteResponse?>(null) }
     var cargandoDetallePublicacion by remember { mutableStateOf(false) }
     var guardandoCalificaciones by remember { mutableStateOf(false) }
+    // Editar y anular una publicación (docente)
+    var guardandoEdicionPub by remember { mutableStateOf(false) }
+    var edicionPubGuardada by remember { mutableStateOf(false) }
+    var anulandoPublicacion by remember { mutableStateOf(false) }
+    // Reenvío de un comunicado (docente)
+    var reenviandoComunicado by remember { mutableStateOf(false) }
+    var reenviadosASel by remember { mutableStateOf<Int?>(null) }
     // Agenda (padre)
     var agendaPorHijoSel by remember { mutableStateOf<Map<Long, List<PublicacionPadreResponse>>>(emptyMap()) }
     var agendaCargada by remember { mutableStateOf(false) }
@@ -763,9 +775,9 @@ fun EduConnectApp() {
             hijos.map { h -> async { obtenerAgendaHijo(h.alumnoId, desde, hasta) } }.awaitAll()
         }
         val publicacionesPorHijo = hijos.mapIndexed { i, h ->
-            // Solo tareas y evaluaciones vigentes (las anuladas no se muestran)
+            // Tareas y evaluaciones (las anuladas también: se muestran tachadas y no cuentan como pendientes)
             h.alumnoId to agendas[i].publicaciones.filter {
-                it.estado != "ANULADA" && (it.tipo == "TAREA" || it.tipo == "EVALUACION")
+                it.tipo == "TAREA" || it.tipo == "EVALUACION"
             }
         }.toMap()
         agendaPorHijoSel = publicacionesPorHijo
@@ -949,7 +961,6 @@ fun EduConnectApp() {
                 val encontrado = contexto
                 when {
                     encontrado == null -> irAgenda()
-                    encontrado.second.estado == "ANULADA" -> aviso("Esta publicación fue anulada por el docente")
                     else -> {
                         hijoAgendaSel = encontrado.first
                         publicacionAgendaSel = encontrado.second
@@ -2616,12 +2627,27 @@ fun EduConnectApp() {
                         onPerfilDocente = { currentScreen = Screen.PERFIL_DOCENTE },
                         onNotificaciones = {},
                         onReenviar = {
-                            // Pendiente: el backend aún no tiene endpoint de reenvío
-                            aviso("Reenvío disponible próximamente")
+                            if (reenviandoComunicado) return@DetalleComunicadoScreen   // evita doble envío
+                            reenviandoComunicado = true
+                            CoroutineScope(Dispatchers.Main).launch {
+                                try {
+                                    // Recordatorio solo a los padres que aún no lo leen
+                                    reenviadosASel = reenviarComunicado(comunicadoIdSel)
+                                } catch (e: ApiException) {
+                                    aviso(if (e.codigo == 409) "Todos los padres ya leyeron este comunicado" else "No se pudo reenviar: ${e.message}")
+                                } catch (e: Exception) {
+                                    aviso("No se pudo reenviar: ${e.message}")
+                                } finally {
+                                    reenviandoComunicado = false
+                                }
+                            }
                         },
                         adjuntoNombre = comunicadoArchivoSel?.nombre ?: "",
                         onAbrirAdjunto = { comunicadoArchivoSel?.let { abrirAdjunto(it) } },
-                        cargando = cargandoLectura
+                        cargando = cargandoLectura,
+                        reenviando = reenviandoComunicado,
+                        reenviadosA = reenviadosASel,
+                        onCerrarReenvio = { reenviadosASel = null }
                     )
                 }
 
@@ -2898,6 +2924,87 @@ fun EduConnectApp() {
                                     aviso("No se pudo guardar: ${e.message}")
                                 } finally {
                                     guardandoCalificaciones = false
+                                }
+                            }
+                        },
+                        // EDITAR: abre el formulario con los datos actuales
+                        onEditar = {
+                            edicionPubGuardada = false
+                            currentScreen = Screen.EDITAR_PUBLICACION
+                        },
+                        // ANULAR (ya confirmado en la pantalla): el backend avisa a los padres
+                        onAnular = {
+                            if (anulandoPublicacion) return@CalificarPublicacionScreen   // evita doble envío
+                            anulandoPublicacion = true
+                            CoroutineScope(Dispatchers.Main).launch {
+                                try {
+                                    val anulada = anularPublicacion(publicacionIdSel)
+                                    detallePublicacionSel = detallePublicacionSel?.copy(publicacion = anulada)
+                                    // El historial y los contadores ya no la cuentan como vigente
+                                    publicacionesDocenteSel = publicacionesDocenteSel.map { if (it.id == anulada.id) anulada else it }
+                                } catch (e: ApiException) {
+                                    aviso(if (e.codigo == 409) e.message ?: "No se puede anular: ya tiene entregas registradas"
+                                    else "No se pudo anular: ${e.message}")
+                                } catch (e: Exception) {
+                                    aviso("No se pudo anular: ${e.message}")
+                                } finally {
+                                    anulandoPublicacion = false
+                                }
+                            }
+                        },
+                        anulando = anulandoPublicacion,
+                        edicionGuardada = edicionPubGuardada,
+                        onCerrarEdicionGuardada = { edicionPubGuardada = false }
+                    )
+                }
+
+                Screen.EDITAR_PUBLICACION -> {
+                    val detalle = detallePublicacionSel?.takeIf { it.publicacion.id == publicacionIdSel }
+                    val volver = { if (!guardandoEdicionPub) currentScreen = Screen.CALIFICAR_PUBLICACION }
+                    androidx.activity.compose.BackHandler { volver() }
+                    EditarPublicacionScreen(
+                        publicacion = detalle?.publicacion?.let { p ->
+                            DetallePublicacionItem(
+                                titulo = p.titulo,
+                                tipo = if (p.tipo == "EVALUACION") "Evaluación" else "Tarea",
+                                cursoNombre = p.curso,
+                                gradoNombre = p.grado,
+                                seccionNombre = p.seccion,
+                                fechaEntrega = p.fechaEntrega ?: "",
+                                descripcion = p.descripcion,
+                                nombreAdjunto = p.archivo?.nombre,
+                                estado = p.estado
+                            )
+                        },
+                        guardando = guardandoEdicionPub,
+                        onBack = volver,
+                        onHomeDocente = { currentScreen = Screen.HOME_DOCENTE },
+                        onAlumnos = {},
+                        onAvisos = {
+                            comunicadosDocenteCargados = false
+                            currentScreen = Screen.COMUNICADOS
+                        },
+                        onPerfilDocente = { currentScreen = Screen.PERFIL_DOCENTE },
+                        onNotificaciones = {},
+                        onGuardar = { titulo, descripcion, fecha ->
+                            if (guardandoEdicionPub) return@EditarPublicacionScreen   // evita doble envío
+                            guardandoEdicionPub = true
+                            CoroutineScope(Dispatchers.Main).launch {
+                                try {
+                                    // El backend guarda y avisa a los padres (con la nueva fecha si cambió)
+                                    val respuesta = editarPublicacion(publicacionIdSel, titulo, descripcion, fecha)
+                                    detallePublicacionSel = respuesta
+                                    publicacionesDocenteSel = publicacionesDocenteSel.map {
+                                        if (it.id == respuesta.publicacion.id) respuesta.publicacion else it
+                                    }
+                                    edicionPubGuardada = true   // popup "Cambios guardados" en el detalle
+                                    currentScreen = Screen.CALIFICAR_PUBLICACION
+                                } catch (e: ApiException) {
+                                    aviso(if (e.codigo == 400) "Datos no válidos: ${e.message}" else "No se pudo guardar: ${e.message}")
+                                } catch (e: Exception) {
+                                    aviso("No se pudo guardar: ${e.message}")
+                                } finally {
+                                    guardandoEdicionPub = false
                                 }
                             }
                         }

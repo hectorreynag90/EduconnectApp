@@ -39,6 +39,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -296,6 +297,7 @@ fun PublicacionHistorialCard(item: PublicacionHistorialItem, onClick: () -> Unit
                 Text(
                     item.titulo, fontFamily = Nunito, fontWeight = FontWeight.Black, fontSize = 15.5.sp,
                     color = if (item.estado == "ANULADA") EduTextoSecundario else EduTexto,
+                    textDecoration = if (item.estado == "ANULADA") TextDecoration.LineThrough else null,
                     maxLines = 2, overflow = TextOverflow.Ellipsis
                 )
                 Row(

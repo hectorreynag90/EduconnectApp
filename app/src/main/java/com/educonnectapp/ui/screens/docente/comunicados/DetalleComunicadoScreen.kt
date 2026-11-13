@@ -49,6 +49,9 @@ import com.educonnectapp.ui.components.BotonPrincipalEdu
 import com.educonnectapp.ui.components.CabeceraEdu
 import com.educonnectapp.ui.components.ChipEdu
 import com.educonnectapp.ui.components.ColorModulo
+import com.educonnectapp.ui.components.PopupConfirmacionEdu
+import com.educonnectapp.ui.components.PopupExitoEdu
+import com.educonnectapp.ui.components.PopupProcesandoEdu
 import com.educonnectapp.ui.components.TarjetaEdu
 import com.educonnectapp.ui.components.TipoBotonEdu
 import com.educonnectapp.ui.components.TonoEdu
@@ -126,9 +129,14 @@ fun DetalleComunicadoScreen(
     // ----- Rediseño 2026 -----
     adjuntoNombre: String = "",          // "" = sin adjunto
     onAbrirAdjunto: () -> Unit = {},
-    cargando: Boolean = false            // se están consultando las lecturas
+    cargando: Boolean = false,           // se están consultando las lecturas
+    // ----- Reenvío (recordatorio a los que no leyeron) -----
+    reenviando: Boolean = false,         // muestra "Enviando recordatorio..."
+    reenviadosA: Int? = null,            // != null: popup de éxito con la cantidad de padres
+    onCerrarReenvio: () -> Unit = {}
 ) {
     var tabSeleccionado by remember { mutableStateOf("Leyeron") }
+    var confirmarReenvio by remember { mutableStateOf(false) }
 
     val padresLeidos = padres.filter { it.leidoEn != null }
     val padresSinLeer = padres.filter { it.leidoEn == null }
@@ -143,6 +151,33 @@ fun DetalleComunicadoScreen(
         if (hora.isNotBlank()) { if (isNotEmpty()) append(" · "); append(hora) }
     }
     val claseTexto = listOf(cursoNombre, "$gradoNombre $seccionNombre".trim()).filter { it.isNotBlank() }.joinToString(" · ")
+
+    // ── POPUPS DEL REENVÍO: confirmación -> "Enviando..." -> "Recordatorio enviado" ──
+    if (confirmarReenvio) {
+        PopupConfirmacionEdu(
+            titulo = "¿Reenviar recordatorio?",
+            mensaje = "Se enviará una notificación solo a " +
+                    (if (totalSinLeer == 1) "el padre que aún no lee" else "los $totalSinLeer padres que aún no leen") +
+                    " este comunicado.",
+            textoConfirmar = "Reenviar",
+            colorConfirmar = TipoBotonEdu.AVANZAR.fondo,
+            icono = Icons.AutoMirrored.Rounded.Send,
+            onCancelar = { confirmarReenvio = false },
+            onConfirmar = {
+                confirmarReenvio = false
+                onReenviar()
+            }
+        )
+    }
+    if (reenviando) PopupProcesandoEdu(titulo = "Enviando recordatorio...")
+    reenviadosA?.let { n ->
+        PopupExitoEdu(
+            titulo = "Recordatorio enviado",
+            mensaje = (if (n == 1) "Se avisó a 1 padre." else "Se avisó a $n padres.") +
+                    " Verás en la pestaña Leyeron cuando lo abran.",
+            onCerrar = onCerrarReenvio
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -302,7 +337,8 @@ fun DetalleComunicadoScreen(
                     texto = "Reenviar a $totalSinLeer sin leer",
                     tipo = TipoBotonEdu.AVANZAR,
                     icono = Icons.AutoMirrored.Rounded.Send,
-                    onClick = onReenviar
+                    habilitado = !reenviando,
+                    onClick = { confirmarReenvio = true }
                 )
             }
         }

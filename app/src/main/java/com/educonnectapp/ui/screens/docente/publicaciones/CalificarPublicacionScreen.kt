@@ -23,11 +23,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.material.icons.rounded.Block
 import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.EditNote
 import androidx.compose.material.icons.rounded.FactCheck
 import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Save
 import androidx.compose.material3.CircularProgressIndicator
@@ -46,6 +48,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -65,13 +68,17 @@ import com.educonnectapp.ui.components.TipoBotonEdu
 import com.educonnectapp.ui.components.TituloSeccionEdu
 import com.educonnectapp.ui.components.TonoEdu
 import com.educonnectapp.ui.components.coloresDeTono
+import com.educonnectapp.ui.screens.acceso.PopupAlertaEdu
 import com.educonnectapp.ui.screens.docente.inicio.BottomNavBarDocente
+import com.educonnectapp.ui.theme.EduAmarillo
 import com.educonnectapp.ui.theme.EduAmarilloClaro
 import com.educonnectapp.ui.theme.EduAmarilloOscuro
 import com.educonnectapp.ui.theme.EduAzulOscuro
 import com.educonnectapp.ui.theme.EduBorde
 import com.educonnectapp.ui.theme.EduCampo
 import com.educonnectapp.ui.theme.EduConnectAppTheme
+import com.educonnectapp.ui.theme.EduCoralClaro
+import com.educonnectapp.ui.theme.EduCoralOscuro
 import com.educonnectapp.ui.theme.EduEtiqueta
 import com.educonnectapp.ui.theme.EduFondo
 import com.educonnectapp.ui.theme.EduTeal
@@ -144,8 +151,9 @@ private fun textoEntrega(estado: String): String = when (estado) {
 
 // =====================================================================
 // ENTREGAS DE UNA TAREA / DETALLE DE UN AVISO DE EVALUACIÓN (rediseño 2026)
-// Cabecera fija amarilla · datos · contadores · lista de alumnos (un toque cambia el estado)
-// Botones fijos: Registrar / Editar entregas · Cancelar + Guardar
+// Cabecera fija amarilla · datos (con botones Editar y Anular) · contadores · lista de alumnos
+// (un toque cambia el estado) · Botones fijos: Registrar / Editar entregas · Cancelar + Guardar
+// Anular: solo sin entregas registradas; una publicación anulada ya no se edita ni registra entregas
 // =====================================================================
 
 @Composable
@@ -163,7 +171,13 @@ fun CalificarPublicacionScreen(
     onPerfilDocente: () -> Unit = {},
     onNotificaciones: () -> Unit = {},
     // Solo los alumnos que cambiaron, con el estado final para el backend
-    onGuardar: (List<AlumnoCalificacionItem>) -> Unit = {}
+    onGuardar: (List<AlumnoCalificacionItem>) -> Unit = {},
+    // ----- Editar y anular -----
+    onEditar: () -> Unit = {},              // abre la pantalla "Editar tarea / evaluación"
+    onAnular: () -> Unit = {},              // ya confirmado por el docente
+    anulando: Boolean = false,              // muestra "Anulando..."
+    edicionGuardada: Boolean = false,       // al volver de Editar: popup "Cambios guardados"
+    onCerrarEdicionGuardada: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val esEvaluacion = publicacion?.tipo == "Evaluación"
@@ -192,6 +206,20 @@ fun CalificarPublicacionScreen(
         if (!guardando && esperandoGuardado) {
             esperandoGuardado = false
             if (alumnos != alumnosAlGuardar) mostrarExito = true
+        }
+    }
+
+    // ANULAR: confirmación (o bloqueo si ya hay entregas) -> "Anulando..." -> "Tarea anulada"
+    var confirmarAnular by remember { mutableStateOf(false) }
+    var bloqueoAnular by remember { mutableStateOf(false) }
+    var esperandoAnulacion by remember { mutableStateOf(false) }
+    var mostrarExitoAnular by remember { mutableStateOf(false) }
+    // Entregas registradas (Entregó o No entregó): con alguna ya no se puede anular
+    val entregasRegistradas = alumnos.count { estadoUi(it.estado) != UI_PENDIENTE }
+    LaunchedEffect(anulando) {
+        if (!anulando && esperandoAnulacion) {
+            esperandoAnulacion = false
+            if (anulada) mostrarExitoAnular = true   // si falló, MainActivity muestra el error
         }
     }
 
@@ -254,6 +282,50 @@ fun CalificarPublicacionScreen(
 
     if (guardando) PopupProcesandoEdu(titulo = "Guardando entregas...")
 
+    val nombreTipo = if (esEvaluacion) "evaluación" else "tarea"
+    if (confirmarAnular && publicacion != null) {
+        PopupConfirmacionEdu(
+            titulo = "¿Anular la $nombreTipo?",
+            mensaje = "“${publicacion.titulo}” quedará anulada. Los padres la verán tachada en su agenda " +
+                    "y recibirán un aviso. No se puede deshacer.",
+            textoConfirmar = "Anular",
+            colorConfirmar = TipoBotonEdu.ELIMINAR.fondo,
+            icono = Icons.Rounded.Block,
+            onCancelar = { confirmarAnular = false },
+            onConfirmar = {
+                confirmarAnular = false
+                esperandoAnulacion = true
+                onAnular()
+            }
+        )
+    }
+    if (bloqueoAnular) {
+        PopupAlertaEdu(
+            icono = Icons.Rounded.Lock,
+            color = EduAmarillo,
+            titulo = "No se puede anular",
+            mensaje = "Esta tarea ya tiene " +
+                    (if (entregasRegistradas == 1) "1 entrega registrada" else "$entregasRegistradas entregas registradas") +
+                    ". Para no perder el seguimiento solo puedes editarla.",
+            onCerrar = { bloqueoAnular = false }
+        )
+    }
+    if (anulando) PopupProcesandoEdu(titulo = "Anulando la $nombreTipo...")
+    if (mostrarExitoAnular) {
+        PopupExitoEdu(
+            titulo = if (esEvaluacion) "Evaluación anulada" else "Tarea anulada",
+            mensaje = "Se avisó a los padres. Queda en tu historial como anulada.",
+            onCerrar = { mostrarExitoAnular = false }
+        )
+    }
+    if (edicionGuardada) {
+        PopupExitoEdu(
+            titulo = "Cambios guardados",
+            mensaje = "Se avisó a los padres que la $nombreTipo se actualizó.",
+            onCerrar = onCerrarEdicionGuardada
+        )
+    }
+
     if (mostrarExito) {
         PopupExitoEdu(
             titulo = "Entregas guardadas",
@@ -311,11 +383,34 @@ fun CalificarPublicacionScreen(
                         p = publicacion,
                         esEvaluacion = esEvaluacion,
                         descargandoAdjunto = descargandoAdjunto,
-                        onAbrirAdjunto = onAbrirAdjunto
+                        onAbrirAdjunto = onAbrirAdjunto,
+                        onEditar = onEditar,
+                        onAnular = { if (entregasRegistradas > 0) bloqueoAnular = true else confirmarAnular = true }
                     )
                 }
 
-                if (esEvaluacion) {
+                // ANULADA: aviso y sin acciones
+                if (anulada) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(EduCoralClaro, RoundedCornerShape(16.dp))
+                            .padding(horizontal = 14.dp, vertical = 12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Icon(Icons.Rounded.Block, contentDescription = null, tint = EduCoralOscuro, modifier = Modifier.size(22.dp))
+                        Text(
+                            "Anulaste esta $nombreTipo. Ya no se puede editar" +
+                                    (if (esEvaluacion) "" else " ni registrar entregas") +
+                                    "; los padres la ven como anulada.",
+                            modifier = Modifier.weight(1f),
+                            fontFamily = Nunito, fontWeight = FontWeight.SemiBold, fontSize = 13.5.sp,
+                            lineHeight = 18.sp, color = EduCoralOscuro
+                        )
+                    }
+                }
+
+                if (esEvaluacion && !anulada) {
                     // EVALUACIÓN: solo aviso
                     Row(
                         modifier = Modifier
@@ -332,7 +427,7 @@ fun CalificarPublicacionScreen(
                             lineHeight = 18.sp, color = EduAmarilloOscuro
                         )
                     }
-                } else {
+                } else if (!esEvaluacion) {
                     // TAREA: contadores + lista
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         ContadorEdu(totalEntregados, "Entregaron", TonoEdu.VERDE, Modifier.weight(1f))
@@ -407,8 +502,8 @@ fun CalificarPublicacionScreen(
                 }
             }
 
-            // BOTONES FIJOS (solo tareas)
-            if (!esEvaluacion) {
+            // BOTONES FIJOS (solo tareas no anuladas)
+            if (!esEvaluacion && !anulada) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -446,7 +541,7 @@ fun CalificarPublicacionScreen(
                             texto = if (yaRegistrada) "Editar entregas" else "Registrar entregas",
                             tipo = if (yaRegistrada) TipoBotonEdu.ACTUALIZAR else TipoBotonEdu.GUARDAR,
                             icono = if (yaRegistrada) Icons.Rounded.Edit else Icons.Rounded.FactCheck,
-                            habilitado = alumnos.isNotEmpty() && !anulada,
+                            habilitado = alumnos.isNotEmpty(),
                             onClick = { version++; editando = true }
                         )
                     }
@@ -464,15 +559,18 @@ fun CalificarPublicacionScreen(
     }
 }
 
-// Tarjeta con tipo, estado, título, fecha, descripción/temario y adjunto
+// Tarjeta con tipo, estado, título, fecha, descripción/temario, adjunto y botones Editar / Anular
 @Composable
 private fun TarjetaPublicacion(
     p: DetallePublicacionItem,
     esEvaluacion: Boolean,
     descargandoAdjunto: Boolean,
-    onAbrirAdjunto: () -> Unit
+    onAbrirAdjunto: () -> Unit,
+    onEditar: () -> Unit,
+    onAnular: () -> Unit
 ) {
     val hoy = hoyPub()
+    val anulada = p.estado == "ANULADA"
     TarjetaEdu(relleno = PaddingValues(horizontal = 16.dp, vertical = 14.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             ChipEdu(if (esEvaluacion) "Evaluación" else "Tarea", if (esEvaluacion) TonoEdu.AMARILLO else TonoEdu.AZUL)
@@ -483,7 +581,11 @@ private fun TarjetaPublicacion(
             }
         }
         Spacer(modifier = Modifier.height(8.dp))
-        Text(p.titulo, fontFamily = Nunito, fontWeight = FontWeight.Black, fontSize = 17.sp, color = EduTexto)
+        Text(
+            p.titulo, fontFamily = Nunito, fontWeight = FontWeight.Black, fontSize = 17.sp,
+            color = if (anulada) EduTextoSecundario else EduTexto,
+            textDecoration = if (anulada) TextDecoration.LineThrough else null
+        )
         Text(
             (if (esEvaluacion) "Fecha de la evaluación: " else "Fecha límite: ") +
                     (if (p.fechaEntrega.isNotEmpty()) fechaLargaPub(p.fechaEntrega) else "—"),
@@ -536,6 +638,39 @@ private fun TarjetaPublicacion(
                 }
             }
         }
+        // ACCIONES: Editar (gris azulado) y Anular (granate claro). No aparecen si ya está anulada.
+        if (!anulada) {
+            Spacer(modifier = Modifier.height(12.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                BotonAccionPub(Icons.Rounded.Edit, "Editar", TonoEdu.AZUL, Modifier.weight(1f), onEditar)
+                BotonAccionPub(Icons.Rounded.Block, "Anular", TonoEdu.CORAL, Modifier.weight(1f), onAnular)
+            }
+        }
+    }
+}
+
+// Botón de acción de la tarjeta (fondo claro del tono, ícono y texto del tono)
+@Composable
+private fun BotonAccionPub(
+    icono: androidx.compose.ui.graphics.vector.ImageVector,
+    texto: String,
+    tono: TonoEdu,
+    modifier: Modifier,
+    onClick: () -> Unit
+) {
+    val c = coloresDeTono(tono)
+    Row(
+        modifier = modifier
+            .height(44.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(c.fondo)
+            .clickable(onClick = onClick),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(icono, contentDescription = null, tint = c.texto, modifier = Modifier.size(19.dp))
+        Spacer(modifier = Modifier.width(6.dp))
+        Text(texto, fontFamily = Nunito, fontWeight = FontWeight.Black, fontSize = 14.5.sp, color = c.texto)
     }
 }
 

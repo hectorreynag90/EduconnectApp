@@ -34,6 +34,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -69,7 +70,7 @@ data class PublicacionAgendaItem(
     val cursoNombre: String,
     val docenteNombre: String,
     val fechaEntrega: String,           // "yyyy-MM-dd"
-    val estado: String = "Pendiente",   // Tarea: "Pendiente", "Entregada", "No entregada", "Vencida" | Evaluación: "Pendiente", "Realizado"
+    val estado: String = "Pendiente",   // Tarea: "Pendiente", "Entregada", "No entregada", "Vencida" | Evaluación: "Pendiente", "Realizado" | ambas: "Anulada"
     val archivoAdjunto: String = "",
     // ----- Rediseño 2026 -----
     val publicadoEn: String = ""        // "yyyy-MM-dd" (hora local)
@@ -280,18 +281,25 @@ private fun Pestanas(opciones: List<String>, seleccionada: Int, onElegir: (Int) 
 @Composable
 private fun TarjetaAgenda(p: PublicacionAgendaItem, onClick: () -> Unit) {
     val esEvaluacion = p.tipo == "Evaluación"
+    val anulada = p.estado == "Anulada"
     val dias = diasHastaAgenda(p.fechaEntrega)
     TarjetaEdu(relleno = PaddingValues(horizontal = 14.dp, vertical = 13.dp), onClick = onClick) {
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             IconoCirculoEdu(
                 if (esEvaluacion) Icons.Rounded.Event else Icons.Rounded.Assignment,
-                if (esEvaluacion) TonoEdu.AZUL else TonoEdu.AMARILLO, tamano = 42.dp
+                when {
+                    anulada -> TonoEdu.GRIS
+                    esEvaluacion -> TonoEdu.AZUL
+                    else -> TonoEdu.AMARILLO
+                }, tamano = 42.dp
             )
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         p.titulo, modifier = Modifier.weight(1f), fontFamily = Nunito, fontWeight = FontWeight.Black,
-                        fontSize = 15.5.sp, color = EduTexto, maxLines = 1, overflow = TextOverflow.Ellipsis
+                        fontSize = 15.5.sp, color = if (anulada) EduTextoSecundario else EduTexto,
+                        textDecoration = if (anulada) TextDecoration.LineThrough else null,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis
                     )
                     Icon(
                         Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = null,
@@ -334,6 +342,7 @@ internal fun ChipEstadoAgenda(estado: String, esEvaluacion: Boolean, dias: Long?
         "Entregada" -> ChipEdu("Entregó", TonoEdu.VERDE)
         "No entregada" -> ChipEdu("No entregó", TonoEdu.CORAL)
         "Realizado" -> ChipEdu("Realizada", TonoEdu.GRIS)
+        "Anulada" -> ChipEdu("Anulada", TonoEdu.GRIS)
         else -> ChipEdu("Vencida", TonoEdu.GRIS)
     }
 }

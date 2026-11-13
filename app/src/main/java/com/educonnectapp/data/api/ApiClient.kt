@@ -252,6 +252,10 @@ interface EduConnectApi {
     @GET("api/docente/comunicados/{id}")
     suspend fun detalleComunicadoDocente(@Path("id") id: Long): DetalleComunicadoDocenteResponse
 
+    // Recordatorio solo a los padres que aún no lo leen (409 = todos ya lo leyeron)
+    @POST("api/docente/comunicados/{id}/reenviar")
+    suspend fun reenviarComunicado(@Path("id") id: Long): ReenvioComunicadoResponse
+
     // Comunicados padre
     @GET("api/padre/hijos/{alumnoId}/comunicados")
     suspend fun comunicadosHijo(@Path("alumnoId") alumnoId: Long): ComunicadosHijoResponse
@@ -279,6 +283,20 @@ interface EduConnectApi {
 
     @GET("api/docente/publicaciones/{id}")
     suspend fun detallePublicacionDocente(@Path("id") id: Long): DetallePublicacionDocenteResponse
+
+    // Editar título, descripción y fecha (el backend avisa a los padres)
+    @PUT("api/docente/publicaciones/{id}")
+    suspend fun editarPublicacion(
+        @Path("id") id: Long,
+        @Body body: EditarPublicacionRequest
+    ): DetallePublicacionDocenteResponse
+
+    // Anular (o cerrar). Anular: 409 si ya tiene entregas registradas
+    @PUT("api/docente/publicaciones/{id}/estado")
+    suspend fun cambiarEstadoPublicacion(
+        @Path("id") id: Long,
+        @Body body: CambiarEstadoPublicacionRequest
+    ): PublicacionDocenteResponse
 
     @PUT("api/docente/publicaciones/{id}/calificaciones")
     suspend fun registrarCalificaciones(
@@ -1028,6 +1046,14 @@ suspend fun enviarComunicado(
 suspend fun obtenerDetalleComunicadoDocente(id: Long): DetalleComunicadoDocenteResponse =
     llamar { api.detalleComunicadoDocente(id) }
 
+@Serializable
+data class ReenvioComunicadoResponse(val comunicadoId: Long, val totalNotificados: Int = 0)
+
+// Reenvía el comunicado como recordatorio a los padres que aún no lo leen.
+// Devuelve cuántos padres recibieron el recordatorio.
+suspend fun reenviarComunicado(comunicadoId: Long): Int =
+    llamar { api.reenviarComunicado(comunicadoId) }.totalNotificados
+
 // =====================================================================
 // COMUNICADOS PADRE
 // =====================================================================
@@ -1189,6 +1215,35 @@ suspend fun crearPublicacion(
         )
     )
 }
+
+// =====================================================================
+// EDITAR Y ANULAR (docente). La clase, el tipo y el adjunto no se cambian.
+// editar: 400 = datos no válidos o publicación anulada
+// anular: 409 = ya tiene entregas registradas (mensaje del backend)
+// =====================================================================
+
+@Serializable
+data class EditarPublicacionRequest(
+    val titulo: String,
+    val descripcion: String,
+    val fechaEntrega: String? = null       // "yyyy-MM-dd"
+)
+
+// estado: "ACTIVA" | "CERRADA" | "ANULADA"
+@Serializable
+data class CambiarEstadoPublicacionRequest(val estado: String)
+
+suspend fun editarPublicacion(
+    publicacionId: Long, titulo: String, descripcion: String, fechaEntrega: String?
+): DetallePublicacionDocenteResponse = llamar {
+    api.editarPublicacion(
+        publicacionId,
+        EditarPublicacionRequest(titulo.trim(), descripcion.trim(), fechaEntrega?.ifBlank { null })
+    )
+}
+
+suspend fun anularPublicacion(publicacionId: Long): PublicacionDocenteResponse =
+    llamar { api.cambiarEstadoPublicacion(publicacionId, CambiarEstadoPublicacionRequest("ANULADA")) }
 
 // =====================================================================
 // AGENDA DEL PADRE
