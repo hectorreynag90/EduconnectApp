@@ -24,11 +24,8 @@ import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.Groups
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.Quiz
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -42,6 +39,7 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.educonnectapp.ui.components.HojaInferiorEdu
 import com.educonnectapp.ui.components.IconoCirculoEdu
 import com.educonnectapp.ui.components.TonoEdu
 import com.educonnectapp.ui.screens.docente.comunicados.SeccionDestinatario
@@ -222,8 +220,7 @@ internal fun CampoParaPub(destino: SeccionDestinatario?, onClick: () -> Unit) {
     }
 }
 
-// Hoja inferior para elegir la clase (agrupada por grado)
-@OptIn(ExperimentalMaterial3Api::class)
+// Hoja inferior para elegir la clase (agrupada por grado). No tapa la barra inferior.
 @Composable
 internal fun HojaElegirClasePub(
     clases: List<SeccionDestinatario>,
@@ -231,11 +228,7 @@ internal fun HojaElegirClasePub(
     onElegir: (SeccionDestinatario) -> Unit,
     onCerrar: () -> Unit
 ) {
-    ModalBottomSheet(
-        onDismissRequest = onCerrar,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        containerColor = Color.White
-    ) {
+    HojaInferiorEdu(onCerrar = onCerrar) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -305,15 +298,10 @@ internal fun HojaElegirClasePub(
     }
 }
 
-// Hoja "¿Qué quieres publicar?": Tarea o Aviso de evaluación
-@OptIn(ExperimentalMaterial3Api::class)
+// Hoja "¿Qué quieres publicar?": Tarea o Aviso de evaluación. No tapa la barra inferior.
 @Composable
 internal fun HojaCrearPublicacion(onTarea: () -> Unit, onEvaluacion: () -> Unit, onCerrar: () -> Unit) {
-    ModalBottomSheet(
-        onDismissRequest = onCerrar,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        containerColor = Color.White
-    ) {
+    HojaInferiorEdu(onCerrar = onCerrar) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()

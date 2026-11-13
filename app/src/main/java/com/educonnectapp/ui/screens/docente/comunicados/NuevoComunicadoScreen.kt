@@ -29,11 +29,8 @@ import androidx.compose.material.icons.rounded.Groups
 import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.Notifications
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -57,6 +54,7 @@ import com.educonnectapp.ui.components.CabeceraEdu
 import com.educonnectapp.ui.components.CampoTextoEdu
 import com.educonnectapp.ui.components.ChipEdu
 import com.educonnectapp.ui.components.ColorModulo
+import com.educonnectapp.ui.components.HojaInferiorEdu
 import com.educonnectapp.ui.components.IconoCirculoEdu
 import com.educonnectapp.ui.components.PopupConfirmacionEdu
 import com.educonnectapp.ui.components.PopupProcesandoEdu
@@ -107,7 +105,6 @@ private fun tamanoLegible(bytes: Long?): String = when {
 // "Enviar comunicado" → confirmación → "Enviando..." (mientras MainActivity envía)
 // =====================================================================
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NuevoComunicadoScreen(
     docenteId: String,
@@ -134,7 +131,6 @@ fun NuevoComunicadoScreen(
     var archivoRechazado by remember { mutableStateOf<Pair<String, Long>?>(null) }
     var mostrarClases by remember { mutableStateOf(false) }
     var mostrarConfirmar by remember { mutableStateOf(false) }
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val context = LocalContext.current
 
     // Si la clase inicial llega después (la lista se carga al entrar), se toma
@@ -373,13 +369,9 @@ fun NuevoComunicadoScreen(
         )
     }
 
-    // HOJA INFERIOR: ELEGIR LA CLASE
+    // HOJA INFERIOR: ELEGIR LA CLASE (sube encima de la barra inferior, sin taparla)
     if (mostrarClases) {
-        ModalBottomSheet(
-            onDismissRequest = { mostrarClases = false },
-            sheetState = sheetState,
-            containerColor = Color.White
-        ) {
+        HojaInferiorEdu(onCerrar = { mostrarClases = false }) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
