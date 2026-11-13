@@ -51,9 +51,7 @@ import com.educonnectapp.ui.screens.docente.historial.ResumenHistorialDocente
 import com.educonnectapp.ui.screens.padre.inicio.HomePadreScreen
 import com.educonnectapp.ui.screens.padre.inicio.HijoInicioItem
 import com.educonnectapp.ui.screens.padre.inicio.AsistenciaHoyItem
-import com.educonnectapp.ui.screens.padre.inicio.NovedadPadreItem
 import com.educonnectapp.ui.screens.padre.inicio.ResumenInicioHijo
-import com.educonnectapp.ui.screens.padre.inicio.TipoNovedad
 import com.educonnectapp.ui.screens.acceso.LoginScreen
 import com.educonnectapp.ui.screens.docente.comunicados.NuevoComunicadoScreen
 import com.educonnectapp.ui.screens.docente.perfil.PerfilDocenteScreen
@@ -290,12 +288,10 @@ private fun PublicacionPadreResponse.aPublicacionAgendaItem(hoy: String): Public
 }
 
 // =====================================================================
-// INICIO DEL PADRE · reglas de NOVEDADES (rediseño 2026)
-//  - Comunicados: los sin leer (siempre) y los leídos de los últimos 7 días
-//  - Tareas pendientes: hasta su fecha límite
-//  - Tareas con resultado (Entregó / No entregó): hasta 7 días después de la fecha límite
-//  - Evaluaciones: desde 14 días antes hasta el mismo día
-// Orden: sin leer y tareas que vencen hoy o mañana -> próximas -> leídos y resueltas
+// INICIO DEL PADRE (rediseño 2026 · versión simple): resumen del hijo elegido
+//  - Asistencia: % del mes (Presente y Tardanza cuentan) y la asistencia de hoy por curso
+//  - Comunicados: sin leer y total recibidos
+//  - Agenda: tareas pendientes (hasta su fecha límite) y la próxima fecha (tarea o evaluación)
 // =====================================================================
 private fun armarResumenInicioPadre(
     asistenciasMes: List<AsistenciaHijoResponse>,
@@ -304,9 +300,6 @@ private fun armarResumenInicioPadre(
     hoy: java.time.LocalDate
 ): ResumenInicioHijo {
     val hoyTexto = hoy.toString()
-    val mananaTexto = hoy.plusDays(1).toString()
-    val hace7 = hoy.minusDays(7).toString()
-    val en14 = hoy.plusDays(14).toString()
 
     // Asistencia de hoy (A, T o F por curso)
     val asistenciaHoy = asistenciasMes
@@ -314,56 +307,28 @@ private fun armarResumenInicioPadre(
         .sortedBy { it.hora }
         .map { AsistenciaHoyItem(it.curso, horaAsistencia(it.hora), it.estado, it.docente) }
 
-    // Comunicados
-    val coms = comunicados
-        .filter { !it.leido || fechaLocal(it.enviadoEn) >= hace7 }
-        .sortedByDescending { aFechaHoraLocal(it.enviadoEn) }
-        .map { c ->
-            NovedadPadreItem(
-                id = c.id, tipo = TipoNovedad.COMUNICADO, titulo = c.asunto, detalle = c.mensaje,
-                curso = c.curso ?: "General", docente = c.docente, fecha = isoLocalSinZona(c.enviadoEn) ?: "",
-                leido = c.leido, adjunto = c.archivo?.nombre ?: ""
-            )
-        }
-
-    // Tareas (solo las vigentes; las anuladas ya se quitaron al cargar la agenda)
-    val tareas = agenda.filter { it.tipo == "TAREA" }.mapNotNull { p ->
+    // Tareas pendientes: sin entrega registrada y con fecha de hoy en adelante (o sin fecha)
+    val tareasPendientes = agenda.filter { p ->
         val fecha = p.fechaEntrega?.take(10).orEmpty()
-        val estado = when (p.calificacionHijo?.estado) {
-            "ENTREGADO", "CALIFICADO" -> "Entregada"
-            "NO_ENTREGADO" -> "No entregada"
-            else -> "Pendiente"
-        }
-        val entra = if (estado == "Pendiente") fecha.isEmpty() || fecha >= hoyTexto
-        else fecha.ifEmpty { fechaLocal(p.publicadoEn) } >= hace7
-        if (!entra) null
-        else NovedadPadreItem(
-            id = p.id, tipo = TipoNovedad.TAREA, titulo = p.titulo, curso = p.curso,
-            docente = p.docente, fecha = fecha, estado = estado
-        )
+        p.tipo == "TAREA" &&
+                (p.calificacionHijo?.estado ?: "") !in listOf("ENTREGADO", "CALIFICADO", "NO_ENTREGADO") &&
+                (fecha.isEmpty() || fecha >= hoyTexto)
     }
-
-    // Evaluaciones de los próximos 14 días
-    val evaluaciones = agenda.filter { it.tipo == "EVALUACION" }.mapNotNull { p ->
+    // Evaluaciones próximas (de hoy en adelante)
+    val evaluacionesProximas = agenda.filter { p ->
         val fecha = p.fechaEntrega?.take(10).orEmpty()
-        if (fecha.isEmpty() || fecha < hoyTexto || fecha > en14) null
-        else NovedadPadreItem(
-            id = p.id, tipo = TipoNovedad.EVALUACION, titulo = p.titulo, curso = p.curso,
-            docente = p.docente, fecha = fecha
-        )
+        p.tipo == "EVALUACION" && fecha.isNotEmpty() && fecha >= hoyTexto
     }
-
-    val pendientes = tareas.filter { it.estado == "Pendiente" }
-    val urgentes = pendientes.filter { it.fecha.isNotEmpty() && it.fecha <= mananaTexto }.sortedBy { it.fecha }
-    val proximas = (pendientes.filter { it !in urgentes } + evaluaciones).sortedBy { it.fecha.ifEmpty { "9999-12-31" } }
-    val resueltas = tareas.filter { it.estado != "Pendiente" }.sortedByDescending { it.fecha }
 
     return ResumenInicioHijo(
         porcentajeMes = if (asistenciasMes.isEmpty()) null else porcentajeAsistencia(asistenciasMes.map { it.estado }),
         sinLeer = comunicados.count { !it.leido },
-        pendientes = pendientes.size,
-        asistenciaHoy = asistenciaHoy,
-        novedades = coms.filter { !it.leido } + urgentes + proximas + coms.filter { it.leido } + resueltas
+        comunicadosTotal = comunicados.size,
+        pendientes = tareasPendientes.size,
+        proximaFecha = (tareasPendientes + evaluacionesProximas)
+            .mapNotNull { it.fechaEntrega?.take(10)?.takeIf { f -> f.isNotEmpty() } }
+            .minOrNull() ?: "",
+        asistenciaHoy = asistenciaHoy
     )
 }
 
@@ -1562,10 +1527,6 @@ fun EduConnectApp() {
                         hijoSeleccionadoId = hijoId,
                         resumen = resumenInicio,
                         onElegirHijo = { hijoInicioSelId = it },
-                        onAbrirNovedad = { novedad ->
-                            if (novedad.tipo == TipoNovedad.COMUNICADO) abrirComunicadoDeNotificacion(novedad.id, Screen.HOME_PADRE)
-                            else abrirPublicacionDeNotificacion(novedad.id, Screen.HOME_PADRE)
-                        },
                         onAsociarHijo = {
                             origenAsociarHijo = Screen.HOME_PADRE
                             currentScreen = Screen.ASOCIAR_HIJO
@@ -1773,6 +1734,7 @@ fun EduConnectApp() {
                         } catch (e: Exception) { aviso("Error cargando estudiantes: ${e.message}") }
                     }
                     SeleccionarEstudianteScreen(
+                        tieneNotificaciones = notificacionesNoLeidasSel > 0,
                         padreId = usuarioLogueado?.id?.toString() ?: "",
                         padreNombre = usuarioLogueado?.nombrecompleto ?: "",
                         listaHijos = listaHijosSel,
@@ -1833,6 +1795,7 @@ fun EduConnectApp() {
                     }
 
                     HistorialAsistenciasScreen(
+                        tieneNotificaciones = notificacionesNoLeidasSel > 0,
                         alumnoId = alumnoIdSel,
                         alumnoNombre = alumnoNombreSel,
                         todasAsistencias = todasAsistenciasSel,
@@ -2067,6 +2030,8 @@ fun EduConnectApp() {
                         } catch (e: Exception) { aviso("Error cargando hijos: ${e.message}") }
                     }
                     PerfilPadreScreen(
+                        onNotificaciones = { abrirNotificaciones() },
+                        tieneNotificaciones = notificacionesNoLeidasSel > 0,
                         usuarioNombre = usuarioLogueado?.nombrecompleto ?: "",
                         dni = usuarioLogueado?.dni ?: "",
                         telefono = usuarioLogueado?.telefono ?: "",
@@ -2264,6 +2229,7 @@ fun EduConnectApp() {
                 )
 
                 Screen.ASOCIAR_HIJO -> AsociarHijoScreen(
+                    tieneNotificaciones = notificacionesNoLeidasSel > 0,
                     onBack = { currentScreen = Screen.PERFIL_PADRE },
                     onHomeDocente = { currentScreen = Screen.HOME_PADRE },   // pantalla del padre
                     onAvisos = { irAvisosPadre() },
@@ -2472,6 +2438,7 @@ fun EduConnectApp() {
                 }
 
                 Screen.MIS_HIJOS -> MisHijosScreen(
+                    tieneNotificaciones = notificacionesNoLeidasSel > 0,
                     hijos = hijosAsociadosSel,
                     onBack = { currentScreen = Screen.PERFIL_PADRE },
                     onNotificaciones = { abrirNotificaciones() },
@@ -2949,6 +2916,7 @@ fun EduConnectApp() {
                         } catch (e: Exception) { aviso("Error cargando agenda: ${e.message}") }
                     }
                     SeleccionarHijoAgendaScreen(
+                        tieneNotificaciones = notificacionesNoLeidasSel > 0,
                         hijos = hijosAgendaSel,
                         cargando = !agendaCargada,
                         onAsociarHijo = {
@@ -2977,6 +2945,7 @@ fun EduConnectApp() {
                             .map { it.aPublicacionAgendaItem(hoy) }
                     }
                     AgendaEscolarScreen(
+                        tieneNotificaciones = notificacionesNoLeidasSel > 0,
                         nombreHijo = hijoAgendaSel?.nombres ?: "",
                         apellidosHijo = hijoAgendaSel?.apellidos ?: "",
                         gradoNombre = hijoAgendaSel?.gradoNombre ?: "",
@@ -3009,6 +2978,7 @@ fun EduConnectApp() {
                     }
                     val adjunto = publicacionAgendaSel?.let { adjuntosPublicacionSel[it.id] }
                     DetalleAgendaScreen(
+                        tieneNotificaciones = notificacionesNoLeidasSel > 0,
                         nombreHijo = hijoAgendaSel?.nombres ?: "",
                         apellidosHijo = hijoAgendaSel?.apellidos ?: "",
                         gradoNombre = hijoAgendaSel?.gradoNombre ?: "",
@@ -3040,6 +3010,7 @@ fun EduConnectApp() {
                         } catch (e: Exception) { aviso("Error cargando comunicados: ${e.message}") }
                     }
                     SeleccionarEstudianteComunicadoScreen(
+                        tieneNotificaciones = notificacionesNoLeidasSel > 0,
                         hijos = hijosComunicadoSel,
                         cargando = !comunicadosPadreCargados,
                         onBack = { currentScreen = Screen.HOME_PADRE },
@@ -3076,6 +3047,7 @@ fun EduConnectApp() {
                         } catch (e: Exception) { aviso("Error: ${e.message}") }
                     }
                     ComunicadosRecibidosScreen(
+                        tieneNotificaciones = notificacionesNoLeidasSel > 0,
                         nombreHijo = hijoComunicadoSel?.nombres ?: "",
                         apellidosHijo = hijoComunicadoSel?.apellidos ?: "",
                         gradoNombre = hijoComunicadoSel?.gradoNombre ?: "",
@@ -3122,6 +3094,7 @@ fun EduConnectApp() {
                     }
                     val adjunto = comunicadoPadreSel?.let { adjuntosComunicadoSel[it.id] }
                     DetalleComunicadoPadreScreen(
+                        tieneNotificaciones = notificacionesNoLeidasSel > 0,
                         comunicado = comunicadoPadreSel,
                         nombreHijo = hijoComunicadoSel?.let { "${it.nombres} ${it.apellidos}".trim() } ?: "",
                         nombreAdjunto = adjunto?.nombre,

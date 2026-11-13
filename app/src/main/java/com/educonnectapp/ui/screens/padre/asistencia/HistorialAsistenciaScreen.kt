@@ -35,11 +35,8 @@ import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.School
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -62,6 +59,7 @@ import com.educonnectapp.ui.components.CabeceraEdu
 import com.educonnectapp.ui.components.ChipCabeceraEdu
 import com.educonnectapp.ui.components.ChipEdu
 import com.educonnectapp.ui.components.ColorModulo
+import com.educonnectapp.ui.components.HojaInferiorEdu
 import com.educonnectapp.ui.components.IconoCirculoEdu
 import com.educonnectapp.ui.components.TarjetaEdu
 import com.educonnectapp.ui.components.TituloSeccionEdu
@@ -125,10 +123,9 @@ private fun porcentaje(lista: List<AsistenciaItem>): Int =
 // =====================================================================
 // ASISTENCIA DEL PADRE · HISTORIAL DE UN HIJO (rediseño 2026)
 // Cabecera fija azul oscuro · pestañas "Calendario" y "Por curso" · resumen del mes ·
-// calendario de lunes a viernes con un punto por clase · detalle en hoja inferior
+// calendario de lunes a viernes con un punto por clase · detalle en hoja inferior (HojaInferiorEdu)
 // =====================================================================
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HistorialAsistenciasScreen(
     alumnoId: Long,
@@ -141,6 +138,7 @@ fun HistorialAsistenciasScreen(
     onAgenda: () -> Unit = {},
     onPerfil: () -> Unit = {},
     onNotificaciones: () -> Unit = {},
+    tieneNotificaciones: Boolean = false,      // punto rojo en la campana (notificaciones sin leer)
     onVerDetalle: (asistenciaId: Long, fecha: String) -> Unit = { _, _ -> },   // ya no se usa: el detalle es una hoja
     // ----- Rediseño 2026 -----
     gradoSeccion: String = "",          // "2do Grado A"
@@ -185,6 +183,7 @@ fun HistorialAsistenciasScreen(
                     icono = Icons.Rounded.Notifications,
                     descripcion = "Notificaciones",
                     onClick = onNotificaciones,
+                    conPunto = tieneNotificaciones,
                     colorCabecera = ColorModulo.Asistencia
                 )
             },
@@ -318,15 +317,9 @@ fun HistorialAsistenciasScreen(
         )
     }
 
-    // ===================== DETALLE (HOJA INFERIOR) =====================
+    // ===================== DETALLE (HOJA INFERIOR, sobre la barra sin taparla) =====================
     detalle?.let { a ->
-        val estadoHoja = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-        ModalBottomSheet(
-            onDismissRequest = { detalle = null },
-            sheetState = estadoHoja,
-            containerColor = Color.White,
-            shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp)
-        ) {
+        HojaInferiorEdu(onCerrar = { detalle = null }) {
             HojaDetalle(a, gradoSeccion, alumnoNombre) { detalle = null }
         }
     }

@@ -79,6 +79,7 @@ fun MisHijosScreen(
     hijos: List<HijoAsociado> = emptyList(),
     onBack: () -> Unit = {},
     onNotificaciones: () -> Unit = {},
+    tieneNotificaciones: Boolean = false,      // punto rojo en la campana (notificaciones sin leer)
     onHomePadre: () -> Unit = {},
     onAvisos: () -> Unit = {},
     onAgenda: () -> Unit = {},
@@ -110,6 +111,7 @@ fun MisHijosScreen(
                     icono = Icons.Rounded.Notifications,
                     descripcion = "Notificaciones",
                     onClick = onNotificaciones,
+                    conPunto = tieneNotificaciones,
                     colorCabecera = ColorModulo.Perfil
                 )
             },

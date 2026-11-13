@@ -122,6 +122,7 @@ fun AgendaEscolarScreen(
     onAgenda: () -> Unit = {},
     onPerfil: () -> Unit = {},
     onNotificaciones: () -> Unit = {},
+    tieneNotificaciones: Boolean = false,      // punto rojo en la campana (notificaciones sin leer)
     onVerDetalle: (PublicacionAgendaItem) -> Unit = {},
     // ----- Rediseño 2026 -----
     apellidosHijo: String = ""
@@ -158,6 +159,7 @@ fun AgendaEscolarScreen(
                     icono = Icons.Rounded.Notifications,
                     descripcion = "Notificaciones",
                     onClick = onNotificaciones,
+                    conPunto = tieneNotificaciones,
                     colorCabecera = ColorModulo.Publicaciones
                 )
             },

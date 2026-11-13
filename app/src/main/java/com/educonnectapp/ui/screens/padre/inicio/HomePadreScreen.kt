@@ -7,9 +7,11 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -21,11 +23,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.Assignment
-import androidx.compose.material.icons.rounded.AttachFile
 import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.Campaign
-import androidx.compose.material.icons.rounded.Event
 import androidx.compose.material.icons.rounded.FactCheck
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Info
@@ -33,9 +34,7 @@ import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PersonAdd
 import androidx.compose.material.icons.rounded.Schedule
-import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.Warning
-import androidx.compose.material.icons.rounded.WbSunny
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -70,7 +69,6 @@ import com.educonnectapp.ui.screens.docente.inicio.AvatarUsuario
 import com.educonnectapp.ui.theme.EduAmarillo
 import com.educonnectapp.ui.theme.EduAzulOscuro
 import com.educonnectapp.ui.theme.EduAzulOscuroClaro
-import com.educonnectapp.ui.theme.EduBorde
 import com.educonnectapp.ui.theme.EduConnectAppTheme
 import com.educonnectapp.ui.theme.EduCoral
 import com.educonnectapp.ui.theme.EduCoralClaro
@@ -83,17 +81,15 @@ import com.educonnectapp.ui.theme.EduTexto
 import com.educonnectapp.ui.theme.EduTextoSecundario
 import com.educonnectapp.ui.theme.Nunito
 import java.time.LocalDate
-import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
-import java.time.temporal.ChronoUnit
 import java.util.Locale
 
 // =====================================================================
-// INICIO DEL PADRE · "muro de novedades" (rediseño 2026)
+// INICIO DEL PADRE (rediseño 2026 · versión simple)
 // Cabecera turquesa fija (saludo, campana, fecha y selector de hijo) ·
-// 3 accesos (Asistencia, Comunicados, Agenda) · HOY (asistencia del día) · NOVEDADES
-// Los datos y las reglas de qué entra en NOVEDADES los arma MainActivity.
+// HOY (asistencia del día del hijo elegido) · 3 accesos grandes (Asistencia, Comunicados, Agenda)
+// Los datos del hijo elegido los arma MainActivity.
 // =====================================================================
 
 // Hijo en el selector de la cabecera
@@ -112,29 +108,14 @@ data class AsistenciaHoyItem(
     val docente: String = ""
 )
 
-enum class TipoNovedad { COMUNICADO, TAREA, EVALUACION }
-
-// Una tarjeta de NOVEDADES
-data class NovedadPadreItem(
-    val id: Long,
-    val tipo: TipoNovedad,
-    val titulo: String,
-    val detalle: String = "",       // mensaje del comunicado
-    val curso: String = "",
-    val docente: String = "",
-    val fecha: String = "",         // comunicado: "yyyy-MM-ddTHH:mm:ss" (envío) · tarea/evaluación: "yyyy-MM-dd"
-    val estado: String = "",        // tarea: "Pendiente" | "Entregada" | "No entregada"
-    val leido: Boolean = true,      // comunicado
-    val adjunto: String = ""        // nombre del archivo adjunto
-)
-
 // Todo lo que se muestra del hijo elegido
 data class ResumenInicioHijo(
     val porcentajeMes: Int? = null,     // null = sin registros en el mes
     val sinLeer: Int = 0,
+    val comunicadosTotal: Int = 0,      // comunicados recibidos
     val pendientes: Int = 0,            // tareas por entregar (no vencidas)
-    val asistenciaHoy: List<AsistenciaHoyItem> = emptyList(),
-    val novedades: List<NovedadPadreItem> = emptyList()
+    val proximaFecha: String = "",      // "yyyy-MM-dd" de la próxima tarea o evaluación ("" = ninguna)
+    val asistenciaHoy: List<AsistenciaHoyItem> = emptyList()
 )
 
 private val LOCALE_PE = Locale("es", "PE")
@@ -156,7 +137,6 @@ fun HomePadreScreen(
     hijoSeleccionadoId: Long? = null,
     resumen: ResumenInicioHijo? = null,           // null = cargando los datos del hijo
     onElegirHijo: (Long) -> Unit = {},
-    onAbrirNovedad: (NovedadPadreItem) -> Unit = {},
     onAsociarHijo: () -> Unit = {}
 ) {
     val saludo = remember {
@@ -277,62 +257,13 @@ fun HomePadreScreen(
                 else -> {
                     val nombreHijo = hijoSel?.nombres?.trim()?.split(" ")?.firstOrNull().orEmpty()
 
-                    // ---------- ACCESOS ----------
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        val pct = resumen?.porcentajeMes
-                        TarjetaAcceso(
-                            icono = Icons.Rounded.FactCheck, tono = TonoEdu.AZUL, titulo = "Asistencia",
-                            dato = when {
-                                resumen == null -> "…"
-                                pct == null -> "Sin registros"
-                                else -> "$pct% mes"
-                            },
-                            tonoDato = when {
-                                pct == null -> TonoEdu.GRIS
-                                pct >= 90 -> TonoEdu.VERDE
-                                pct >= 75 -> TonoEdu.AMARILLO
-                                else -> TonoEdu.CORAL
-                            },
-                            modifier = Modifier.weight(1f),
-                            onClick = onAsistencias
-                        )
-                        val sinLeer = resumen?.sinLeer ?: 0
-                        TarjetaAcceso(
-                            icono = Icons.Rounded.Campaign, tono = TonoEdu.CORAL, titulo = "Comunicados",
-                            dato = when {
-                                resumen == null -> "…"
-                                sinLeer > 0 -> "$sinLeer sin leer"
-                                else -> "Al día"
-                            },
-                            tonoDato = if (sinLeer > 0) TonoEdu.CORAL else TonoEdu.VERDE,
-                            datoSolido = sinLeer > 0,
-                            modifier = Modifier.weight(1f),
-                            onClick = onComunicados
-                        )
-                        val pendientes = resumen?.pendientes ?: 0
-                        TarjetaAcceso(
-                            icono = Icons.Rounded.Assignment, tono = TonoEdu.AMARILLO, titulo = "Agenda",
-                            dato = when {
-                                resumen == null -> "…"
-                                pendientes == 1 -> "1 pendiente"
-                                pendientes > 1 -> "$pendientes pendientes"
-                                else -> "Al día"
-                            },
-                            tonoDato = if (pendientes > 0) TonoEdu.AMARILLO else TonoEdu.VERDE,
-                            modifier = Modifier.weight(1f),
-                            onClick = onAgenda
-                        )
-                    }
-
+                    // ---------- HOY ----------
+                    TituloSeccionEdu("Hoy")
                     if (resumen == null) {
-                        TarjetaCargando("Cargando las novedades de $nombreHijo…")
+                        TarjetaCargando("Cargando la información de $nombreHijo…")
                     } else {
-                        // ---------- AVISO DE FALTA ----------
                         val faltas = resumen.asistenciaHoy.filter { it.estado == "F" }
                         if (faltas.isNotEmpty()) AvisoFalta(nombreHijo, faltas)
-
-                        // ---------- HOY ----------
-                        TituloSeccionEdu("Hoy")
                         if (resumen.asistenciaHoy.isEmpty()) {
                             TarjetaEdu(relleno = PaddingValues(horizontal = 15.dp, vertical = 13.dp)) {
                                 Row(
@@ -346,7 +277,7 @@ fun HomePadreScreen(
                                             fontSize = 15.sp, color = EduTexto
                                         )
                                         Text(
-                                            "Verás aquí la asistencia cuando el docente la tome",
+                                            "Verás aquí la asistencia de $nombreHijo cuando el docente la tome",
                                             fontFamily = Nunito, fontWeight = FontWeight.Bold, fontSize = 12.5.sp,
                                             color = EduTextoSecundario
                                         )
@@ -356,45 +287,66 @@ fun HomePadreScreen(
                         } else {
                             TarjetaAsistenciaHoy(resumen.asistenciaHoy)
                         }
+                    }
 
-                        // ---------- NOVEDADES ----------
-                        TituloSeccionEdu("Novedades")
-                        if (resumen.novedades.isEmpty()) {
-                            TarjetaEdu(relleno = PaddingValues(horizontal = 16.dp, vertical = 18.dp)) {
-                                Column(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    IconoCirculoEdu(Icons.Rounded.WbSunny, TonoEdu.VERDE, tamano = 64.dp)
-                                    Text(
-                                        "Todo al día", fontFamily = Nunito, fontWeight = FontWeight.Black,
-                                        fontSize = 17.sp, color = EduTexto
-                                    )
-                                    Text(
-                                        "No hay comunicados nuevos ni tareas pendientes de $nombreHijo. " +
-                                                "Te avisaremos cuando llegue algo.",
-                                        fontFamily = Nunito, fontWeight = FontWeight.SemiBold, fontSize = 13.5.sp,
-                                        lineHeight = 19.sp, color = EduTextoSecundario, textAlign = TextAlign.Center
-                                    )
-                                }
-                            }
-                        } else {
-                            resumen.novedades.forEach { n ->
-                                when (n.tipo) {
-                                    TipoNovedad.COMUNICADO -> TarjetaComunicado(n) { onAbrirNovedad(n) }
-                                    TipoNovedad.TAREA -> TarjetaTarea(n) { onAbrirNovedad(n) }
-                                    TipoNovedad.EVALUACION -> TarjetaEvaluacion(n) { onAbrirNovedad(n) }
-                                }
-                            }
-                            Text(
-                                "Estás al día con las novedades de $nombreHijo",
-                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                                fontFamily = Nunito, fontWeight = FontWeight.ExtraBold, fontSize = 13.sp,
-                                color = EduTextoSecundario, textAlign = TextAlign.Center
-                            )
+                    // ---------- ACCESOS ----------
+                    TituloSeccionEdu("¿Qué deseas ver?", modifier = Modifier.padding(top = 4.dp))
+                    val pct = resumen?.porcentajeMes
+                    val estadoHoy = resumen?.asistenciaHoy?.map { it.estado }.orEmpty().let { e ->
+                        when {
+                            "F" in e -> "Hoy: Falta"
+                            "T" in e -> "Hoy: Tardanza"
+                            e.isNotEmpty() -> "Hoy: Presente"
+                            else -> "Hoy: sin registros"
                         }
                     }
+                    val sinLeer = resumen?.sinLeer ?: 0
+                    val total = resumen?.comunicadosTotal ?: 0
+                    val pendientes = resumen?.pendientes ?: 0
+                    Row(
+                        modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        TarjetaModuloPadre(
+                            icono = Icons.Rounded.FactCheck, color = EduAzulOscuro, titulo = "Asistencia",
+                            linea1 = when {
+                                resumen == null -> "Cargando…"
+                                pct == null -> "Sin registros este mes"
+                                else -> "$pct % este mes"
+                            },
+                            linea2 = if (resumen == null) "" else estadoHoy,
+                            onClick = onAsistencias, modifier = Modifier.weight(1f)
+                        )
+                        TarjetaModuloPadre(
+                            icono = Icons.Rounded.Campaign, color = EduCoral, titulo = "Comunicados",
+                            linea1 = when {
+                                resumen == null -> "Cargando…"
+                                sinLeer == 1 -> "1 sin leer"
+                                sinLeer > 1 -> "$sinLeer sin leer"
+                                else -> "Al día"
+                            },
+                            linea2 = when {
+                                resumen == null -> ""
+                                total == 1 -> "1 recibido"
+                                else -> "$total recibidos"
+                            },
+                            alerta = sinLeer > 0,
+                            onClick = onComunicados, modifier = Modifier.weight(1f)
+                        )
+                    }
+                    TarjetaModuloPadre(
+                        icono = Icons.Rounded.Assignment, color = EduAmarillo, titulo = "Agenda",
+                        linea1 = when {
+                            resumen == null -> "Cargando…"
+                            pendientes == 0 -> "Sin tareas pendientes"
+                            pendientes == 1 -> "1 tarea pendiente"
+                            else -> "$pendientes tareas pendientes"
+                        },
+                        linea2 = resumen?.proximaFecha?.takeIf { it.isNotBlank() }
+                            ?.let { "Próximo: ${fechaCortaDia(it)}" } ?: "Tareas y evaluaciones",
+                        horizontal = true,
+                        onClick = onAgenda, modifier = Modifier.fillMaxWidth()
+                    )
                 }
             }
         }
@@ -465,49 +417,79 @@ private fun ChipHijo(hijo: HijoInicioItem, seleccionado: Boolean, onClick: () ->
     }
 }
 
-// Acceso a un módulo: ícono, nombre y un dato rápido
+// Acceso grande a un módulo: ícono en cuadro de color, nombre y un dato rápido (2 líneas).
+// horizontal = true: ícono a la izquierda (tarjeta de ancho completo). alerta = dato en granate.
 @Composable
-private fun TarjetaAcceso(
+private fun TarjetaModuloPadre(
     icono: ImageVector,
-    tono: TonoEdu,
+    color: Color,
     titulo: String,
-    dato: String,
-    tonoDato: TonoEdu,
+    linea1: String,
+    linea2: String,
+    onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    datoSolido: Boolean = false,
-    onClick: () -> Unit
+    alerta: Boolean = false,
+    horizontal: Boolean = false
 ) {
-    TarjetaEdu(modifier = modifier, relleno = PaddingValues(horizontal = 6.dp, vertical = 12.dp), onClick = onClick) {
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+    val cuadro: @Composable () -> Unit = {
+        Box(
+            modifier = Modifier.size(58.dp).background(color, RoundedCornerShape(18.dp)),
+            contentAlignment = Alignment.Center
         ) {
-            IconoCirculoEdu(icono, tono, tamano = 42.dp)
+            Icon(
+                icono, contentDescription = null,
+                tint = if (color == EduAmarillo) EduTexto else Color.White,
+                modifier = Modifier.size(30.dp)
+            )
+        }
+    }
+    val textos: @Composable () -> Unit = {
+        Column {
             Text(
-                titulo, fontFamily = Nunito, fontWeight = FontWeight.Black, fontSize = 14.sp,
+                titulo, fontFamily = Nunito, fontWeight = FontWeight.Black, fontSize = 18.sp,
                 color = EduTexto, maxLines = 1, overflow = TextOverflow.Ellipsis
             )
-            EtiquetaPequena(dato, tonoDato, solido = datoSolido)
+            Text(
+                linea1, fontFamily = Nunito, fontWeight = if (alerta) FontWeight.Black else FontWeight.Bold,
+                fontSize = 13.5.sp, color = if (alerta) EduCoralOscuro else EduTextoSecundario
+            )
+            if (linea2.isNotBlank()) {
+                Text(linea2, fontFamily = Nunito, fontWeight = FontWeight.Bold, fontSize = 13.5.sp, color = EduTextoSecundario)
+            }
+        }
+    }
+    TarjetaEdu(
+        modifier = modifier.fillMaxHeight(),
+        relleno = PaddingValues(horizontal = 16.dp, vertical = if (horizontal) 16.dp else 18.dp),
+        onClick = onClick
+    ) {
+        if (horizontal) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                cuadro()
+                Box(modifier = Modifier.weight(1f)) { textos() }
+                Icon(
+                    Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = null,
+                    tint = EduTextoSecundario, modifier = Modifier.size(24.dp)
+                )
+            }
+        } else {
+            Box(modifier = Modifier.fillMaxWidth()) {
+                cuadro()
+                Icon(
+                    Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = null,
+                    tint = EduTextoSecundario, modifier = Modifier.align(Alignment.TopEnd).size(24.dp)
+                )
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            textos()
         }
     }
 }
 
-// Chip pequeño (dato de los accesos y estado de las tarjetas)
-@Composable
-private fun EtiquetaPequena(texto: String, tono: TonoEdu, solido: Boolean = false) {
-    val c = coloresDeTono(tono)
-    Text(
-        texto,
-        modifier = Modifier
-            .background(if (solido) c.solido else c.fondo, RoundedCornerShape(50))
-            .padding(horizontal = 9.dp, vertical = 3.dp),
-        fontFamily = Nunito, fontWeight = FontWeight.ExtraBold, fontSize = 11.5.sp,
-        color = if (solido) Color.White else c.texto, maxLines = 1
-    )
-}
-
-// Etiqueta del tipo de tarjeta: COMUNICADO, TAREA, EVALUACIÓN, ASISTENCIA DE HOY
+// Etiqueta de la tarjeta de asistencia de hoy
 @Composable
 private fun EtiquetaTipo(texto: String, icono: ImageVector, tono: TonoEdu) {
     val c = coloresDeTono(tono)
@@ -620,157 +602,6 @@ private fun TarjetaAsistenciaHoy(lista: List<AsistenciaHoyItem>) {
     }
 }
 
-// Botón pequeño blanco "Leer" (acción secundaria)
-@Composable
-private fun BotonLeer(onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .height(38.dp)
-            .clip(RoundedCornerShape(13.dp))
-            .background(Color.White)
-            .border(2.dp, EduBorde, RoundedCornerShape(13.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp)
-    ) {
-        Icon(Icons.Rounded.Visibility, contentDescription = null, tint = EduEtiqueta, modifier = Modifier.size(17.dp))
-        Text("Leer", fontFamily = Nunito, fontWeight = FontWeight.Black, fontSize = 14.5.sp, color = EduEtiqueta)
-    }
-}
-
-@Composable
-private fun TarjetaComunicado(n: NovedadPadreItem, onClick: () -> Unit) {
-    TarjetaEdu(relleno = PaddingValues(horizontal = 15.dp, vertical = 13.dp), onClick = onClick) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            EtiquetaTipo("COMUNICADO", Icons.Rounded.Campaign, TonoEdu.CORAL)
-            Spacer(modifier = Modifier.weight(1f))
-            if (!n.leido) EtiquetaPequena("Nuevo", TonoEdu.CORAL, solido = true)
-            else EtiquetaPequena("Leído", TonoEdu.GRIS)
-        }
-        Text(
-            n.titulo, modifier = Modifier.padding(top = 8.dp), fontFamily = Nunito, fontWeight = FontWeight.Black,
-            fontSize = 16.sp, color = EduTexto, maxLines = 2, overflow = TextOverflow.Ellipsis
-        )
-        if (n.detalle.isNotBlank()) {
-            Text(
-                n.detalle, modifier = Modifier.padding(top = 3.dp), fontFamily = Nunito,
-                fontWeight = FontWeight.SemiBold, fontSize = 13.5.sp, lineHeight = 19.sp, color = EduEtiqueta,
-                maxLines = 2, overflow = TextOverflow.Ellipsis
-            )
-        }
-        Text(
-            listOf(n.docente, n.curso, fechaEnvio(n.fecha)).filter { it.isNotBlank() }.joinToString(" · "),
-            modifier = Modifier.padding(top = 6.dp), fontFamily = Nunito, fontWeight = FontWeight.Bold,
-            fontSize = 12.5.sp, color = EduTextoSecundario, maxLines = 1, overflow = TextOverflow.Ellipsis
-        )
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            if (n.adjunto.isNotBlank()) {
-                Icon(Icons.Rounded.AttachFile, contentDescription = null, tint = EduTextoSecundario, modifier = Modifier.size(16.dp))
-                Text(
-                    n.adjunto, modifier = Modifier.weight(1f).padding(start = 4.dp, end = 8.dp), fontFamily = Nunito,
-                    fontWeight = FontWeight.ExtraBold, fontSize = 13.sp, color = EduTextoSecundario,
-                    maxLines = 1, overflow = TextOverflow.Ellipsis
-                )
-            } else {
-                Spacer(modifier = Modifier.weight(1f))
-            }
-            BotonLeer(onClick)
-        }
-    }
-}
-
-@Composable
-private fun TarjetaTarea(n: NovedadPadreItem, onClick: () -> Unit) {
-    val dias = diasHasta(n.fecha)
-    val pendiente = n.estado == "Pendiente"
-    val urgente = pendiente && dias != null && dias <= 1
-    TarjetaEdu(relleno = PaddingValues(horizontal = 15.dp, vertical = 13.dp), onClick = onClick) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            EtiquetaTipo("TAREA", Icons.Rounded.Assignment, TonoEdu.AMARILLO)
-            Spacer(modifier = Modifier.weight(1f))
-            when (n.estado) {
-                "Entregada" -> EtiquetaPequena("Entregó", TonoEdu.VERDE)
-                "No entregada" -> EtiquetaPequena("No entregó", TonoEdu.CORAL)
-                else -> EtiquetaPequena("Pendiente", TonoEdu.AMARILLO)
-            }
-        }
-        Text(
-            n.titulo, modifier = Modifier.padding(top = 8.dp), fontFamily = Nunito, fontWeight = FontWeight.Black,
-            fontSize = 16.sp, color = EduTexto, maxLines = 2, overflow = TextOverflow.Ellipsis
-        )
-        Text(
-            listOf(n.curso, n.docente).filter { it.isNotBlank() }.joinToString(" · "),
-            modifier = Modifier.padding(top = 2.dp), fontFamily = Nunito, fontWeight = FontWeight.Bold,
-            fontSize = 13.sp, color = EduTextoSecundario, maxLines = 1, overflow = TextOverflow.Ellipsis
-        )
-        val textoFecha = when {
-            n.fecha.isBlank() -> "Sin fecha límite"
-            !pendiente -> "Fecha límite: ${fechaCortaDia(n.fecha)}"
-            dias == 0L -> "Vence hoy"
-            dias == 1L -> "Vence mañana"
-            else -> "Vence el ${fechaCortaDia(n.fecha)}"
-        }
-        Row(
-            modifier = Modifier.padding(top = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(5.dp)
-        ) {
-            val color = if (urgente) EduCoralOscuro else EduTextoSecundario
-            Icon(Icons.Rounded.Schedule, contentDescription = null, tint = color, modifier = Modifier.size(16.dp))
-            Text(
-                textoFecha, fontFamily = Nunito, fontWeight = if (urgente) FontWeight.Black else FontWeight.ExtraBold,
-                fontSize = 13.sp, color = color
-            )
-        }
-    }
-}
-
-@Composable
-private fun TarjetaEvaluacion(n: NovedadPadreItem, onClick: () -> Unit) {
-    val dias = diasHasta(n.fecha)
-    TarjetaEdu(relleno = PaddingValues(horizontal = 15.dp, vertical = 13.dp), onClick = onClick) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            EtiquetaTipo("EVALUACIÓN", Icons.Rounded.Event, TonoEdu.AZUL)
-            Spacer(modifier = Modifier.weight(1f))
-            EtiquetaPequena(
-                when (dias) {
-                    null -> "Próxima"
-                    0L -> "Hoy"
-                    1L -> "Mañana"
-                    else -> "En $dias días"
-                },
-                if (dias != null && dias <= 1) TonoEdu.AMARILLO else TonoEdu.AZUL
-            )
-        }
-        Text(
-            n.titulo, modifier = Modifier.padding(top = 8.dp), fontFamily = Nunito, fontWeight = FontWeight.Black,
-            fontSize = 16.sp, color = EduTexto, maxLines = 2, overflow = TextOverflow.Ellipsis
-        )
-        Text(
-            listOf(n.curso, n.docente).filter { it.isNotBlank() }.joinToString(" · "),
-            modifier = Modifier.padding(top = 2.dp), fontFamily = Nunito, fontWeight = FontWeight.Bold,
-            fontSize = 13.sp, color = EduTextoSecundario, maxLines = 1, overflow = TextOverflow.Ellipsis
-        )
-        if (n.fecha.isNotBlank()) {
-            Row(
-                modifier = Modifier.padding(top = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(5.dp)
-            ) {
-                Icon(Icons.Rounded.CalendarMonth, contentDescription = null, tint = EduTextoSecundario, modifier = Modifier.size(16.dp))
-                Text(
-                    fechaLarga(n.fecha), fontFamily = Nunito, fontWeight = FontWeight.ExtraBold,
-                    fontSize = 13.sp, color = EduTextoSecundario
-                )
-            }
-        }
-    }
-}
-
 // ---------------------------------------------------------------------
 // Fechas (solo formato para mostrar)
 // ---------------------------------------------------------------------
@@ -779,31 +610,10 @@ private fun TarjetaEvaluacion(n: NovedadPadreItem, onClick: () -> Unit) {
 private fun gradoCorto(grado: String): String =
     grado.firstOrNull { it.isDigit() }?.let { "$it°" } ?: grado
 
-// Días que faltan desde hoy ("yyyy-MM-dd"); null si la fecha no es válida
-private fun diasHasta(fecha: String): Long? = try {
-    ChronoUnit.DAYS.between(LocalDate.now(), LocalDate.parse(fecha.take(10)))
-} catch (e: Exception) { null }
-
 // "2026-10-23" -> "vie 23 oct"
 private fun fechaCortaDia(fecha: String): String = try {
     LocalDate.parse(fecha.take(10)).format(DateTimeFormatter.ofPattern("EEE d MMM", LOCALE_PE)).replace(".", "")
 } catch (e: Exception) { fecha }
-
-// "2026-10-26" -> "Lunes 26 de octubre"
-private fun fechaLarga(fecha: String): String = try {
-    LocalDate.parse(fecha.take(10)).format(DateTimeFormatter.ofPattern("EEEE d 'de' MMMM", LOCALE_PE))
-        .replaceFirstChar { it.uppercase() }
-} catch (e: Exception) { fecha }
-
-// Fecha de envío del comunicado: "hoy 09:40 a. m.", "ayer" o "vie 16 oct"
-private fun fechaEnvio(fechaHora: String): String = try {
-    val f = LocalDateTime.parse(fechaHora)
-    when (ChronoUnit.DAYS.between(f.toLocalDate(), LocalDate.now())) {
-        0L -> "hoy " + f.format(DateTimeFormatter.ofPattern("hh:mm a", LOCALE_PE))
-        1L -> "ayer"
-        else -> f.format(DateTimeFormatter.ofPattern("EEE d MMM", LOCALE_PE)).replace(".", "")
-    }
-} catch (e: Exception) { "" }
 
 // =====================================================================
 // BARRA INFERIOR DEL PADRE (la usan todas las pantallas del padre).
@@ -852,26 +662,11 @@ fun HomePadrePreview() {
             ),
             hijoSeleccionadoId = 1,
             resumen = ResumenInicioHijo(
-                porcentajeMes = 96, sinLeer = 2, pendientes = 1,
+                porcentajeMes = 96, sinLeer = 2, comunicadosTotal = 9, pendientes = 1,
+                proximaFecha = hoy.plusDays(1).toString(),
                 asistenciaHoy = listOf(
                     AsistenciaHoyItem("Ciencia y Tecnología", "08:05 a. m.", "A", "Prof. Hector Reyna"),
                     AsistenciaHoyItem("Comunicación", "10:02 a. m.", "T")
-                ),
-                novedades = listOf(
-                    NovedadPadreItem(
-                        1, TipoNovedad.COMUNICADO, "Reunión de padres este viernes",
-                        "Los esperamos el viernes 23 a las 6:00 p. m. en el aula de 2° A.",
-                        "Ciencia y Tecnología", "Prof. Hector Reyna", hoy.atTime(9, 40).toString() + ":00",
-                        leido = false, adjunto = "citacion.pdf"
-                    ),
-                    NovedadPadreItem(
-                        2, TipoNovedad.TAREA, "Maqueta de ecosistemas", curso = "Ciencia y Tecnología",
-                        fecha = hoy.plusDays(1).toString(), estado = "Pendiente"
-                    ),
-                    NovedadPadreItem(
-                        3, TipoNovedad.EVALUACION, "Evaluación de fracciones", curso = "Matemáticas",
-                        fecha = hoy.plusDays(7).toString()
-                    )
                 )
             )
         )

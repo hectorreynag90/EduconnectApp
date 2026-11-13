@@ -83,6 +83,7 @@ fun DetalleComunicadoPadreScreen(
     onAgenda: () -> Unit = {},
     onPerfil: () -> Unit = {},
     onNotificaciones: () -> Unit = {},
+    tieneNotificaciones: Boolean = false,      // punto rojo en la campana (notificaciones sin leer)
     // ----- Rediseño 2026 -----
     nombreHijo: String = ""                 // "Angela Perez" (subtítulo de la cabecera)
 ) {
@@ -105,6 +106,7 @@ fun DetalleComunicadoPadreScreen(
                     icono = Icons.Rounded.Notifications,
                     descripcion = "Notificaciones",
                     onClick = onNotificaciones,
+                    conPunto = tieneNotificaciones,
                     colorCabecera = ColorModulo.Comunicados
                 )
             }

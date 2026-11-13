@@ -88,6 +88,7 @@ fun DetalleAgendaScreen(
     onAgenda: () -> Unit = {},
     onPerfil: () -> Unit = {},
     onNotificaciones: () -> Unit = {},
+    tieneNotificaciones: Boolean = false,      // punto rojo en la campana (notificaciones sin leer)
     // ----- Rediseño 2026 -----
     apellidosHijo: String = ""
 ) {
@@ -111,6 +112,7 @@ fun DetalleAgendaScreen(
                     icono = Icons.Rounded.Notifications,
                     descripcion = "Notificaciones",
                     onClick = onNotificaciones,
+                    conPunto = tieneNotificaciones,
                     colorCabecera = ColorModulo.Publicaciones
                 )
             }

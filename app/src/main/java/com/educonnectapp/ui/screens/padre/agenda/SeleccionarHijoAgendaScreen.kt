@@ -85,6 +85,7 @@ fun SeleccionarHijoAgendaScreen(
     onAgenda: () -> Unit = {},
     onPerfil: () -> Unit = {},
     onNotificaciones: () -> Unit = {},
+    tieneNotificaciones: Boolean = false,      // punto rojo en la campana (notificaciones sin leer)
     onVerAgenda: (hijo: HijoAgendaItem) -> Unit = {},
     // ----- Rediseño 2026 -----
     cargando: Boolean = false,
@@ -110,6 +111,7 @@ fun SeleccionarHijoAgendaScreen(
                     icono = Icons.Rounded.Notifications,
                     descripcion = "Notificaciones",
                     onClick = onNotificaciones,
+                    conPunto = tieneNotificaciones,
                     colorCabecera = ColorModulo.Publicaciones
                 )
             },

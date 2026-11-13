@@ -104,6 +104,7 @@ fun AsociarHijoScreen(
     onAvisos: () -> Unit = {},
     onPerfil: () -> Unit = {},
     onNotificaciones: () -> Unit = {},
+    tieneNotificaciones: Boolean = false,      // punto rojo en la campana (notificaciones sin leer)
     onBuscar: (codigo: String) -> Unit = {},
     alumnoEncontrado: AlumnoEncontrado? = null,
     mensajeError: String = "",
@@ -138,6 +139,7 @@ fun AsociarHijoScreen(
                     icono = Icons.Rounded.Notifications,
                     descripcion = "Notificaciones",
                     onClick = onNotificaciones,
+                    conPunto = tieneNotificaciones,
                     colorCabecera = ColorModulo.Perfil
                 )
             }

@@ -83,6 +83,7 @@ fun SeleccionarEstudianteComunicadoScreen(
     onAgenda: () -> Unit = {},
     onPerfil: () -> Unit = {},
     onNotificaciones: () -> Unit = {},
+    tieneNotificaciones: Boolean = false,      // punto rojo en la campana (notificaciones sin leer)
     onVerComunicados: (hijo: HijoComunicadoItem) -> Unit = {},
     // ----- Rediseño 2026 -----
     cargando: Boolean = false,
@@ -107,6 +108,7 @@ fun SeleccionarEstudianteComunicadoScreen(
                     icono = Icons.Rounded.Notifications,
                     descripcion = "Notificaciones",
                     onClick = onNotificaciones,
+                    conPunto = tieneNotificaciones,
                     colorCabecera = ColorModulo.Comunicados
                 )
             },

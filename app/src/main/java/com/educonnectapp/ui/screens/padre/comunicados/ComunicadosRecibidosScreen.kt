@@ -108,6 +108,7 @@ fun ComunicadosRecibidosScreen(
     onAgenda: () -> Unit = {},
     onPerfil: () -> Unit = {},
     onNotificaciones: () -> Unit = {},
+    tieneNotificaciones: Boolean = false,      // punto rojo en la campana (notificaciones sin leer)
     onVerDetalle: (ComunicadoPadreItem) -> Unit = {},
     // ----- Rediseño 2026 -----
     apellidosHijo: String = "",
@@ -149,6 +150,7 @@ fun ComunicadosRecibidosScreen(
                     icono = Icons.Rounded.Notifications,
                     descripcion = "Notificaciones",
                     onClick = onNotificaciones,
+                    conPunto = tieneNotificaciones,
                     colorCabecera = ColorModulo.Comunicados
                 )
             },
