@@ -113,6 +113,10 @@ import com.educonnectapp.data.api.restablecerContrasena
 import com.educonnectapp.data.api.solicitarCodigoRecuperacion
 import com.educonnectapp.data.api.verificarCodigoRecuperacion
 import com.educonnectapp.data.api.ApiException
+import com.educonnectapp.data.api.MINUTOS_INACTIVIDAD
+import com.educonnectapp.data.api.SesionApi
+import com.educonnectapp.data.api.SesionGuardada
+import com.educonnectapp.data.api.UsuarioGuardado
 import com.educonnectapp.data.api.reenviarComunicado
 import com.educonnectapp.data.api.subirArchivos
 import com.educonnectapp.data.api.adjuntos
@@ -346,9 +350,31 @@ private fun horaAsistencia(hora: String): String = try {
     t?.format(java.time.format.DateTimeFormatter.ofPattern("hh:mm a", java.util.Locale("es", "PE"))) ?: ""
 } catch (e: Exception) { hora }
 
+// =====================================================================
+// NOTIFICACIÓN TOCADA (push de la barra del celular o de la pantalla bloqueada)
+// EduConnectFirebaseService pone "tipo" y "referenciaId" en el intent. MainActivity los guarda aquí
+// y EduConnectApp abre el detalle: al instante si hay sesión, o justo después de iniciar sesión.
+// =====================================================================
+data class NotificacionTocada(val tipo: String, val referenciaId: Long?)
+
+object NotificacionAbierta {
+    val pendiente = mutableStateOf<NotificacionTocada?>(null)
+
+    // Lee la notificación del intent (una sola vez: luego se quitan los datos)
+    fun leer(intent: Intent?) {
+        val tipo = intent?.getStringExtra(EXTRA_TIPO_NOTIFICACION)?.takeIf { it.isNotBlank() } ?: return
+        val referenciaId = intent.getStringExtra(EXTRA_REFERENCIA_NOTIFICACION)?.toLongOrNull()
+        intent.removeExtra(EXTRA_TIPO_NOTIFICACION)
+        intent.removeExtra(EXTRA_REFERENCIA_NOTIFICACION)
+        pendiente.value = NotificacionTocada(tipo, referenciaId)
+    }
+}
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Abierta desde una notificación (con la app cerrada). Al girar la pantalla no se vuelve a leer.
+        if (savedInstanceState == null) NotificacionAbierta.leer(intent)
         // Coil (fotos de perfil) usa el cliente HTTP de ApiClient, que agrega el token de la sesión
         coil.Coil.setImageLoader(crearCargadorImagenes(this))
 
@@ -368,13 +394,51 @@ class MainActivity : ComponentActivity() {
 
         setContent { EduConnectAppTheme { EduConnectApp() } }
     }
+
+    // Al volver a la app: si estuvo más de 10 min en segundo plano (o bloqueada), la sesión vence
+    override fun onStart() {
+        super.onStart()
+        if (SesionApi.token != null && SesionGuardada.vencida(this)) SesionGuardada.expirada.value = true
+    }
+
+    // Al pasar a segundo plano o bloquear el celular: empieza a contar la inactividad
+    override fun onStop() {
+        super.onStop()
+        SesionGuardada.marcarActividad(this)
+    }
+
+    // Notificación tocada con la app ya abierta (launchMode="singleTop": se reutiliza esta pantalla)
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        NotificacionAbierta.leer(intent)
+    }
 }
 
 @Composable
 fun EduConnectApp() {
     val context = LocalContext.current
-    var currentScreen by remember { mutableStateOf(Screen.WELCOME) }
-    var usuarioLogueado by remember { mutableStateOf<UsuarioLogueado?>(null) }
+    // Sesión guardada en el celular (si Android cerró la app hace menos de 10 min, se recupera sin login)
+    val sesionRecuperada = remember { SesionGuardada.restaurar(context) }
+    var currentScreen by remember {
+        mutableStateOf(
+            when (sesionRecuperada?.rol) {
+                "DOCENTE" -> Screen.HOME_DOCENTE
+                "PADRE" -> Screen.HOME_PADRE
+                else -> Screen.WELCOME
+            }
+        )
+    }
+    var usuarioLogueado by remember {
+        mutableStateOf(
+            sesionRecuperada?.let {
+                UsuarioLogueado(
+                    id = it.id, nombrecompleto = it.nombreCompleto, email = it.email, rol = it.rol,
+                    dni = it.dni, telefono = it.telefono, fotoId = it.fotoId
+                )
+            }
+        )
+    }
     var gradoIdSel by remember { mutableStateOf(0L) }
     var seccionIdSel by remember { mutableStateOf(0L) }
     var cursoIdSel by remember { mutableStateOf(0L) }
@@ -3569,6 +3633,85 @@ fun EduConnectApp() {
                     }
                 }
             )
+        }
+    }
+
+    // ── SESIÓN GUARDADA ────────────────────────────────────────────────────────
+    // Cada cambio del usuario (login, foto, datos) se guarda cifrado; al cerrar sesión se borra
+    androidx.compose.runtime.LaunchedEffect(usuarioLogueado) {
+        val u = usuarioLogueado
+        if (u != null) {
+            SesionGuardada.guardar(
+                context,
+                UsuarioGuardado(
+                    id = u.id, nombreCompleto = u.nombrecompleto, email = u.email, rol = u.rol,
+                    dni = u.dni, telefono = u.telefono, fotoId = u.fotoId
+                )
+            )
+        } else {
+            SesionGuardada.borrar(context)
+        }
+    }
+    // Volvió después de 10 min sin usar la app: se pide iniciar sesión otra vez.
+    // No se quita el token FCM del backend: las notificaciones siguen llegando al celular.
+    val sesionExpirada by SesionGuardada.expirada
+    androidx.compose.runtime.LaunchedEffect(sesionExpirada) {
+        if (!sesionExpirada) return@LaunchedEffect
+        SesionGuardada.expirada.value = false
+        if (usuarioLogueado != null) {
+            limpiarDatosSesion()
+            SesionApi.limpiar()
+            currentScreen = Screen.LOGIN
+            aviso("Tu sesión se cerró tras $MINUTOS_INACTIVIDAD minutos sin usar la app. Vuelve a ingresar.")
+        }
+    }
+
+    // ── NOTIFICACIÓN TOCADA EN EL CELULAR ──────────────────────────────────────
+    // Sin sesión: se muestra Iniciar sesión y la notificación espera. Con sesión: abre su detalle.
+    val notificacionTocada by NotificacionAbierta.pendiente
+    androidx.compose.runtime.LaunchedEffect(notificacionTocada, usuarioLogueado?.id) {
+        val tocada = notificacionTocada ?: return@LaunchedEffect
+        val usuario = usuarioLogueado
+        if (usuario == null) {
+            // Directo a Iniciar sesión (sin pasar por la Bienvenida)
+            if (currentScreen == Screen.WELCOME || currentScreen == Screen.REGISTER) currentScreen = Screen.LOGIN
+            return@LaunchedEffect
+        }
+        NotificacionAbierta.pendiente.value = null   // se atiende una sola vez
+
+        if (usuario.rol != "PADRE") {
+            // Docente: por ahora solo recibe avisos generales -> Inicio
+            currentScreen = Screen.HOME_DOCENTE
+            return@LaunchedEffect
+        }
+        // Marca como leída la notificación de la campana que corresponde (la más reciente sin leer)
+        CoroutineScope(Dispatchers.Main).launch {
+            try {
+                val bandeja = obtenerBandeja()
+                bandeja.notificaciones
+                    .filter { !it.leida && it.tipo == tocada.tipo && it.referenciaId == tocada.referenciaId }
+                    .forEach { marcarNotificacionLeida(it.id) }
+                notificacionesNoLeidasSel = obtenerBandeja().noLeidas
+            } catch (e: Exception) { /* el punto rojo se actualiza al abrir la campana */ }
+        }
+        when (tocada.tipo) {
+            "PUBLICACION", "CALIFICACION" -> {
+                agendaCargada = false   // tarea nueva, editada, anulada o con entrega: datos frescos
+                abrirPublicacionDeNotificacion(tocada.referenciaId)
+            }
+            "COMUNICADO" -> {
+                comunicadosPadreCargados = false
+                abrirComunicadoDeNotificacion(tocada.referenciaId)
+            }
+            "ASISTENCIA" -> irAModuloDeNotificacion("ASISTENCIA")
+            else -> {
+                // AVISO u otro: Inicio con el panel de notificaciones abierto
+                currentScreen = Screen.HOME_PADRE
+                CoroutineScope(Dispatchers.Main).launch {
+                    kotlinx.coroutines.delay(400)   // espera el cambio de pantalla (que cierra el panel)
+                    if (!mostrarNotificaciones) abrirNotificaciones()
+                }
+            }
         }
     }
 
