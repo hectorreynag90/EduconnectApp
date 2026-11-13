@@ -1,8 +1,6 @@
 package com.educonnectapp.ui.screens.padre.comunicados
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,18 +19,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CheckCircle
-import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.Notifications
-import androidx.compose.material.icons.rounded.Visibility
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -42,17 +34,13 @@ import com.educonnectapp.ui.components.BotonIconoCabeceraEdu
 import com.educonnectapp.ui.components.CabeceraEdu
 import com.educonnectapp.ui.components.ChipEdu
 import com.educonnectapp.ui.components.ColorModulo
-import com.educonnectapp.ui.components.IconoCirculoEdu
+import com.educonnectapp.ui.components.ListaAdjuntosAbrirEdu
 import com.educonnectapp.ui.components.TarjetaEdu
 import com.educonnectapp.ui.components.TituloSeccionEdu
 import com.educonnectapp.ui.components.TonoEdu
 import com.educonnectapp.ui.screens.padre.inicio.BottomNavBarPadre
 import com.educonnectapp.ui.theme.EduAmarillo
-import com.educonnectapp.ui.theme.EduAzulOscuro
-import com.educonnectapp.ui.theme.EduAzulOscuroClaro
-import com.educonnectapp.ui.theme.EduBorde
 import com.educonnectapp.ui.theme.EduConnectAppTheme
-import com.educonnectapp.ui.theme.EduEtiqueta
 import com.educonnectapp.ui.theme.EduFondo
 import com.educonnectapp.ui.theme.EduTealClaro
 import com.educonnectapp.ui.theme.EduTealOscuro
@@ -77,6 +65,9 @@ fun DetalleComunicadoPadreScreen(
     nombreAdjunto: String? = null,          // null = el comunicado no tiene adjunto
     descargandoAdjunto: Boolean = false,
     onAbrirAdjunto: () -> Unit = {},
+    // ----- Varios adjuntos (paso 27) -----
+    adjuntos: List<String> = emptyList(),   // nombres de todos los adjuntos, en orden
+    onAbrirAdjuntoEn: (Int) -> Unit = {},   // posición del adjunto tocado
     onBack: () -> Unit = {},
     onHomePadre: () -> Unit = {},
     onAvisos: () -> Unit = {},
@@ -175,55 +166,17 @@ fun DetalleComunicadoPadreScreen(
                     )
                 }
 
-                // ---------- ADJUNTO ----------
-                if (nombreAdjunto != null) {
-                    TituloSeccionEdu("Adjunto")
-                    TarjetaEdu(
-                        relleno = PaddingValues(horizontal = 14.dp, vertical = 12.dp),
-                        onClick = if (descargandoAdjunto) null else onAbrirAdjunto
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            IconoCirculoEdu(Icons.Rounded.Description, TonoEdu.AZUL)
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    nombreAdjunto, fontFamily = Nunito, fontWeight = FontWeight.Black, fontSize = 14.5.sp,
-                                    color = EduTexto, maxLines = 1, overflow = TextOverflow.Ellipsis
-                                )
-                                Text(
-                                    if (descargandoAdjunto) "Descargando…" else "Toca para abrir",
-                                    fontFamily = Nunito, fontWeight = FontWeight.Bold, fontSize = 12.5.sp, color = EduTextoSecundario
-                                )
-                            }
-                            if (descargandoAdjunto) {
-                                CircularProgressIndicator(color = EduAzulOscuro, strokeWidth = 3.dp, modifier = Modifier.size(24.dp))
-                            } else {
-                                // Botón secundario "Abrir"
-                                Row(
-                                    modifier = Modifier
-                                        .height(38.dp)
-                                        .clip(RoundedCornerShape(13.dp))
-                                        .background(Color.White)
-                                        .border(2.dp, EduBorde, RoundedCornerShape(13.dp))
-                                        .clickable(onClick = onAbrirAdjunto)
-                                        .padding(horizontal = 14.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    Icon(Icons.Rounded.Visibility, contentDescription = null, tint = EduEtiqueta, modifier = Modifier.size(16.dp))
-                                    Text("Abrir", fontFamily = Nunito, fontWeight = FontWeight.Black, fontSize = 14.sp, color = EduEtiqueta)
-                                }
-                            }
-                        }
-                        if (descargandoAdjunto) {
-                            LinearProgressIndicator(
-                                modifier = Modifier.padding(top = 10.dp).fillMaxWidth().height(6.dp).clip(RoundedCornerShape(50)),
-                                color = EduAzulOscuro,
-                                trackColor = EduAzulOscuroClaro
-                            )
-                        }
+                // ---------- ADJUNTOS ----------
+                val nombresAdjuntos = adjuntos.ifEmpty { listOfNotNull(nombreAdjunto) }
+                if (nombresAdjuntos.isNotEmpty()) {
+                    TituloSeccionEdu(if (nombresAdjuntos.size == 1) "Adjunto" else "Adjuntos · ${nombresAdjuntos.size}")
+                    TarjetaEdu(relleno = PaddingValues(horizontal = 14.dp, vertical = 4.dp)) {
+                        ListaAdjuntosAbrirEdu(
+                            nombres = nombresAdjuntos,
+                            tono = TonoEdu.CORAL,
+                            descargando = descargandoAdjunto,
+                            onAbrir = { i -> if (adjuntos.isEmpty()) onAbrirAdjunto() else onAbrirAdjuntoEn(i) }
+                        )
                     }
                 }
 

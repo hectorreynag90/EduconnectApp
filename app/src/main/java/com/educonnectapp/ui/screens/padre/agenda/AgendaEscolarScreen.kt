@@ -73,7 +73,8 @@ data class PublicacionAgendaItem(
     val estado: String = "Pendiente",   // Tarea: "Pendiente", "Entregada", "No entregada", "Vencida" | Evaluación: "Pendiente", "Realizado" | ambas: "Anulada"
     val archivoAdjunto: String = "",
     // ----- Rediseño 2026 -----
-    val publicadoEn: String = ""        // "yyyy-MM-dd" (hora local)
+    val publicadoEn: String = "",       // "yyyy-MM-dd" (hora local)
+    val adjuntos: List<String> = emptyList()   // nombres de todos los adjuntos, en orden (paso 27)
 )
 
 // ---------------------------------------------------------------------

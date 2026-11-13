@@ -16,6 +16,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.EditNote
 import androidx.compose.material.icons.rounded.Groups
+import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.NotificationsActive
@@ -46,6 +47,7 @@ import com.educonnectapp.ui.components.PopupConfirmacionEdu
 import com.educonnectapp.ui.components.PopupProcesandoEdu
 import com.educonnectapp.ui.components.TipoBotonEdu
 import com.educonnectapp.ui.components.TonoEdu
+import com.educonnectapp.ui.components.esNombreImagenEdu
 import com.educonnectapp.ui.screens.docente.inicio.BottomNavBarDocente
 import com.educonnectapp.ui.theme.EduAmarilloClaro
 import com.educonnectapp.ui.theme.EduAmarilloOscuro
@@ -208,12 +210,21 @@ fun EditarPublicacionScreen(
                     )
                 }
             }
-            if (!esEvaluacion && !publicacion?.nombreAdjunto.isNullOrBlank()) {
-                CampoBloqueadoPub(
-                    etiqueta = "Adjunto",
-                    icono = Icons.Rounded.Description,
-                    texto = publicacion?.nombreAdjunto.orEmpty()
-                )
+            // ADJUNTOS (bloqueados): uno debajo de otro
+            val nombresAdjuntos = publicacion?.adjuntos.orEmpty()
+                .ifEmpty { listOfNotNull(publicacion?.nombreAdjunto?.takeIf { it.isNotBlank() }) }
+            if (!esEvaluacion && nombresAdjuntos.isNotEmpty()) {
+                nombresAdjuntos.forEachIndexed { i, nombre ->
+                    CampoBloqueadoPub(
+                        etiqueta = when {
+                            i > 0 -> null
+                            nombresAdjuntos.size == 1 -> "Adjunto"
+                            else -> "Adjuntos · ${nombresAdjuntos.size}"
+                        },
+                        icono = if (esNombreImagenEdu(nombre)) Icons.Rounded.Image else Icons.Rounded.Description,
+                        texto = nombre
+                    )
+                }
             }
             Text(
                 if (esEvaluacion) "La clase no se puede cambiar." else "La clase y el adjunto no se pueden cambiar.",
@@ -274,10 +285,10 @@ fun EditarPublicacionScreen(
 
 // Campo que no se puede cambiar: fondo gris, texto gris y candado
 @Composable
-private fun CampoBloqueadoPub(etiqueta: String, icono: ImageVector, texto: String) {
+private fun CampoBloqueadoPub(etiqueta: String?, icono: ImageVector, texto: String) {
     val forma = RoundedCornerShape(16.dp)
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        EtiquetaCampoPub(etiqueta)
+        if (etiqueta != null) EtiquetaCampoPub(etiqueta)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -304,7 +315,8 @@ fun EditarPublicacionPreview() {
         EditarPublicacionScreen(
             publicacion = DetallePublicacionItem(
                 "Ejercicios de fracciones", "Tarea", "Ciencia y Tecnología", "1er Grado", "A",
-                "2026-11-17", "Resolver los ejercicios del 1 al 20 en el cuaderno.", "practica_fracciones.pdf"
+                "2026-11-17", "Resolver los ejercicios del 1 al 20 en el cuaderno.", "practica_fracciones.pdf",
+                adjuntos = listOf("practica_fracciones.pdf", "ejemplo_resuelto.jpg")
             )
         )
     }

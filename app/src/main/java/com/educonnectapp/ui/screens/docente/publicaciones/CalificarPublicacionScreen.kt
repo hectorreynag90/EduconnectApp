@@ -22,9 +22,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.Block
-import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.EditNote
 import androidx.compose.material.icons.rounded.FactCheck
@@ -60,6 +58,7 @@ import com.educonnectapp.ui.components.CabeceraEdu
 import com.educonnectapp.ui.components.ChipEdu
 import com.educonnectapp.ui.components.ColorModulo
 import com.educonnectapp.ui.components.ContadorEdu
+import com.educonnectapp.ui.components.ListaAdjuntosAbrirEdu
 import com.educonnectapp.ui.components.PopupConfirmacionEdu
 import com.educonnectapp.ui.components.PopupExitoEdu
 import com.educonnectapp.ui.components.PopupProcesandoEdu
@@ -96,8 +95,9 @@ data class DetallePublicacionItem(
     val seccionNombre: String,
     val fechaEntrega: String,       // "yyyy-MM-dd"
     val descripcion: String,
-    val nombreAdjunto: String? = null,
-    val estado: String = "ACTIVA"
+    val nombreAdjunto: String? = null,         // primer adjunto (compatibilidad)
+    val estado: String = "ACTIVA",
+    val adjuntos: List<String> = emptyList()   // nombres de todos los adjuntos, en orden
 )
 
 // Entrega de un alumno (solo tareas: las evaluaciones son avisos). estado usa los códigos del backend:
@@ -177,7 +177,9 @@ fun CalificarPublicacionScreen(
     onAnular: () -> Unit = {},              // ya confirmado por el docente
     anulando: Boolean = false,              // muestra "Anulando..."
     edicionGuardada: Boolean = false,       // al volver de Editar: popup "Cambios guardados"
-    onCerrarEdicionGuardada: () -> Unit = {}
+    onCerrarEdicionGuardada: () -> Unit = {},
+    // ----- Varios adjuntos (paso 27) -----
+    onAbrirAdjuntoEn: (Int) -> Unit = {}     // posición del adjunto tocado
 ) {
     val context = LocalContext.current
     val esEvaluacion = publicacion?.tipo == "Evaluación"
@@ -384,6 +386,7 @@ fun CalificarPublicacionScreen(
                         esEvaluacion = esEvaluacion,
                         descargandoAdjunto = descargandoAdjunto,
                         onAbrirAdjunto = onAbrirAdjunto,
+                        onAbrirAdjuntoEn = onAbrirAdjuntoEn,
                         onEditar = onEditar,
                         onAnular = { if (entregasRegistradas > 0) bloqueoAnular = true else confirmarAnular = true }
                     )
@@ -566,9 +569,11 @@ private fun TarjetaPublicacion(
     esEvaluacion: Boolean,
     descargandoAdjunto: Boolean,
     onAbrirAdjunto: () -> Unit,
+    onAbrirAdjuntoEn: (Int) -> Unit,
     onEditar: () -> Unit,
     onAnular: () -> Unit
 ) {
+    val nombresAdjuntos = p.adjuntos.ifEmpty { listOfNotNull(p.nombreAdjunto) }
     val hoy = hoyPub()
     val anulada = p.estado == "ANULADA"
     TarjetaEdu(relleno = PaddingValues(horizontal = 16.dp, vertical = 14.dp)) {
@@ -610,33 +615,19 @@ private fun TarjetaPublicacion(
                 lineHeight = 19.sp, color = EduEtiqueta
             )
         }
-        if (!esEvaluacion && p.nombreAdjunto != null) {
-            Spacer(modifier = Modifier.height(10.dp))
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(14.dp))
-                    .border(1.5.dp, EduBorde, RoundedCornerShape(14.dp))
-                    .clickable(enabled = !descargandoAdjunto) { onAbrirAdjunto() }
-                    .padding(horizontal = 10.dp, vertical = 9.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Icon(Icons.Rounded.Description, contentDescription = null, tint = EduAzulOscuro, modifier = Modifier.size(20.dp))
-                Text(
-                    if (descargandoAdjunto) "Descargando..." else p.nombreAdjunto,
-                    modifier = Modifier.weight(1f), fontFamily = Nunito, fontWeight = FontWeight.ExtraBold,
-                    fontSize = 14.sp, color = EduTexto, maxLines = 1, overflow = TextOverflow.Ellipsis
-                )
-                if (descargandoAdjunto) {
-                    CircularProgressIndicator(color = EduTeal, strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
-                } else {
-                    Icon(
-                        Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = "Abrir adjunto",
-                        tint = EduTextoSecundario, modifier = Modifier.size(22.dp)
-                    )
-                }
-            }
+        if (!esEvaluacion && nombresAdjuntos.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                if (nombresAdjuntos.size == 1) "ADJUNTO" else "ADJUNTOS · ${nombresAdjuntos.size}",
+                fontFamily = Nunito, fontWeight = FontWeight.Black, fontSize = 12.sp,
+                letterSpacing = 0.6.sp, color = EduTextoSecundario
+            )
+            ListaAdjuntosAbrirEdu(
+                nombres = nombresAdjuntos,
+                tono = TonoEdu.AMARILLO,
+                descargando = descargandoAdjunto,
+                onAbrir = { i -> if (p.adjuntos.isEmpty()) onAbrirAdjunto() else onAbrirAdjuntoEn(i) }
+            )
         }
         // ACCIONES: Editar (gris azulado) y Anular (granate claro). No aparecen si ya está anulada.
         if (!anulada) {

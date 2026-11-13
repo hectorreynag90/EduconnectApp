@@ -1,9 +1,5 @@
 package com.educonnectapp.ui.screens.docente.comunicados
 
-import android.net.Uri
-import android.provider.OpenableColumns
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -11,7 +7,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -22,11 +17,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Send
-import androidx.compose.material.icons.rounded.AttachFile
-import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.Groups
-import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material3.Icon
@@ -41,13 +32,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.educonnectapp.ui.components.AdjuntoLocal
 import com.educonnectapp.ui.components.BotonIconoCabeceraEdu
 import com.educonnectapp.ui.components.BotonPrincipalEdu
 import com.educonnectapp.ui.components.CabeceraEdu
@@ -56,17 +46,16 @@ import com.educonnectapp.ui.components.ChipEdu
 import com.educonnectapp.ui.components.ColorModulo
 import com.educonnectapp.ui.components.HojaInferiorEdu
 import com.educonnectapp.ui.components.IconoCirculoEdu
+import com.educonnectapp.ui.components.ListaAdjuntosResumenEdu
 import com.educonnectapp.ui.components.PopupConfirmacionEdu
 import com.educonnectapp.ui.components.PopupProcesandoEdu
+import com.educonnectapp.ui.components.SelectorAdjuntosEdu
 import com.educonnectapp.ui.components.TipoBotonEdu
 import com.educonnectapp.ui.components.TonoEdu
 import com.educonnectapp.ui.screens.docente.inicio.BottomNavBarDocente
-import com.educonnectapp.ui.theme.EduAzulOscuroClaro
 import com.educonnectapp.ui.theme.EduBorde
 import com.educonnectapp.ui.theme.EduCampo
 import com.educonnectapp.ui.theme.EduConnectAppTheme
-import com.educonnectapp.ui.theme.EduCoral
-import com.educonnectapp.ui.theme.EduCoralClaro
 import com.educonnectapp.ui.theme.EduEtiqueta
 import com.educonnectapp.ui.theme.EduFondo
 import com.educonnectapp.ui.theme.EduTeal
@@ -77,9 +66,6 @@ import com.educonnectapp.ui.theme.Nunito
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-
-// Límite del adjunto (el mismo que valida el backend)
-private const val TAMANO_MAXIMO_BYTES = 10L * 1024 * 1024   // 10 MB
 
 // Data class para destinatario sin Room
 data class SeccionDestinatario(
@@ -92,16 +78,9 @@ data class SeccionDestinatario(
     val totalPadres: Int
 )
 
-// "1.2 MB" / "850 KB"
-private fun tamanoLegible(bytes: Long?): String = when {
-    bytes == null -> ""
-    bytes >= 1024 * 1024 -> String.format(Locale.US, "%.1f MB", bytes / (1024.0 * 1024.0))
-    else -> "${(bytes / 1024).coerceAtLeast(1)} KB"
-}
-
 // =====================================================================
 // NUEVO COMUNICADO (rediseño 2026)
-// Cabecera fija granate · Para (hoja con las clases) · asunto · mensaje · adjunto
+// Cabecera fija granate · Para (hoja con las clases) · asunto · mensaje · adjuntos (hasta 5)
 // "Enviar comunicado" → confirmación → "Enviando..." (mientras MainActivity envía)
 // =====================================================================
 
@@ -116,7 +95,8 @@ fun NuevoComunicadoScreen(
     onAvisos: () -> Unit = {},
     onPerfilDocente: () -> Unit = {},
     onNotificaciones: () -> Unit = {},
-    onEnviado: (asunto: String, mensaje: String, adjunto: String, destinatario: String, curso: String, totalNotificados: Int, hora: String, fecha: String) -> Unit = { _, _, _, _, _, _, _, _ -> },
+    // adjuntos: Uri (en texto) de cada archivo elegido, en orden
+    onEnviado: (asunto: String, mensaje: String, adjuntos: List<String>, destinatario: String, curso: String, totalNotificados: Int, hora: String, fecha: String) -> Unit = { _, _, _, _, _, _, _, _ -> },
     // ----- Rediseño 2026 -----
     destinatarioInicial: SeccionDestinatario? = null,   // clase ya elegida (al crear desde una clase)
     enviando: Boolean = false                           // muestra "Enviando comunicado..."
@@ -124,66 +104,19 @@ fun NuevoComunicadoScreen(
     var destinatarioSeleccionado by remember { mutableStateOf(destinatarioInicial) }
     var asunto by remember { mutableStateOf("") }
     var mensaje by remember { mutableStateOf("") }
-    var archivoUri by remember { mutableStateOf<Uri?>(null) }
-    var nombreArchivo by remember { mutableStateOf("") }
-    var tamanoArchivo by remember { mutableStateOf<Long?>(null) }
-    // Datos del archivo rechazado por tamaño: si no es null, se muestra la alerta
-    var archivoRechazado by remember { mutableStateOf<Pair<String, Long>?>(null) }
+    // Adjuntos elegidos (hasta 5 de 10 MB cada uno)
+    var adjuntos by remember { mutableStateOf<List<AdjuntoLocal>>(emptyList()) }
     var mostrarClases by remember { mutableStateOf(false) }
     var mostrarConfirmar by remember { mutableStateOf(false) }
-    val context = LocalContext.current
 
     // Si la clase inicial llega después (la lista se carga al entrar), se toma
     LaunchedEffect(destinatarioInicial) {
         if (destinatarioSeleccionado == null && destinatarioInicial != null) destinatarioSeleccionado = destinatarioInicial
     }
 
-    val archivoLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri ->
-        uri?.let {
-            // Nombre visible (ej. "tarea.pdf") y tamaño en bytes, sin leer el archivo completo
-            var nombre: String? = null
-            var tamano: Long? = null
-            context.contentResolver.query(
-                it,
-                arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE),
-                null, null, null
-            )?.use { c ->
-                if (c.moveToFirst()) {
-                    nombre = c.getString(0)
-                    if (!c.isNull(1)) tamano = c.getLong(1)
-                }
-            }
-            val nombreFinal = nombre ?: it.lastPathSegment ?: "archivo"
-            val tamanoFinal = tamano
-            if (tamanoFinal != null && tamanoFinal > TAMANO_MAXIMO_BYTES) {
-                // Se rechaza al elegirlo: no queda adjunto y se avisa con la alerta
-                archivoRechazado = nombreFinal to tamanoFinal
-            } else {
-                archivoUri = it
-                nombreArchivo = nombreFinal
-                tamanoArchivo = tamanoFinal
-            }
-        }
-    }
-
     val completo = destinatarioSeleccionado != null && asunto.isNotBlank() && mensaje.isNotBlank()
 
     // ── POPUPS ──────────────────────────────────────────────────────────────
-    archivoRechazado?.let { (nombre, tamano) ->
-        PopupConfirmacionEdu(
-            titulo = "Archivo demasiado grande",
-            mensaje = "\"$nombre\" pesa ${tamanoLegible(tamano)}. El tamaño máximo permitido es 10 MB. " +
-                    "Elige un archivo más liviano o comprímelo antes de adjuntarlo.",
-            textoConfirmar = "Elegir otro",
-            colorConfirmar = TipoBotonEdu.AVANZAR.fondo,
-            icono = Icons.Rounded.AttachFile,
-            onCancelar = { archivoRechazado = null },
-            onConfirmar = { archivoRechazado = null; archivoLauncher.launch("*/*") }
-        )
-    }
-
     if (mostrarConfirmar) {
         val dest = destinatarioSeleccionado
         PopupConfirmacionEdu(
@@ -201,7 +134,7 @@ fun NuevoComunicadoScreen(
                     onEnviado(
                         asunto.trim(),
                         mensaje.trim(),
-                        archivoUri?.toString() ?: "",
+                        adjuntos.map { it.uri },
                         "${dest.gradoNombre} Sec. ${dest.seccionNombre}",
                         dest.cursoNombre,
                         dest.totalPadres,
@@ -229,7 +162,13 @@ fun NuevoComunicadoScreen(
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         ChipEdu("${dest.totalPadres} padres", TonoEdu.VERDE)
-                        if (nombreArchivo.isNotEmpty()) ChipEdu("1 adjunto", TonoEdu.AZUL)
+                        if (adjuntos.isNotEmpty()) {
+                            ChipEdu(if (adjuntos.size == 1) "1 adjunto" else "${adjuntos.size} adjuntos", TonoEdu.CORAL)
+                        }
+                    }
+                    // Adjuntos con el color del módulo (granate)
+                    if (adjuntos.isNotEmpty()) {
+                        ListaAdjuntosResumenEdu(adjuntos.map { it.nombre }, TonoEdu.CORAL, Modifier.padding(top = 4.dp))
                     }
                 }
             }
@@ -238,7 +177,11 @@ fun NuevoComunicadoScreen(
 
     if (enviando) {
         PopupProcesandoEdu(
-            titulo = if (nombreArchivo.isNotEmpty()) "Subiendo adjunto y enviando..." else "Enviando comunicado..."
+            titulo = when (adjuntos.size) {
+                0 -> "Enviando comunicado..."
+                1 -> "Subiendo adjunto y enviando..."
+                else -> "Subiendo ${adjuntos.size} adjuntos y enviando..."
+            }
         )
     }
 
@@ -296,52 +239,13 @@ fun NuevoComunicadoScreen(
                 mensajeAyuda = if (mensaje.isEmpty()) null else "${mensaje.length} caracteres"
             )
 
-            // ADJUNTO
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    "Adjunto (opcional · máx. 10 MB)", fontFamily = Nunito, fontWeight = FontWeight.ExtraBold,
-                    fontSize = 14.sp, color = EduEtiqueta
-                )
-                if (nombreArchivo.isNotEmpty()) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(Color.White, RoundedCornerShape(16.dp))
-                            .border(1.5.dp, EduBorde, RoundedCornerShape(16.dp))
-                            .padding(horizontal = 12.dp, vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        IconoCirculoEdu(Icons.Rounded.Description, TonoEdu.AZUL, tamano = 38.dp)
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                nombreArchivo, fontFamily = Nunito, fontWeight = FontWeight.Black, fontSize = 14.5.sp,
-                                color = EduTexto, maxLines = 1, overflow = TextOverflow.Ellipsis
-                            )
-                            if (tamanoArchivo != null) {
-                                Text(
-                                    tamanoLegible(tamanoArchivo), fontFamily = Nunito, fontWeight = FontWeight.Bold,
-                                    fontSize = 12.5.sp, color = EduTextoSecundario
-                                )
-                            }
-                        }
-                        Box(
-                            modifier = Modifier
-                                .size(34.dp)
-                                .clip(RoundedCornerShape(11.dp))
-                                .background(EduCoralClaro)
-                                .clickable { archivoUri = null; nombreArchivo = ""; tamanoArchivo = null },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(Icons.Rounded.Close, contentDescription = "Quitar adjunto", tint = EduCoral, modifier = Modifier.size(18.dp))
-                        }
-                    }
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    BotonAdjuntar(Icons.Rounded.AttachFile, "Archivo", Modifier.weight(1f)) { archivoLauncher.launch("*/*") }
-                    BotonAdjuntar(Icons.Rounded.Image, "Foto", Modifier.weight(1f)) { archivoLauncher.launch("image/*") }
-                }
-            }
+            // ADJUNTOS (varios, con el color del módulo)
+            SelectorAdjuntosEdu(
+                adjuntos = adjuntos,
+                onCambio = { adjuntos = it },
+                tono = TonoEdu.CORAL,
+                habilitado = !enviando
+            )
         }
 
         // BOTÓN FIJO
@@ -490,26 +394,6 @@ private fun OpcionClase(destino: SeccionDestinatario, seleccionada: Boolean, onC
                 fontWeight = FontWeight.Bold, fontSize = 12.5.sp, color = EduTextoSecundario
             )
         }
-    }
-}
-
-// Botón con borde punteado para adjuntar (Archivo / Foto)
-@Composable
-private fun BotonAdjuntar(icono: ImageVector, texto: String, modifier: Modifier, onClick: () -> Unit) {
-    val forma = RoundedCornerShape(14.dp)
-    Row(
-        modifier = modifier
-            .clip(forma)
-            .background(Color.White)
-            .border(1.5.dp, EduAzulOscuroClaro, forma)
-            .clickable(onClick = onClick)
-            .padding(vertical = 11.dp),
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(icono, contentDescription = null, tint = EduEtiqueta, modifier = Modifier.size(19.dp))
-        Spacer(modifier = Modifier.size(7.dp))
-        Text(texto, fontFamily = Nunito, fontWeight = FontWeight.Black, fontSize = 14.sp, color = EduEtiqueta)
     }
 }
 

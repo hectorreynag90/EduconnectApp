@@ -46,6 +46,7 @@ import com.educonnectapp.ui.components.BotonSecundarioEdu
 import com.educonnectapp.ui.components.CabeceraEdu
 import com.educonnectapp.ui.components.ChipEdu
 import com.educonnectapp.ui.components.ColorModulo
+import com.educonnectapp.ui.components.ListaAdjuntosResumenEdu
 import com.educonnectapp.ui.components.TarjetaEdu
 import com.educonnectapp.ui.components.TipoBotonEdu
 import com.educonnectapp.ui.components.TonoEdu
@@ -86,8 +87,10 @@ fun ConfirmacionComunicadoScreen(
     onVerHistorial: () -> Unit = {},     // "Ver comunicados de la clase"
     onClose: () -> Unit = {},
     // ----- Rediseño 2026 -----
-    adjunto: String = ""                 // nombre del archivo adjunto ("" = sin adjunto)
+    adjunto: String = "",                // nombre del archivo adjunto ("" = sin adjunto) · compatibilidad
+    adjuntos: List<String> = emptyList() // nombres de todos los adjuntos (se muestran en granate)
 ) {
+    val nombresAdjuntos = adjuntos.ifEmpty { listOf(adjunto).filter { it.isNotBlank() } }
     val fechaTexto = remember(fecha) { fechaConfirmacion(fecha) }
 
     Column(
@@ -156,8 +159,20 @@ fun ConfirmacionComunicadoScreen(
                 FilaDatoComunicado(Icons.Rounded.Groups, "Para", destinatario.replace(" Sec. ", " "))
                 FilaDatoComunicado(Icons.Rounded.MenuBook, "Curso", curso.ifBlank { "General" })
                 FilaDatoComunicado(Icons.Rounded.CalendarToday, "Fecha", fechaTexto)
-                if (adjunto.isNotBlank()) FilaDatoComunicado(Icons.Rounded.AttachFile, "Adjunto", adjunto)
                 if (docenteNombre.isNotBlank()) FilaDatoComunicado(Icons.Rounded.Person, "Docente", docenteNombre)
+                // ADJUNTOS: ícono y nombre en el color del módulo (granate)
+                if (nombresAdjuntos.isNotEmpty()) {
+                    FilaDatoComunicado(
+                        Icons.Rounded.AttachFile, "Adjuntos",
+                        if (nombresAdjuntos.size == 1) "1 archivo" else "${nombresAdjuntos.size} archivos"
+                    )
+                    ListaAdjuntosResumenEdu(
+                        nombresAdjuntos, TonoEdu.CORAL,
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(start = 44.dp, top = 2.dp, bottom = 4.dp)
+                    )
+                }
             }
         }
 
@@ -221,7 +236,7 @@ fun ConfirmacionComunicadoPreview() {
             totalNotificados = 5,
             hora = "10:24 a. m.",
             fecha = "2026-10-19",
-            adjunto = "agenda_reunion.pdf"
+            adjuntos = listOf("agenda_reunion.pdf", "foto_pizarra.jpg")
         )
     }
 }

@@ -933,7 +933,8 @@ data class EnviarComunicadoRequest(
     val cursoId: Long? = null,
     val asunto: String,
     val mensaje: String,
-    val archivoId: Long? = null
+    val archivoId: Long? = null,               // compatibilidad (un solo adjunto)
+    val archivoIds: List<Long> = emptyList()   // hasta 5 adjuntos, en orden (paso 27)
 )
 
 @Serializable
@@ -948,6 +949,7 @@ data class ComunicadoDocenteResponse(
     val asunto: String,
     val mensaje: String = "",
     val archivo: ArchivoResponse? = null,
+    val archivos: List<ArchivoResponse> = emptyList(),   // todos los adjuntos (paso 27)
     val enviadoEn: String = "",          // ISO date-time
     val totalNotificados: Int = 0,
     val totalLeidos: Long = 0,
@@ -978,6 +980,7 @@ data class ComunicadoPadreResponse(
     val cursoId: Long? = null,
     val curso: String? = null,
     val archivo: ArchivoResponse? = null,
+    val archivos: List<ArchivoResponse> = emptyList(),   // todos los adjuntos (paso 27)
     val enviadoEn: String = "",
     val leido: Boolean = false,
     val leidoEn: String? = null
@@ -1010,6 +1013,16 @@ suspend fun subirArchivo(resolver: android.content.ContentResolver, uri: android
     return llamar { api.subirArchivo(parte) }
 }
 
+// Sube varios archivos, uno tras otro y en el mismo orden. Devuelve sus ids para adjuntarlos.
+suspend fun subirArchivos(resolver: android.content.ContentResolver, uris: List<String>): List<Long> =
+    uris.map { subirArchivo(resolver, android.net.Uri.parse(it)).id }
+
+// Todos los adjuntos de una respuesta (si el backend es anterior al paso 27, solo trae "archivo")
+fun ComunicadoDocenteResponse.adjuntos(): List<ArchivoResponse> = archivos.ifEmpty { listOfNotNull(archivo) }
+fun ComunicadoPadreResponse.adjuntos(): List<ArchivoResponse> = archivos.ifEmpty { listOfNotNull(archivo) }
+fun PublicacionDocenteResponse.adjuntos(): List<ArchivoResponse> = archivos.ifEmpty { listOfNotNull(archivo) }
+fun PublicacionPadreResponse.adjuntos(): List<ArchivoResponse> = archivos.ifEmpty { listOfNotNull(archivo) }
+
 // Nombre real del archivo (ej. "tarea.pdf"), no el identificador interno del Uri
 fun nombreArchivo(resolver: android.content.ContentResolver, uri: android.net.Uri): String {
     resolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
@@ -1038,9 +1051,11 @@ suspend fun obtenerComunicadosDocente(seccionId: Long? = null): List<ComunicadoD
     llamar { api.comunicadosDocente(seccionId) }
 
 suspend fun enviarComunicado(
-    seccionId: Long, cursoId: Long?, asunto: String, mensaje: String, archivoId: Long?
+    seccionId: Long, cursoId: Long?, asunto: String, mensaje: String, archivoIds: List<Long>
 ): ComunicadoDocenteResponse = llamar {
-    api.enviarComunicado(EnviarComunicadoRequest(seccionId, cursoId, asunto.trim(), mensaje.trim(), archivoId))
+    api.enviarComunicado(
+        EnviarComunicadoRequest(seccionId, cursoId, asunto.trim(), mensaje.trim(), archivoIds = archivoIds)
+    )
 }
 
 suspend fun obtenerDetalleComunicadoDocente(id: Long): DetalleComunicadoDocenteResponse =
@@ -1105,7 +1120,8 @@ data class CrearPublicacionRequest(
     val descripcion: String,
     val fechaEntrega: String? = null,      // "yyyy-MM-dd"
     val puntajeMaximo: Double? = null,
-    val archivoId: Long? = null
+    val archivoId: Long? = null,               // compatibilidad (un solo adjunto)
+    val archivoIds: List<Long> = emptyList()   // hasta 5 adjuntos, en orden (paso 27)
 )
 
 // estado: "ACTIVA" | "CERRADA" | "ANULADA"
@@ -1124,6 +1140,7 @@ data class PublicacionDocenteResponse(
     val fechaEntrega: String? = null,
     val puntajeMaximo: Double? = null,
     val archivo: ArchivoResponse? = null,
+    val archivos: List<ArchivoResponse> = emptyList(),   // todos los adjuntos (paso 27)
     val estado: String = "ACTIVA",
     val publicadoEn: String = "",
     val totalAlumnos: Long = 0,
@@ -1153,6 +1170,7 @@ data class PublicacionPadreResponse(
     val fechaEntrega: String? = null,
     val puntajeMaximo: Double? = null,
     val archivo: ArchivoResponse? = null,
+    val archivos: List<ArchivoResponse> = emptyList(),   // todos los adjuntos (paso 27)
     val estado: String = "ACTIVA",
     val publicadoEn: String = "",
     val leido: Boolean = false,
@@ -1201,7 +1219,7 @@ suspend fun obtenerPublicacionesDocente(
 
 suspend fun crearPublicacion(
     seccionId: Long, cursoId: Long, tipo: String, titulo: String, descripcion: String,
-    fechaEntrega: String?, archivoId: Long?
+    fechaEntrega: String?, archivoIds: List<Long>
 ): PublicacionDocenteResponse = llamar {
     api.crearPublicacion(
         CrearPublicacionRequest(
@@ -1211,7 +1229,7 @@ suspend fun crearPublicacion(
             titulo = titulo.trim(),
             descripcion = descripcion.trim(),
             fechaEntrega = fechaEntrega?.ifBlank { null },
-            archivoId = archivoId
+            archivoIds = archivoIds
         )
     )
 }

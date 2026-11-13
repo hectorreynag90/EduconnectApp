@@ -114,6 +114,8 @@ import com.educonnectapp.data.api.solicitarCodigoRecuperacion
 import com.educonnectapp.data.api.verificarCodigoRecuperacion
 import com.educonnectapp.data.api.ApiException
 import com.educonnectapp.data.api.reenviarComunicado
+import com.educonnectapp.data.api.subirArchivos
+import com.educonnectapp.data.api.adjuntos
 import com.educonnectapp.data.api.editarPublicacion
 import com.educonnectapp.data.api.anularPublicacion
 import com.educonnectapp.data.api.ingresar
@@ -156,7 +158,6 @@ import com.educonnectapp.data.api.porcentajeAsistencia
 import com.educonnectapp.data.api.inicioAnioEscolar
 import com.educonnectapp.data.api.ArchivoResponse
 import com.educonnectapp.data.api.ComunicadoDocenteResponse
-import com.educonnectapp.data.api.subirArchivo
 import com.educonnectapp.data.api.descargarArchivo
 import com.educonnectapp.data.api.enviarComunicado
 import com.educonnectapp.data.api.obtenerComunicadosDocente
@@ -288,6 +289,7 @@ private fun PublicacionPadreResponse.aPublicacionAgendaItem(hoy: String): Public
         fechaEntrega = fecha,
         estado = estadoUi,
         archivoAdjunto = archivo?.nombre ?: "",
+        adjuntos = adjuntos().map { it.nombre },
         publicadoEn = fechaLocal(publicadoEn)
     )
 }
@@ -406,8 +408,8 @@ fun EduConnectApp() {
     var totalHoySel by remember { mutableStateOf(0) }
     var sinLeerSel by remember { mutableStateOf(0) }
     // Comunicados (rediseño 2026)
-    var comunicadoAdjuntoSel by remember { mutableStateOf("") }                      // nombre del adjunto enviado
-    var comunicadoArchivoSel by remember { mutableStateOf<ArchivoResponse?>(null) }  // adjunto del detalle
+    var comunicadoAdjuntosSel by remember { mutableStateOf<List<String>>(emptyList()) }         // nombres de los adjuntos enviados
+    var comunicadoArchivosSel by remember { mutableStateOf<List<ArchivoResponse>>(emptyList()) } // adjuntos del detalle
     var destinoComunicadoInicialSel by remember { mutableStateOf<SeccionDestinatario?>(null) }  // clase ya elegida
     var origenNuevoComunicado by remember { mutableStateOf(Screen.COMUNICADOS) }
     var comunicadosListaSel by remember { mutableStateOf<List<ComunicadoResumenItem>>(emptyList()) }
@@ -549,7 +551,7 @@ fun EduConnectApp() {
     // Comunicados
     var enviandoComunicado by remember { mutableStateOf(false) }
     var comunicadosDocenteSel by remember { mutableStateOf<List<ComunicadoDocenteResponse>>(emptyList()) }
-    var adjuntosComunicadoSel by remember { mutableStateOf<Map<Long, ArchivoResponse>>(emptyMap()) }
+    var adjuntosComunicadoSel by remember { mutableStateOf<Map<Long, List<ArchivoResponse>>>(emptyMap()) }
     var descargandoAdjunto by remember { mutableStateOf(false) }
     // Datos ya cargados (evitan peticiones repetidas al volver a una pantalla).
     // Se recargan al entrar al módulo desde el Home o después de guardar algo.
@@ -601,7 +603,7 @@ fun EduConnectApp() {
     // Agenda (padre)
     var agendaPorHijoSel by remember { mutableStateOf<Map<Long, List<PublicacionPadreResponse>>>(emptyMap()) }
     var agendaCargada by remember { mutableStateOf(false) }
-    var adjuntosPublicacionSel by remember { mutableStateOf<Map<Long, ArchivoResponse>>(emptyMap()) }
+    var adjuntosPublicacionSel by remember { mutableStateOf<Map<Long, List<ArchivoResponse>>>(emptyMap()) }
     var publicacionesLeidasSel by remember { mutableStateOf<Set<Long>>(emptySet()) }
     // Notificaciones (campana del Home padre)
     var notificacionesSel by remember { mutableStateOf<List<NotificacionResponse>>(emptyList()) }
@@ -782,7 +784,7 @@ fun EduConnectApp() {
         }.toMap()
         agendaPorHijoSel = publicacionesPorHijo
         adjuntosPublicacionSel = publicacionesPorHijo.values.flatten()
-            .mapNotNull { p -> p.archivo?.let { p.id to it } }.toMap()
+            .associate { p -> p.id to p.adjuntos() }.filterValues { it.isNotEmpty() }
         publicacionesLeidasSel = publicacionesPorHijo.values.flatten().filter { it.leido }.map { it.id }.toSet()
         val hoyTexto = hoy.toString()
         hijosAgendaSel = hijos.map { h ->
@@ -836,7 +838,7 @@ fun EduConnectApp() {
     // Lista de comunicados de un hijo (COMUNICADOS_RECIBIDOS): más recientes primero
     // (la pantalla los separa en Todos / Sin leer / Leídos y los agrupa por fecha)
     fun aplicarComunicadosHijo(hijo: HijoComunicadoItem, comunicados: List<ComunicadoPadreResponse>) {
-        adjuntosComunicadoSel = comunicados.mapNotNull { c -> c.archivo?.let { c.id to it } }.toMap()
+        adjuntosComunicadoSel = comunicados.associate { c -> c.id to c.adjuntos() }.filterValues { it.isNotEmpty() }
         comunicadosPadreSel = comunicados
             .sortedByDescending { aFechaHoraLocal(it.enviadoEn) }
             .map { c ->
@@ -951,7 +953,9 @@ fun EduConnectApp() {
                     for (hijo in hijosAgendaSel) {
                         val publicacion = try { obtenerPublicacionHijo(hijo.id, publicacionId) } catch (e: ApiException) { null }
                         if (publicacion != null) {
-                            publicacion.archivo?.let { adjuntosPublicacionSel = adjuntosPublicacionSel + (publicacion.id to it) }
+                            publicacion.adjuntos().takeIf { it.isNotEmpty() }?.let {
+                                adjuntosPublicacionSel = adjuntosPublicacionSel + (publicacion.id to it)
+                            }
                             if (publicacion.leido) publicacionesLeidasSel = publicacionesLeidasSel + publicacion.id
                             contexto = hijo to publicacion
                             break
@@ -998,27 +1002,28 @@ fun EduConnectApp() {
         return comunicadosTodosSel
     }
 
-    // Publicar tarea o evaluación: sube el adjunto (si hay) y crea la publicación.
+    // Publicar tarea o evaluación: sube los adjuntos (si hay, hasta 5) y crea la publicación.
     // El backend notifica por push a los padres de la sección.
     fun publicar(
-        tipoBackend: String, titulo: String, descripcion: String, adjunto: String,
+        tipoBackend: String, titulo: String, descripcion: String, adjuntos: List<String>,
         seccion: SeccionDestinatario, fechaEntrega: String, hora: String
     ) {
         if (publicandoSel) return   // evita doble envío
         publicandoSel = true   // la pantalla muestra el popup "Publicando..."
         CoroutineScope(Dispatchers.Main).launch {
             try {
-                val archivoId = if (adjunto.isNotEmpty())
-                    subirArchivo(context.contentResolver, android.net.Uri.parse(adjunto)).id
-                else null
+                // 1) Subir los adjuntos (en orden) y obtener sus ids
+                val archivoIds = subirArchivos(context.contentResolver, adjuntos)
+                // 2) Crear la publicación con todos sus adjuntos
                 val publicada = crearPublicacion(
-                    seccion.seccionId, seccion.cursoId, tipoBackend, titulo, descripcion, fechaEntrega, archivoId
+                    seccion.seccionId, seccion.cursoId, tipoBackend, titulo, descripcion, fechaEntrega, archivoIds
                 )
                 tituloPublicacionSel = publicada.titulo
                 fechaEntregaSel = publicada.fechaEntrega ?: fechaEntrega
                 horaPublicacionSel = hora
                 publicacionNotificadosSel = publicada.totalAlumnos.toInt()
-                adjuntoPublicacionSel = publicada.archivo?.nombre ?: ""
+                // Confirmación: nombres de los adjuntos separados por coma
+                adjuntoPublicacionSel = publicada.adjuntos().joinToString(", ") { it.nombre }
                 // Clase de la publicación: para la confirmación, "Ver publicaciones de la clase" y "Nueva tarea"
                 asignacionPublicacionSel = asignacionesApiSel.find {
                     it.seccionId == seccion.seccionId && it.cursoId == seccion.cursoId
@@ -1911,7 +1916,7 @@ fun EduConnectApp() {
                         onAvisos = { currentScreen = Screen.COMUNICADOS },
                         onPerfilDocente = { currentScreen = Screen.PERFIL_DOCENTE },
                         onNotificaciones = {},
-                        onEnviado = { asunto, mensaje, adjunto, destinatario, curso, _, _, _ ->
+                        onEnviado = { asunto, mensaje, adjuntos, destinatario, curso, _, _, _ ->
                             if (enviandoComunicado) return@NuevoComunicadoScreen   // evita doble envío
                             // Sección + curso (una sección puede tener varios cursos del mismo docente)
                             val dest = listaDestinatariosSel.find {
@@ -1920,19 +1925,17 @@ fun EduConnectApp() {
                             enviandoComunicado = true   // muestra el popup "Enviando comunicado..."
                             CoroutineScope(Dispatchers.Main).launch {
                                 try {
-                                    // 1) Subir el adjunto (si hay) y obtener su id
-                                    val archivoId = if (adjunto.isNotEmpty())
-                                        subirArchivo(context.contentResolver, Uri.parse(adjunto)).id
-                                    else null
+                                    // 1) Subir los adjuntos (si hay, hasta 5) en orden y obtener sus ids
+                                    val archivoIds = subirArchivos(context.contentResolver, adjuntos)
                                     // 2) Enviar el comunicado: el backend notifica por push a los padres
-                                    val enviado = enviarComunicado(dest.seccionId, dest.cursoId, asunto, mensaje, archivoId)
+                                    val enviado = enviarComunicado(dest.seccionId, dest.cursoId, asunto, mensaje, archivoIds)
                                     comunicadoAsuntoSel = enviado.asunto
                                     comunicadoDestinatarioSel = destinatario
                                     comunicadoCursoSel = curso
                                     comunicadoNotificadosSel = enviado.totalNotificados
                                     comunicadoHoraSel = horaLocal(enviado.enviadoEn)
                                     comunicadoFechaSel = fechaLocal(enviado.enviadoEn)
-                                    comunicadoAdjuntoSel = enviado.archivo?.nombre ?: ""
+                                    comunicadoAdjuntosSel = enviado.adjuntos().map { it.nombre }
                                     comunicadosDocenteCargados = false   // hay un comunicado nuevo
                                     // La clase del envío: para "Ver comunicados de la clase" y "Nuevo comunicado"
                                     gradoIdSel = dest.gradoId; seccionIdSel = dest.seccionId; cursoIdSel = dest.cursoId
@@ -1963,7 +1966,7 @@ fun EduConnectApp() {
                     totalNotificados = comunicadoNotificadosSel,
                     hora = comunicadoHoraSel,
                     fecha = comunicadoFechaSel,
-                    adjunto = comunicadoAdjuntoSel,
+                    adjuntos = comunicadoAdjuntosSel,
                     onNuevoComunicado = {
                         // Misma clase ya elegida (se puede cambiar en "Para")
                         origenNuevoComunicado = Screen.COMUNICADOS
@@ -2574,14 +2577,14 @@ fun EduConnectApp() {
                     var cargandoLectura by remember { mutableStateOf(true) }
                     androidx.compose.runtime.LaunchedEffect(comunicadoIdSel) {
                         // Mostrar de inmediato lo que ya se tiene de la lista
-                        comunicadoArchivoSel = null
+                        comunicadoArchivosSel = emptyList()
                         comunicadosDocenteSel.find { it.id == comunicadoIdSel }?.let { c ->
                             comunicadoAsuntoSel = c.asunto
                             comunicadoMensajeSel = c.mensaje
                             comunicadoTotalNotifSel = c.totalNotificados
                             comunicadoHoraSel = horaLocal(c.enviadoEn)
                             comunicadoFechaSel = fechaLocal(c.enviadoEn)
-                            comunicadoArchivoSel = c.archivo
+                            comunicadoArchivosSel = c.adjuntos()
                         }
                         padresLecturaSel = emptyList()
                         cargandoLectura = true
@@ -2593,7 +2596,7 @@ fun EduConnectApp() {
                             comunicadoTotalNotifSel = detalle.comunicado.totalNotificados
                             comunicadoHoraSel = horaLocal(detalle.comunicado.enviadoEn)
                             comunicadoFechaSel = fechaLocal(detalle.comunicado.enviadoEn)
-                            comunicadoArchivoSel = detalle.comunicado.archivo ?: comunicadoArchivoSel
+                            comunicadoArchivosSel = detalle.comunicado.adjuntos().ifEmpty { comunicadoArchivosSel }
                             padresLecturaSel = detalle.lecturas.map { l ->
                                 PadreLecturaItem(
                                     padreId = l.padreId.toString(),
@@ -2642,8 +2645,9 @@ fun EduConnectApp() {
                                 }
                             }
                         },
-                        adjuntoNombre = comunicadoArchivoSel?.nombre ?: "",
-                        onAbrirAdjunto = { comunicadoArchivoSel?.let { abrirAdjunto(it) } },
+                        adjuntos = comunicadoArchivosSel.map { it.nombre },
+                        onAbrirAdjuntoEn = { i -> comunicadoArchivosSel.getOrNull(i)?.let { abrirAdjunto(it) } },
+                        descargandoAdjunto = descargandoAdjunto,
                         cargando = cargandoLectura,
                         reenviando = reenviandoComunicado,
                         reenviadosA = reenviadosASel,
@@ -2724,8 +2728,8 @@ fun EduConnectApp() {
                             onAvisos = irAvisos,
                             onPerfilDocente = { currentScreen = Screen.PERFIL_DOCENTE },
                             onNotificaciones = {},
-                            onPublicar = { titulo, descripcion, adjunto, seccion, fechaEntrega, _, hora ->
-                                publicar("TAREA", titulo, descripcion, adjunto, seccion, fechaEntrega, hora)
+                            onPublicar = { titulo, descripcion, adjuntos, seccion, fechaEntrega, _, hora ->
+                                publicar("TAREA", titulo, descripcion, adjuntos, seccion, fechaEntrega, hora)
                             }
                         )
                     } else {
@@ -2739,8 +2743,9 @@ fun EduConnectApp() {
                             onAvisos = irAvisos,
                             onPerfilDocente = { currentScreen = Screen.PERFIL_DOCENTE },
                             onNotificaciones = {},
-                            onPublicar = { titulo, descripcion, adjunto, seccion, fechaEvaluacion, _, hora ->
-                                publicar("EVALUACION", titulo, descripcion, adjunto, seccion, fechaEvaluacion, hora)
+                            onPublicar = { titulo, descripcion, _, seccion, fechaEvaluacion, _, hora ->
+                                // Las evaluaciones no llevan adjuntos
+                                publicar("EVALUACION", titulo, descripcion, emptyList(), seccion, fechaEvaluacion, hora)
                             }
                         )
                     }
@@ -2864,7 +2869,8 @@ fun EduConnectApp() {
                                 fechaEntrega = p.fechaEntrega ?: "",
                                 descripcion = p.descripcion,
                                 nombreAdjunto = p.archivo?.nombre,
-                                estado = p.estado
+                                estado = p.estado,
+                                adjuntos = p.adjuntos().map { it.nombre }
                             )
                         },
                         alumnos = detalle?.calificaciones.orEmpty()
@@ -2885,6 +2891,7 @@ fun EduConnectApp() {
                         guardando = guardandoCalificaciones,
                         descargandoAdjunto = descargandoAdjunto,
                         onAbrirAdjunto = { detalle?.publicacion?.archivo?.let { abrirAdjunto(it) } },
+                        onAbrirAdjuntoEn = { i -> detalle?.publicacion?.adjuntos()?.getOrNull(i)?.let { abrirAdjunto(it) } },
                         onBack = { currentScreen = origenCalificar },
                         onHomeDocente = { currentScreen = Screen.HOME_DOCENTE },
                         onAlumnos = {},
@@ -2973,7 +2980,8 @@ fun EduConnectApp() {
                                 fechaEntrega = p.fechaEntrega ?: "",
                                 descripcion = p.descripcion,
                                 nombreAdjunto = p.archivo?.nombre,
-                                estado = p.estado
+                                estado = p.estado,
+                                adjuntos = p.adjuntos().map { it.nombre }
                             )
                         },
                         guardando = guardandoEdicionPub,
@@ -3083,7 +3091,7 @@ fun EduConnectApp() {
                             throw e
                         } catch (e: Exception) { /* se reintentará al abrirla de nuevo */ }
                     }
-                    val adjunto = publicacionAgendaSel?.let { adjuntosPublicacionSel[it.id] }
+                    val adjuntosAgenda = publicacionAgendaSel?.let { adjuntosPublicacionSel[it.id] }.orEmpty()
                     DetalleAgendaScreen(
                         tieneNotificaciones = notificacionesNoLeidasSel > 0,
                         nombreHijo = hijoAgendaSel?.nombres ?: "",
@@ -3092,7 +3100,8 @@ fun EduConnectApp() {
                         seccionNombre = hijoAgendaSel?.seccionNombre ?: "",
                         publicacion = publicacionAgendaSel,
                         descargandoAdjunto = descargandoAdjunto,
-                        onAbrirAdjunto = { adjunto?.let { abrirAdjunto(it) } },
+                        onAbrirAdjunto = { adjuntosAgenda.firstOrNull()?.let { abrirAdjunto(it) } },
+                        onAbrirAdjuntoEn = { i -> adjuntosAgenda.getOrNull(i)?.let { abrirAdjunto(it) } },
                         onBack = {
                             currentScreen = origenDetalleAgenda
                             origenDetalleAgenda = Screen.AGENDA_ESCOLAR
@@ -3199,14 +3208,16 @@ fun EduConnectApp() {
                             throw e
                         } catch (e: Exception) { /* se reintentará al abrirlo de nuevo */ }
                     }
-                    val adjunto = comunicadoPadreSel?.let { adjuntosComunicadoSel[it.id] }
+                    val adjuntosCom = comunicadoPadreSel?.let { adjuntosComunicadoSel[it.id] }.orEmpty()
                     DetalleComunicadoPadreScreen(
                         tieneNotificaciones = notificacionesNoLeidasSel > 0,
                         comunicado = comunicadoPadreSel,
                         nombreHijo = hijoComunicadoSel?.let { "${it.nombres} ${it.apellidos}".trim() } ?: "",
-                        nombreAdjunto = adjunto?.nombre,
+                        nombreAdjunto = adjuntosCom.firstOrNull()?.nombre,
+                        adjuntos = adjuntosCom.map { it.nombre },
                         descargandoAdjunto = descargandoAdjunto,
-                        onAbrirAdjunto = { adjunto?.let { abrirAdjunto(it) } },
+                        onAbrirAdjunto = { adjuntosCom.firstOrNull()?.let { abrirAdjunto(it) } },
+                        onAbrirAdjuntoEn = { i -> adjuntosCom.getOrNull(i)?.let { abrirAdjunto(it) } },
                         onBack = {
                             currentScreen = origenDetalleComunicadoPadre
                             origenDetalleComunicadoPadre = Screen.COMUNICADOS_RECIBIDOS

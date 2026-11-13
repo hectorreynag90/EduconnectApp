@@ -20,9 +20,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.rounded.Send
-import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Visibility
@@ -49,6 +47,7 @@ import com.educonnectapp.ui.components.BotonPrincipalEdu
 import com.educonnectapp.ui.components.CabeceraEdu
 import com.educonnectapp.ui.components.ChipEdu
 import com.educonnectapp.ui.components.ColorModulo
+import com.educonnectapp.ui.components.ListaAdjuntosAbrirEdu
 import com.educonnectapp.ui.components.PopupConfirmacionEdu
 import com.educonnectapp.ui.components.PopupExitoEdu
 import com.educonnectapp.ui.components.PopupProcesandoEdu
@@ -59,7 +58,6 @@ import com.educonnectapp.ui.components.coloresDeTono
 import com.educonnectapp.ui.screens.docente.inicio.BottomNavBarDocente
 import com.educonnectapp.ui.theme.EduAmarilloClaro
 import com.educonnectapp.ui.theme.EduAmarilloOscuro
-import com.educonnectapp.ui.theme.EduAzulOscuro
 import com.educonnectapp.ui.theme.EduBorde
 import com.educonnectapp.ui.theme.EduCampo
 import com.educonnectapp.ui.theme.EduConnectAppTheme
@@ -127,14 +125,19 @@ fun DetalleComunicadoScreen(
     onNotificaciones: () -> Unit = {},
     onReenviar: () -> Unit = {},
     // ----- Rediseño 2026 -----
-    adjuntoNombre: String = "",          // "" = sin adjunto
+    adjuntoNombre: String = "",          // "" = sin adjunto (compatibilidad: se usa si adjuntos está vacío)
     onAbrirAdjunto: () -> Unit = {},
     cargando: Boolean = false,           // se están consultando las lecturas
     // ----- Reenvío (recordatorio a los que no leyeron) -----
     reenviando: Boolean = false,         // muestra "Enviando recordatorio..."
     reenviadosA: Int? = null,            // != null: popup de éxito con la cantidad de padres
-    onCerrarReenvio: () -> Unit = {}
+    onCerrarReenvio: () -> Unit = {},
+    // ----- Varios adjuntos (paso 27) -----
+    adjuntos: List<String> = emptyList(),      // nombres, en orden
+    onAbrirAdjuntoEn: (Int) -> Unit = {},      // posición del adjunto tocado
+    descargandoAdjunto: Boolean = false
 ) {
+    val nombresAdjuntos = adjuntos.ifEmpty { listOf(adjuntoNombre).filter { it.isNotBlank() } }
     var tabSeleccionado by remember { mutableStateOf("Leyeron") }
     var confirmarReenvio by remember { mutableStateOf(false) }
 
@@ -229,28 +232,19 @@ fun DetalleComunicadoScreen(
                         lineHeight = 19.sp, color = EduEtiqueta
                     )
                 }
-                if (adjuntoNombre.isNotBlank()) {
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(14.dp))
-                            .border(1.5.dp, EduBorde, RoundedCornerShape(14.dp))
-                            .clickable(onClick = onAbrirAdjunto)
-                            .padding(horizontal = 10.dp, vertical = 9.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Icon(Icons.Rounded.Description, contentDescription = null, tint = EduAzulOscuro, modifier = Modifier.size(20.dp))
-                        Text(
-                            adjuntoNombre, modifier = Modifier.weight(1f), fontFamily = Nunito, fontWeight = FontWeight.ExtraBold,
-                            fontSize = 14.sp, color = EduTexto, maxLines = 1, overflow = TextOverflow.Ellipsis
-                        )
-                        Icon(
-                            Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = "Abrir adjunto",
-                            tint = EduTextoSecundario, modifier = Modifier.size(22.dp)
-                        )
-                    }
+                if (nombresAdjuntos.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        if (nombresAdjuntos.size == 1) "ADJUNTO" else "ADJUNTOS · ${nombresAdjuntos.size}",
+                        fontFamily = Nunito, fontWeight = FontWeight.Black, fontSize = 12.5.sp,
+                        letterSpacing = 0.6.sp, color = EduTextoSecundario
+                    )
+                    ListaAdjuntosAbrirEdu(
+                        nombres = nombresAdjuntos,
+                        tono = TonoEdu.CORAL,
+                        descargando = descargandoAdjunto,
+                        onAbrir = { i -> if (adjuntos.isEmpty()) onAbrirAdjunto() else onAbrirAdjuntoEn(i) }
+                    )
                 }
             }
 
@@ -422,7 +416,7 @@ fun DetalleComunicadoPreview() {
             seccionNombre = "A",
             cursoNombre = "Ciencia y Tecnología",
             totalNotificados = 5,
-            adjuntoNombre = "agenda_reunion.pdf",
+            adjuntos = listOf("agenda_reunion.pdf", "foto_pizarra.jpg"),
             padres = listOf(
                 PadreLecturaItem("1", "Luis Pérez", "Carlos", "2026-10-19T09:52:00"),
                 PadreLecturaItem("2", "Carla Castillo", "María", "2026-10-19T10:05:00"),
