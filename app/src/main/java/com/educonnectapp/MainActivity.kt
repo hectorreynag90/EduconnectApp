@@ -45,7 +45,9 @@ import com.educonnectapp.ui.screens.docente.comunicados.ComunicadosScreen
 import com.educonnectapp.ui.screens.padre.asistencia.HistorialAsistenciasScreen
 import com.educonnectapp.ui.screens.docente.inicio.HomeDocenteScreen
 import com.educonnectapp.ui.screens.docente.inicio.ClaseHoyItem
-import com.educonnectapp.ui.screens.docente.inicio.EnviadoInicioItem
+import com.educonnectapp.ui.screens.docente.inicio.ResumenInicioDocente
+import com.educonnectapp.ui.screens.docente.historial.HistorialDocenteScreen
+import com.educonnectapp.ui.screens.docente.historial.ResumenHistorialDocente
 import com.educonnectapp.ui.screens.padre.inicio.HomePadreScreen
 import com.educonnectapp.ui.screens.padre.inicio.HijoInicioItem
 import com.educonnectapp.ui.screens.padre.inicio.AsistenciaHoyItem
@@ -181,6 +183,7 @@ import com.educonnectapp.data.api.obtenerDetallePublicacionDocente
 import com.educonnectapp.data.api.registrarCalificaciones
 import com.educonnectapp.ui.screens.docente.publicaciones.HistorialPublicacionesScreen
 import com.educonnectapp.ui.screens.docente.publicaciones.PublicacionHistorialItem
+import com.educonnectapp.ui.screens.docente.publicaciones.clase
 import com.educonnectapp.ui.screens.docente.publicaciones.CalificarPublicacionScreen
 import com.educonnectapp.ui.screens.docente.publicaciones.DetallePublicacionItem
 import com.educonnectapp.ui.screens.docente.publicaciones.AlumnoCalificacionItem
@@ -208,6 +211,7 @@ enum class Screen {
     SELECCIONAR_HIJO_AGENDA, AGENDA_ESCOLAR, DETALLE_AGENDA,
     COMUNICADOS_PADRE, SELECCIONAR_ESTUDIANTE_COMUNICADO, COMUNICADOS_RECIBIDOS, DETALLE_COMUNICADO_PADRE,
     HISTORIAL_PUBLICACIONES, CALIFICAR_PUBLICACION,
+    HISTORIAL_DOCENTE, HISTORIAL_COMUNICADOS,
     RECUPERAR_CORREO, RECUPERAR_CODIGO, RECUPERAR_NUEVA, RECUPERAR_LISTO
 }
 
@@ -604,6 +608,11 @@ fun EduConnectApp() {
     var origenNuevaPublicacion by remember { mutableStateOf(Screen.PUBLICACIONES) }
     var adjuntoPublicacionSel by remember { mutableStateOf("") }
     var claseHistorialPublicacionSel by remember { mutableStateOf<Pair<Long, Long>?>(null) }      // (seccionId, cursoId)
+    // Historial del docente: pantalla a la que vuelve cada historial y pestaña inicial de publicaciones
+    var origenHistorialAsistencia by remember { mutableStateOf(Screen.ASISTENCIAS) }
+    var origenHistorialComunicados by remember { mutableStateOf(Screen.COMUNICADOS) }
+    var origenHistorialPublicaciones by remember { mutableStateOf(Screen.PUBLICACIONES) }
+    var tabHistorialPublicacionesSel by remember { mutableStateOf("Todas") }
     var asignacionPublicacionSel by remember { mutableStateOf<AsignacionResponse?>(null) }
     var publicandoSel by remember { mutableStateOf(false) }
     var publicacionNotificadosSel by remember { mutableStateOf(0) }
@@ -752,6 +761,14 @@ fun EduConnectApp() {
         destinoPublicacionInicialSel = destino
         origenNuevaPublicacion = origen
         currentScreen = if (tipo == "Tarea") Screen.NUEVA_TAREA else Screen.NUEVA_EVALUACION
+    }
+
+    // Abre el historial de publicaciones: clase = null muestra todas las clases
+    fun irHistorialPublicaciones(clase: Pair<Long, Long>?, tab: String, origen: Screen) {
+        claseHistorialPublicacionSel = clase
+        tabHistorialPublicacionesSel = tab
+        origenHistorialPublicaciones = origen
+        currentScreen = Screen.HISTORIAL_PUBLICACIONES
     }
 
     // Hijos del padre: se piden 1 sola vez por sesión (se actualizan en PERFIL_PADRE y al asociar)
@@ -1435,39 +1452,26 @@ fun EduConnectApp() {
                         }
                     }
 
-                    // Último comunicado y última tarea (los más recientes)
-                    val ultimoComunicado = comunicadosTodosSel
-                        .maxByOrNull { aFechaHoraLocal(it.enviadoEn) ?: java.time.LocalDateTime.MIN }
-                    val ultimaTarea = publicacionesDocenteSel
-                        .filter { it.tipo == "TAREA" }
-                        .maxByOrNull { aFechaHoraLocal(it.publicadoEn) ?: java.time.LocalDateTime.MIN }
+                    // Dato rápido de cada acceso (con los datos ya cargados; sin peticiones extra)
+                    val hoyInicio = java.time.LocalDate.now().toString()
+                    val notificadosInicio = comunicadosTodosSel.sumOf { it.totalNotificados }
+                    val leidosInicio = comunicadosTodosSel.sumOf { it.totalLeidos.toInt() }
+                    // Tareas activas = no anuladas y con entrega de hoy en adelante
+                    val tareasActivasInicio = publicacionesDocenteSel.filter {
+                        it.tipo == "TAREA" && it.estado == "ACTIVA" && (it.fechaEntrega?.take(10) ?: "") >= hoyInicio
+                    }
 
                     HomeDocenteScreen(
                         usuarioNombre = usuarioLogueado?.nombrecompleto ?: "",
                         fotoUrl = usuarioLogueado?.fotoId?.let { urlArchivo(it) },
                         clases = clasesDeHoy(),
                         cargandoClases = cargandoInicioDocente,
-                        ultimoComunicado = ultimoComunicado?.let { c ->
-                            EnviadoInicioItem(
-                                id = c.id,
-                                titulo = c.asunto,
-                                detalle = listOfNotNull("${c.grado} ${c.seccion}", c.curso).joinToString(" · "),
-                                fecha = fechaLocal(c.enviadoEn),
-                                hechos = c.totalLeidos.toInt(),
-                                total = c.totalNotificados
-                            )
-                        },
-                        ultimaTarea = ultimaTarea?.let { t ->
-                            EnviadoInicioItem(
-                                id = t.id,
-                                titulo = t.titulo,
-                                detalle = "${t.grado} ${t.seccion} · ${t.curso}" +
-                                        (t.fechaEntrega?.let { " · Entrega: ${formatearFechaCorta(it)}" } ?: ""),
-                                fecha = fechaLocal(t.publicadoEn),
-                                hechos = t.calificados.toInt(),
-                                total = t.totalAlumnos.toInt()
-                            )
-                        },
+                        resumen = ResumenInicioDocente(
+                            comunicadosEnviados = comunicadosTodosSel.size,
+                            porcentajeLectura = if (notificadosInicio > 0) leidosInicio * 100 / notificadosInicio else null,
+                            tareasActivas = tareasActivasInicio.size,
+                            proximaEntrega = tareasActivasInicio.mapNotNull { it.fechaEntrega?.take(10) }.minOrNull() ?: ""
+                        ),
                         tieneNotificaciones = false,   // el docente aún no tiene bandeja de notificaciones
                         onTomarAsistencia = { clase ->
                             gradoIdSel = clase.gradoId; seccionIdSel = clase.seccionId; cursoIdSel = clase.cursoId
@@ -1488,46 +1492,7 @@ fun EduConnectApp() {
                             publicacionesCargadas = false
                             currentScreen = Screen.PUBLICACIONES
                         },
-                        onVerComunicado = { id ->
-                            comunicadosTodosSel.find { it.id == id }?.let { c ->
-                                comunicadosDocenteSel = listOf(c)
-                                comunicadosListaSel = listOf(
-                                    ComunicadoResumenItem(
-                                        id = c.id,
-                                        asunto = c.asunto,
-                                        mensaje = c.mensaje,
-                                        fecha = fechaLocal(c.enviadoEn),
-                                        totalNotificados = c.totalNotificados,
-                                        totalLeidos = c.totalLeidos.toInt()
-                                    )
-                                )
-                                gradoSel = c.grado; seccionSel = c.seccion; cursoSel = c.curso ?: ""
-                                seccionIdSel = c.seccionId
-                                c.cursoId?.let { cursoIdSel = it }
-                            }
-                            comunicadoIdSel = id
-                            origenDetalleComunicado = Screen.HOME_DOCENTE
-                            currentScreen = Screen.DETALLE_COMUNICADO
-                        },
-                        onVerTarea = { id ->
-                            publicacionIdSel = id
-                            origenCalificar = Screen.HOME_DOCENTE
-                            currentScreen = Screen.CALIFICAR_PUBLICACION
-                        },
-                        onCrearComunicado = {
-                            comunicadosDocenteCargados = false
-                            destinoComunicadoInicialSel = null
-                            origenNuevoComunicado = Screen.HOME_DOCENTE
-                            currentScreen = Screen.NUEVO_COMUNICADO
-                        },
-                        onCrearTarea = {
-                            publicacionesCargadas = false
-                            irANuevaPublicacion("Tarea", null, Screen.HOME_DOCENTE)
-                        },
-                        onCrearEvaluacion = {
-                            publicacionesCargadas = false
-                            irANuevaPublicacion("Evaluación", null, Screen.HOME_DOCENTE)
-                        },
+                        onHistorial = { currentScreen = Screen.HISTORIAL_DOCENTE },
                         onAlumnos = { aviso("Alumnos disponible próximamente") },
                         onAvisos = {
                             comunicadosDocenteCargados = false
@@ -1638,7 +1603,10 @@ fun EduConnectApp() {
                     }
                     AsistenciasScreen(
                         onBack = { currentScreen = Screen.HOME_DOCENTE },
-                        onHistorial = { currentScreen = Screen.SELECCIONAR_SECCION_HISTORIAL },
+                        onHistorial = {
+                            origenHistorialAsistencia = Screen.ASISTENCIAS
+                            currentScreen = Screen.SELECCIONAR_SECCION_HISTORIAL
+                        },
                         onHomeDocente = { currentScreen = Screen.HOME_DOCENTE },
                         onAlumnos = { aviso("Alumnos disponible próximamente") },
                         onAvisos = {
@@ -1919,6 +1887,10 @@ fun EduConnectApp() {
                             destinoComunicadoInicialSel = null
                             origenNuevoComunicado = Screen.COMUNICADOS
                             currentScreen = Screen.NUEVO_COMUNICADO
+                        },
+                        onHistorial = {
+                            origenHistorialComunicados = Screen.COMUNICADOS
+                            currentScreen = Screen.HISTORIAL_COMUNICADOS
                         },
                         clases = clasesComunicado(),
                         cargandoClases = cargandoClasesComunicado,
@@ -2725,11 +2697,11 @@ fun EduConnectApp() {
                         onNotificaciones = {},
                         onNuevaTarea = { irANuevaPublicacion("Tarea", null, Screen.PUBLICACIONES) },
                         onNuevaEvaluacion = { irANuevaPublicacion("Evaluación", null, Screen.PUBLICACIONES) },
+                        onHistorial = { irHistorialPublicaciones(null, "Todas", Screen.PUBLICACIONES) },
                         clases = clasesPublicacion(),
                         cargandoClases = cargandoClasesPub,
                         onElegirClase = { clase ->
-                            claseHistorialPublicacionSel = clase.seccionId to clase.cursoId
-                            currentScreen = Screen.HISTORIAL_PUBLICACIONES
+                            irHistorialPublicaciones(clase.seccionId to clase.cursoId, "Todas", Screen.PUBLICACIONES)
                         }
                     )
                 }
@@ -2793,7 +2765,11 @@ fun EduConnectApp() {
                     adjunto = adjuntoPublicacionSel,
                     // Otra del mismo tipo para la misma clase (se puede cambiar en "Para")
                     onNuevaPublicacion = { irANuevaPublicacion(tipoPublicacionSel, destinoPublicacionInicialSel, Screen.PUBLICACIONES) },
-                    onVerHistorial = { currentScreen = Screen.HISTORIAL_PUBLICACIONES },
+                    onVerHistorial = {
+                        tabHistorialPublicacionesSel = "Todas"
+                        origenHistorialPublicaciones = Screen.PUBLICACIONES
+                        currentScreen = Screen.HISTORIAL_PUBLICACIONES
+                    },
                     onVolver = { currentScreen = Screen.PUBLICACIONES }
                 )
 
@@ -2820,34 +2796,38 @@ fun EduConnectApp() {
                             totalPadres = it.cantidadAlumnos.toInt()
                         )
                     }
+                    // Sin clase elegida = historial de todas las clases (con filtro por clase)
+                    val itemsHistorialPub = publicacionesDocenteSel
+                        .filter { it.tipo == "TAREA" || it.tipo == "EVALUACION" }
+                        .filter { p -> clasePub == null || (p.seccionId == clasePub.first && p.cursoId == clasePub.second) }
+                        .sortedByDescending { aFechaHoraLocal(it.publicadoEn) }
+                        .map { p ->
+                            PublicacionHistorialItem(
+                                id = p.id,
+                                tipo = if (p.tipo == "EVALUACION") "Evaluación" else "Tarea",
+                                titulo = p.titulo,
+                                cursoNombre = p.curso,
+                                gradoNombre = p.grado,
+                                seccionNombre = p.seccion,
+                                fechaEntrega = p.fechaEntrega ?: "",
+                                fechaPublicacion = fechaLocal(p.publicadoEn),
+                                totalAlumnos = p.totalAlumnos.toInt(),
+                                calificados = p.calificados.toInt(),
+                                lecturas = p.lecturas.toInt(),
+                                estado = p.estado
+                            )
+                        }
                     HistorialPublicacionesScreen(
-                        titulo = asignacionClase?.curso ?: "Publicaciones",
-                        subtitulo = asignacionClase?.let { "Publicaciones · ${it.grado} ${it.seccion}" } ?: "Todas tus clases",
+                        titulo = asignacionClase?.curso ?: "Historial",
+                        subtitulo = asignacionClase?.let { "Publicaciones · ${it.grado} ${it.seccion}" } ?: "Publicaciones de todas tus clases",
+                        tabInicial = tabHistorialPublicacionesSel,
+                        filtrosClase = if (clasePub == null) itemsHistorialPub.map { it.clase() }.distinct().sorted() else emptyList(),
                         onNuevaTarea = { irANuevaPublicacion("Tarea", destinoClase, Screen.HISTORIAL_PUBLICACIONES) },
                         onNuevaEvaluacion = { irANuevaPublicacion("Evaluación", destinoClase, Screen.HISTORIAL_PUBLICACIONES) },
                         // Sin peticiones extra: la lista ya trae alumnos, calificados y lecturas
-                        publicaciones = publicacionesDocenteSel
-                            .filter { it.tipo == "TAREA" || it.tipo == "EVALUACION" }
-                            .filter { p -> clasePub == null || (p.seccionId == clasePub.first && p.cursoId == clasePub.second) }
-                            .sortedByDescending { aFechaHoraLocal(it.publicadoEn) }
-                            .map { p ->
-                                PublicacionHistorialItem(
-                                    id = p.id,
-                                    tipo = if (p.tipo == "EVALUACION") "Evaluación" else "Tarea",
-                                    titulo = p.titulo,
-                                    cursoNombre = p.curso,
-                                    gradoNombre = p.grado,
-                                    seccionNombre = p.seccion,
-                                    fechaEntrega = p.fechaEntrega ?: "",
-                                    fechaPublicacion = fechaLocal(p.publicadoEn),
-                                    totalAlumnos = p.totalAlumnos.toInt(),
-                                    calificados = p.calificados.toInt(),
-                                    lecturas = p.lecturas.toInt(),
-                                    estado = p.estado
-                                )
-                            },
+                        publicaciones = itemsHistorialPub,
                         cargando = !publicacionesCargadas,
-                        onBack = { currentScreen = Screen.PUBLICACIONES },
+                        onBack = { currentScreen = origenHistorialPublicaciones },
                         onHomeDocente = { currentScreen = Screen.HOME_DOCENTE },
                         onAlumnos = {},
                         onAvisos = {
@@ -3159,6 +3139,124 @@ fun EduConnectApp() {
                     )
                 }
 
+                Screen.HISTORIAL_DOCENTE -> {
+                    androidx.compose.runtime.LaunchedEffect(usuarioLogueado?.id) {
+                        if (usuarioLogueado == null) return@LaunchedEffect
+                        try {
+                            // Datos ya cargados en el Inicio; solo se piden si faltan
+                            if (asignacionesApiSel.isEmpty()) aplicarAsignaciones(obtenerAsignaciones())
+                            comunicadosDelDocente()
+                            if (!publicacionesCargadas) {
+                                publicacionesDocenteSel = obtenerPublicacionesDocente()
+                                publicacionesCargadas = true
+                            }
+                        } catch (e: kotlinx.coroutines.CancellationException) {
+                            throw e
+                        } catch (e: Exception) { aviso("Error cargando el historial: ${e.message}") }
+                    }
+                    val hoyHist = java.time.LocalDate.now().toString()
+                    // Último registro de asistencia (si ya se consultó el historial de las clases)
+                    val ultimaFechaAsistencia = historialesClaseSel.values.flatten().maxOfOrNull { it.fecha }
+                    val notificadosHist = comunicadosTodosSel.sumOf { it.totalNotificados }
+                    val leidosHist = comunicadosTodosSel.sumOf { it.totalLeidos.toInt() }
+                    val vigentesHist = publicacionesDocenteSel.filter { it.estado != "ANULADA" }
+                    val tareasHist = vigentesHist.filter { it.tipo == "TAREA" }
+                    val evaluacionesHist = vigentesHist.filter { it.tipo == "EVALUACION" }
+                    HistorialDocenteScreen(
+                        resumen = ResumenHistorialDocente(
+                            clases = asignacionesApiSel.size,
+                            ultimoRegistro = when (ultimaFechaAsistencia) {
+                                null -> ""
+                                hoyHist -> "Hoy"
+                                else -> formatearFechaDiaCorta(ultimaFechaAsistencia)
+                            },
+                            comunicados = comunicadosTodosSel.size,
+                            porcentajeLectura = if (notificadosHist > 0) leidosHist * 100 / notificadosHist else null,
+                            tareas = tareasHist.size,
+                            entregasRegistradas = tareasHist.sumOf { it.calificados.toInt() },
+                            entregasTotales = tareasHist.sumOf { it.totalAlumnos.toInt() },
+                            evaluaciones = evaluacionesHist.size,
+                            proximaEvaluacion = evaluacionesHist.mapNotNull { it.fechaEntrega?.take(10) }
+                                .filter { it >= hoyHist }.minOrNull() ?: ""
+                        ),
+                        onAsistencias = {
+                            origenHistorialAsistencia = Screen.HISTORIAL_DOCENTE
+                            currentScreen = Screen.SELECCIONAR_SECCION_HISTORIAL
+                        },
+                        onComunicados = {
+                            origenHistorialComunicados = Screen.HISTORIAL_DOCENTE
+                            currentScreen = Screen.HISTORIAL_COMUNICADOS
+                        },
+                        onTareas = { irHistorialPublicaciones(null, "Tareas", Screen.HISTORIAL_DOCENTE) },
+                        onEvaluaciones = { irHistorialPublicaciones(null, "Evaluaciones", Screen.HISTORIAL_DOCENTE) },
+                        onBack = { currentScreen = Screen.HOME_DOCENTE },
+                        onHomeDocente = { currentScreen = Screen.HOME_DOCENTE },
+                        onAlumnos = { aviso("Alumnos disponible próximamente") },
+                        onAvisos = {
+                            comunicadosDocenteCargados = false
+                            currentScreen = Screen.COMUNICADOS
+                        },
+                        onPerfilDocente = { currentScreen = Screen.PERFIL_DOCENTE },
+                        onNotificaciones = {}
+                    )
+                }
+
+                Screen.HISTORIAL_COMUNICADOS -> {
+                    androidx.compose.runtime.LaunchedEffect(usuarioLogueado?.id) {
+                        if (usuarioLogueado == null) return@LaunchedEffect
+                        try {
+                            comunicadosDelDocente()   // 1 petición solo si aún no están cargados
+                        } catch (e: kotlinx.coroutines.CancellationException) {
+                            throw e
+                        } catch (e: Exception) { aviso("Error cargando comunicados: ${e.message}") }
+                    }
+                    // Todos los comunicados del docente, con su clase ("1er A · Ciencia y Tecnología")
+                    val itemsHistorialCom = comunicadosTodosSel.map { c ->
+                        ComunicadoResumenItem(
+                            id = c.id,
+                            asunto = c.asunto,
+                            mensaje = c.mensaje,
+                            fecha = fechaLocal(c.enviadoEn),
+                            totalNotificados = c.totalNotificados,
+                            totalLeidos = c.totalLeidos.toInt(),
+                            hora = horaLocal(c.enviadoEn),
+                            clase = "${c.grado} ${c.seccion}" + (c.curso?.let { " · $it" } ?: "")
+                        )
+                    }.sortedByDescending { it.fecha }
+                    BusquedaComunicadoScreen(
+                        titulo = "Historial",
+                        subtitulo = "Comunicados de todas tus clases",
+                        filtrosClase = itemsHistorialCom.map { it.clase }.distinct().sorted(),
+                        comunicados = itemsHistorialCom,
+                        onBack = { currentScreen = origenHistorialComunicados },
+                        onHomeDocente = { currentScreen = Screen.HOME_DOCENTE },
+                        onAlumnos = { aviso("Alumnos disponible próximamente") },
+                        onAvisos = {
+                            comunicadosDocenteCargados = false
+                            currentScreen = Screen.COMUNICADOS
+                        },
+                        onPerfilDocente = { currentScreen = Screen.PERFIL_DOCENTE },
+                        onNotificaciones = {},
+                        onVerDetalle = { comunicadoId ->
+                            // El detalle muestra la clase del comunicado elegido
+                            comunicadosTodosSel.find { it.id == comunicadoId }?.let { c ->
+                                comunicadosDocenteSel = comunicadosTodosSel
+                                gradoSel = c.grado; seccionSel = c.seccion; cursoSel = c.curso ?: ""
+                                seccionIdSel = c.seccionId
+                                c.cursoId?.let { cursoIdSel = it }
+                            }
+                            comunicadoIdSel = comunicadoId
+                            origenDetalleComunicado = Screen.HISTORIAL_COMUNICADOS
+                            currentScreen = Screen.DETALLE_COMUNICADO
+                        },
+                        onNuevoComunicado = {
+                            destinoComunicadoInicialSel = null
+                            origenNuevoComunicado = Screen.HISTORIAL_COMUNICADOS
+                            currentScreen = Screen.NUEVO_COMUNICADO
+                        }
+                    )
+                }
+
                 Screen.SELECCIONAR_SECCION_HISTORIAL -> {
                     var cargandoClasesHistorial by remember { mutableStateOf(asignacionesApiSel.isEmpty()) }
                     androidx.compose.runtime.LaunchedEffect(usuarioLogueado?.id) {
@@ -3211,7 +3309,7 @@ fun EduConnectApp() {
                             historialDocenteCargado = false
                             currentScreen = Screen.HISTORIAL_ASISTENCIA_DOCENTE
                         },
-                        onBack = { currentScreen = Screen.ASISTENCIAS },
+                        onBack = { currentScreen = origenHistorialAsistencia },
                         onHomeDocente = { currentScreen = Screen.HOME_DOCENTE },
                         onAlumnos = { aviso("Alumnos disponible próximamente") },
                         onAvisos = {

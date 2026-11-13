@@ -14,7 +14,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.School
 import androidx.compose.material3.CircularProgressIndicator
@@ -28,7 +27,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.educonnectapp.ui.components.BotonIconoCabeceraEdu
-import com.educonnectapp.ui.components.BotonSecundarioEdu
+import com.educonnectapp.ui.components.BotonHistorialEdu
 import com.educonnectapp.ui.components.CabeceraEdu
 import com.educonnectapp.ui.components.ChipCabeceraEdu
 import com.educonnectapp.ui.components.ColorModulo
@@ -90,10 +89,19 @@ fun AsistenciasScreen(
                 )
             },
             contenidoInferior = {
-                ChipCabeceraEdu(
-                    fechaHoy, modifier = Modifier.padding(top = 14.dp),
-                    colorCabecera = ColorModulo.Asistencia
-                )
+                // Fecha + botón "Historial"
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    ChipCabeceraEdu(
+                        fechaHoy, modifier = Modifier.weight(1f, fill = false),
+                        colorCabecera = ColorModulo.Asistencia
+                    )
+                    Spacer(modifier = Modifier.weight(1f))
+                    BotonHistorialEdu(onClick = onHistorial, colorCabecera = ColorModulo.Asistencia)
+                }
             }
         )
 
@@ -148,9 +156,6 @@ fun AsistenciasScreen(
                     TarjetaClase(clase = clase, onClick = { onTomarAsistencia(clase) })
                 }
             }
-
-            Spacer(modifier = Modifier.height(4.dp))
-            BotonSecundarioEdu(texto = "Ver historial", onClick = onHistorial, icono = Icons.Rounded.History)
         }
 
         BottomNavBarDocente(

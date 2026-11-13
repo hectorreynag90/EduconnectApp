@@ -3,6 +3,7 @@ package com.educonnectapp.ui.screens.docente.publicaciones
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,6 +21,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Assignment
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.material.icons.rounded.Groups
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Quiz
 import androidx.compose.material.icons.rounded.SearchOff
@@ -53,6 +55,7 @@ import com.educonnectapp.ui.components.TarjetaEdu
 import com.educonnectapp.ui.components.TonoEdu
 import com.educonnectapp.ui.screens.docente.inicio.BottomNavBarDocente
 import com.educonnectapp.ui.theme.EduAmarillo
+import com.educonnectapp.ui.theme.EduAzulOscuro
 import com.educonnectapp.ui.theme.EduBorde
 import com.educonnectapp.ui.theme.EduConnectAppTheme
 import com.educonnectapp.ui.theme.EduEtiqueta
@@ -78,9 +81,14 @@ data class PublicacionHistorialItem(
     val estado: String = "ACTIVA"  // "ACTIVA" | "CERRADA" | "ANULADA"
 )
 
+// Clase de una publicación: "1er A · Ciencia y Tecnología" (filtro y etiqueta del historial)
+fun PublicacionHistorialItem.clase(): String = "$gradoNombre $seccionNombre · $cursoNombre"
+
 // =====================================================================
 // PUBLICACIONES DE UNA CLASE (rediseño 2026)
 // Cabecera fija amarilla · pestañas Todas / Tareas / Evaluaciones · tarjetas con entregas y lecturas
+// También es el HISTORIAL de todas las clases: con filtrosClase se muestran las pastillas por clase
+// y la clase de cada publicación. tabInicial abre directo en "Tareas" o "Evaluaciones".
 // =====================================================================
 
 @Composable
@@ -98,17 +106,24 @@ fun HistorialPublicacionesScreen(
     titulo: String = "Publicaciones",      // el curso de la clase
     subtitulo: String = "",                // "Publicaciones · 1er Grado A"
     onNuevaTarea: () -> Unit = {},
-    onNuevaEvaluacion: () -> Unit = {}
+    onNuevaEvaluacion: () -> Unit = {},
+    // ----- Historial de todas las clases -----
+    tabInicial: String = "Todas",                  // "Todas" | "Tareas" | "Evaluaciones"
+    filtrosClase: List<String> = emptyList()       // clases para filtrar (vacío = una sola clase)
 ) {
-    var tabSeleccionado by remember { mutableStateOf("Todas") }
+    var tabSeleccionado by remember(tabInicial) { mutableStateOf(tabInicial) }
+    var claseSeleccionada by remember { mutableStateOf("") }     // "" = todas las clases
     var mostrarCrear by remember { mutableStateOf(false) }
+    val esHistorial = filtrosClase.isNotEmpty()
 
-    val tareas = publicaciones.filter { it.tipo != "Evaluación" }
-    val evaluaciones = publicaciones.filter { it.tipo == "Evaluación" }
+    // Primero la clase; las pestañas cuentan sobre ese resultado
+    val deLaClase = if (claseSeleccionada.isEmpty()) publicaciones else publicaciones.filter { it.clase() == claseSeleccionada }
+    val tareas = deLaClase.filter { it.tipo != "Evaluación" }
+    val evaluaciones = deLaClase.filter { it.tipo == "Evaluación" }
     val lista = when (tabSeleccionado) {
         "Tareas" -> tareas
         "Evaluaciones" -> evaluaciones
-        else -> publicaciones
+        else -> deLaClase
     }
 
     if (mostrarCrear) {
@@ -153,9 +168,22 @@ fun HistorialPublicacionesScreen(
             ) {
                 // PESTAÑAS
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    PestanaPub("Todas (${publicaciones.size})", tabSeleccionado == "Todas") { tabSeleccionado = "Todas" }
+                    PestanaPub("Todas (${deLaClase.size})", tabSeleccionado == "Todas") { tabSeleccionado = "Todas" }
                     PestanaPub("Tareas (${tareas.size})", tabSeleccionado == "Tareas") { tabSeleccionado = "Tareas" }
                     PestanaPub("Evaluaciones (${evaluaciones.size})", tabSeleccionado == "Evaluaciones") { tabSeleccionado = "Evaluaciones" }
+                }
+
+                // FILTRO POR CLASE (solo en el historial, si hay más de una clase)
+                if (filtrosClase.size > 1) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        PildoraClasePub("Todas las clases", claseSeleccionada.isEmpty()) { claseSeleccionada = "" }
+                        filtrosClase.forEach { clase ->
+                            PildoraClasePub(clase, claseSeleccionada == clase) { claseSeleccionada = clase }
+                        }
+                    }
                 }
 
                 when {
@@ -179,15 +207,18 @@ fun HistorialPublicacionesScreen(
                         ) {
                             IconoCirculoEdu(Icons.Rounded.SearchOff, TonoEdu.GRIS, tamano = 56.dp)
                             Text(
-                                if (publicaciones.isEmpty()) "Aún no publicaste tareas ni evaluaciones en esta clase."
-                                else "No hay publicaciones de este tipo.",
+                                when {
+                                    publicaciones.isEmpty() && esHistorial -> "Aún no publicaste tareas ni evaluaciones."
+                                    publicaciones.isEmpty() -> "Aún no publicaste tareas ni evaluaciones en esta clase."
+                                    else -> "No hay publicaciones de este tipo."
+                                },
                                 fontFamily = Nunito, fontWeight = FontWeight.SemiBold, fontSize = 14.5.sp,
                                 color = EduTextoSecundario, textAlign = TextAlign.Center
                             )
                         }
                     }
                     else -> lista.forEach { item ->
-                        PublicacionHistorialCard(item = item, onClick = { onVerDetalle(item) })
+                        PublicacionHistorialCard(item = item, onClick = { onVerDetalle(item) }, mostrarClase = esHistorial)
                     }
                 }
             }
@@ -227,9 +258,27 @@ private fun PestanaPub(texto: String, activa: Boolean, onClick: () -> Unit) {
     )
 }
 
-// Tarjeta de una publicación: tipo, título, fecha y estado; entregas (tareas) y lecturas
+// Pastilla del filtro por clase: azul oscuro sólido cuando está activa
 @Composable
-fun PublicacionHistorialCard(item: PublicacionHistorialItem, onClick: () -> Unit) {
+private fun PildoraClasePub(texto: String, activa: Boolean, onClick: () -> Unit) {
+    val forma = RoundedCornerShape(50)
+    Text(
+        texto,
+        modifier = Modifier
+            .clip(forma)
+            .background(if (activa) EduAzulOscuro else Color.White)
+            .border(1.5.dp, if (activa) EduAzulOscuro else EduBorde, forma)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 13.dp, vertical = 7.dp),
+        fontFamily = Nunito, fontWeight = FontWeight.Black, fontSize = 13.5.sp,
+        color = if (activa) Color.White else EduEtiqueta, maxLines = 1
+    )
+}
+
+// Tarjeta de una publicación: tipo, título, fecha y estado; entregas (tareas) y lecturas
+// mostrarClase = true en el historial de todas las clases
+@Composable
+fun PublicacionHistorialCard(item: PublicacionHistorialItem, onClick: () -> Unit, mostrarClase: Boolean = false) {
     val esEvaluacion = item.tipo == "Evaluación"
     val hoy = hoyPub()
     val progreso = if (item.totalAlumnos > 0) item.calificados.toFloat() / item.totalAlumnos else 0f
@@ -271,6 +320,10 @@ fun PublicacionHistorialCard(item: PublicacionHistorialItem, onClick: () -> Unit
                 Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = "Ver detalle",
                 tint = EduTextoSecundario, modifier = Modifier.size(24.dp)
             )
+        }
+        if (mostrarClase) {
+            Spacer(modifier = Modifier.height(8.dp))
+            ChipEdu(item.clase(), TonoEdu.AZUL, icono = Icons.Rounded.Groups)
         }
         Spacer(modifier = Modifier.height(8.dp))
         Row(

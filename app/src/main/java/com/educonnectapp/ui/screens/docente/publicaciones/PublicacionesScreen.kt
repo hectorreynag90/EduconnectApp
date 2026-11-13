@@ -37,6 +37,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.educonnectapp.ui.components.BotonCrearEdu
+import com.educonnectapp.ui.components.BotonHistorialEdu
 import com.educonnectapp.ui.components.BotonIconoCabeceraEdu
 import com.educonnectapp.ui.components.CabeceraEdu
 import com.educonnectapp.ui.components.ChipCabeceraEdu
@@ -77,7 +78,7 @@ data class ClasePublicacionItem(
 
 // =====================================================================
 // PUBLICACIONES · inicio del módulo (rediseño 2026)
-// Cabecera fija amarilla · resumen · mis clases por grado · "+ Crear" (Tarea / Aviso de evaluación)
+// Cabecera fija amarilla (con botón "Historial") · resumen · mis clases por grado · "+ Crear" (Tarea / Aviso de evaluación)
 // =====================================================================
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -95,7 +96,7 @@ fun PublicacionesScreen(
     onNotificaciones: () -> Unit = {},
     onNuevaTarea: () -> Unit = {},
     onNuevaEvaluacion: () -> Unit = {},
-    onHistorial: () -> Unit = {},          // ya no se usa (se conserva por compatibilidad)
+    onHistorial: () -> Unit = {},          // botón "Historial" de la cabecera (todas las clases)
     // ----- Rediseño 2026 -----
     clases: List<ClasePublicacionItem> = emptyList(),
     cargandoClases: Boolean = false,
@@ -137,10 +138,19 @@ fun PublicacionesScreen(
                 )
             },
             contenidoInferior = {
-                ChipCabeceraEdu(
-                    fechaHoy, modifier = Modifier.padding(top = 14.dp),
-                    colorCabecera = ColorModulo.Publicaciones
-                )
+                // Fecha + botón "Historial"
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    ChipCabeceraEdu(
+                        fechaHoy, modifier = Modifier.weight(1f, fill = false),
+                        colorCabecera = ColorModulo.Publicaciones
+                    )
+                    Spacer(modifier = Modifier.weight(1f))
+                    BotonHistorialEdu(onClick = onHistorial, colorCabecera = ColorModulo.Publicaciones)
+                }
             }
         )
 

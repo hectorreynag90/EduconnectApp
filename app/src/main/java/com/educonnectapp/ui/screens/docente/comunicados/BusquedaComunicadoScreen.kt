@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -22,6 +23,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Groups
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.SearchOff
 import androidx.compose.material.icons.rounded.Search
@@ -79,7 +81,8 @@ data class ComunicadoResumenItem(
     val fecha: String,              // "yyyy-MM-dd"
     val totalNotificados: Int,
     val totalLeidos: Int,
-    val hora: String = ""           // "10:24 a. m." (rediseño 2026)
+    val hora: String = "",          // "10:24 a. m." (rediseño 2026)
+    val clase: String = ""          // "1er A · Ciencia y Tecnología" (solo en el historial de todas las clases)
 )
 
 private fun hoyComunicados(): String = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
@@ -98,9 +101,17 @@ private fun fechaCortaComunicado(fecha: String): String = try {
     }
 } catch (e: Exception) { fecha }
 
+// "2026-11-12" -> "NOVIEMBRE 2026"
+private fun mesAnioComunicado(fecha: String): String = try {
+    val d = SimpleDateFormat("yyyy-MM", Locale.US).parse(fecha.take(7))
+    SimpleDateFormat("MMMM yyyy", Locale("es", "PE")).format(d!!).uppercase()
+} catch (e: Exception) { fecha.take(7) }
+
 // =====================================================================
 // COMUNICADOS DE UNA CLASE (rediseño 2026)
 // Cabecera fija granate · búsqueda + fecha · pestañas Todos / Leídos / Sin leer · lista con lectura
+// También es el HISTORIAL de todas las clases: con filtrosClase se muestran las pastillas por clase,
+// la clase de cada comunicado y la lista agrupada por mes.
 // =====================================================================
 
 @Composable
@@ -117,12 +128,18 @@ fun BusquedaComunicadoScreen(
     onNotificaciones: () -> Unit = {},
     onVerDetalle: (comunicadoId: Long) -> Unit = {},
     // ----- Rediseño 2026 -----
-    onNuevoComunicado: () -> Unit = {}     // "+ Nuevo" para esta clase
+    onNuevoComunicado: () -> Unit = {},    // "+ Nuevo" para esta clase
+    // ----- Historial de todas las clases -----
+    titulo: String? = null,                // null = el curso de la clase
+    subtitulo: String? = null,             // null = "Comunicados · 1er A"
+    filtrosClase: List<String> = emptyList()   // clases para filtrar (vacío = una sola clase)
 ) {
     val context = LocalContext.current
     var busqueda by remember { mutableStateOf("") }
     var fechaSeleccionada by remember { mutableStateOf("") }
     var tabSeleccionado by remember { mutableStateOf("Todos") }
+    var claseSeleccionada by remember { mutableStateOf("") }     // "" = todas las clases
+    val esHistorial = filtrosClase.isNotEmpty()
 
     fun abrirCalendario() {
         val calendario = Calendar.getInstance()
@@ -137,7 +154,8 @@ fun BusquedaComunicadoScreen(
 
     // Búsqueda y fecha primero; las pestañas cuentan sobre ese resultado
     val filtrados = comunicados.filter { item ->
-        (busqueda.isBlank() || item.asunto.contains(busqueda.trim(), ignoreCase = true)) &&
+        (claseSeleccionada.isEmpty() || item.clase == claseSeleccionada) &&
+                (busqueda.isBlank() || item.asunto.contains(busqueda.trim(), ignoreCase = true)) &&
                 (fechaSeleccionada.isEmpty() || item.fecha == fechaSeleccionada)
     }
     val leidos = filtrados.filter { it.totalNotificados - it.totalLeidos <= 0 }
@@ -155,8 +173,8 @@ fun BusquedaComunicadoScreen(
     ) {
         // CABECERA FIJA
         CabeceraEdu(
-            titulo = cursoNombre.ifBlank { "Comunicados" },
-            subtitulo = "Comunicados · $gradoNombre $seccionNombre",
+            titulo = titulo ?: cursoNombre.ifBlank { "Comunicados" },
+            subtitulo = subtitulo ?: "Comunicados · $gradoNombre $seccionNombre",
             onVolver = onBack,
             colorFondo = ColorModulo.Comunicados,
             acciones = {
@@ -184,6 +202,22 @@ fun BusquedaComunicadoScreen(
                     .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 90.dp),   // espacio para "+ Nuevo"
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
+                // FILTRO POR CLASE (solo en el historial, si hay más de una clase)
+                if (filtrosClase.size > 1) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        PildoraClase("Todas (${comunicados.size})", claseSeleccionada.isEmpty()) { claseSeleccionada = "" }
+                        filtrosClase.forEach { clase ->
+                            PildoraClase(
+                                "$clase (${comunicados.count { it.clase == clase }})",
+                                claseSeleccionada == clase
+                            ) { claseSeleccionada = clase }
+                        }
+                    }
+                }
+
                 // BÚSQUEDA + CALENDARIO
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Row(
@@ -279,11 +313,27 @@ fun BusquedaComunicadoScreen(
                         ) {
                             IconoCirculoEdu(Icons.Rounded.SearchOff, TonoEdu.GRIS, tamano = 56.dp)
                             Text(
-                                if (comunicados.isEmpty()) "Aún no enviaste comunicados a esta clase."
-                                else "No se encontraron comunicados.",
+                                when {
+                                    comunicados.isEmpty() && esHistorial -> "Aún no enviaste comunicados."
+                                    comunicados.isEmpty() -> "Aún no enviaste comunicados a esta clase."
+                                    else -> "No se encontraron comunicados."
+                                },
                                 fontFamily = Nunito, fontWeight = FontWeight.SemiBold, fontSize = 14.5.sp,
                                 color = EduTextoSecundario, textAlign = TextAlign.Center
                             )
+                        }
+                    }
+                } else if (esHistorial) {
+                    // Historial: agrupado por mes, del más reciente al más antiguo
+                    lista.sortedByDescending { it.fecha }.groupBy { it.fecha.take(7) }.forEach { (mes, delMes) ->
+                        Text(
+                            mesAnioComunicado(mes),
+                            modifier = Modifier.padding(start = 2.dp, top = 2.dp),
+                            fontFamily = Nunito, fontWeight = FontWeight.Black, fontSize = 12.5.sp,
+                            letterSpacing = 0.6.sp, color = EduTextoSecundario.copy(alpha = 0.8f)
+                        )
+                        delMes.forEach { item ->
+                            ComunicadoResumenCard(item = item, onClick = { onVerDetalle(item.id) })
                         }
                     }
                 } else {
@@ -330,7 +380,25 @@ private fun PestanaComunicado(texto: String, activa: Boolean, onClick: () -> Uni
     )
 }
 
+// Pastilla del filtro por clase: azul oscuro sólido cuando está activa
+@Composable
+private fun PildoraClase(texto: String, activa: Boolean, onClick: () -> Unit) {
+    val forma = RoundedCornerShape(50)
+    Text(
+        texto,
+        modifier = Modifier
+            .clip(forma)
+            .background(if (activa) EduAzulOscuro else Color.White)
+            .border(1.5.dp, if (activa) EduAzulOscuro else EduBorde, forma)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 7.dp),
+        fontFamily = Nunito, fontWeight = FontWeight.Black, fontSize = 13.5.sp,
+        color = if (activa) Color.White else EduEtiqueta, maxLines = 1
+    )
+}
+
 // Tarjeta de un comunicado: asunto, fecha y hora, cuántos leyeron / sin leer y barra de lectura
+// (en el historial, también la clase)
 @Composable
 fun ComunicadoResumenCard(
     item: ComunicadoResumenItem,
@@ -355,6 +423,9 @@ fun ComunicadoResumenCard(
                     detalleFecha, fontFamily = Nunito, fontWeight = FontWeight.Bold, fontSize = 13.sp,
                     color = EduTextoSecundario
                 )
+                if (item.clase.isNotBlank()) {
+                    ChipEdu(item.clase, TonoEdu.AZUL, modifier = Modifier.padding(top = 6.dp), icono = Icons.Rounded.Groups)
+                }
             }
             Spacer(modifier = Modifier.size(8.dp))
             Text(
